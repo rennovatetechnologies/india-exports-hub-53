@@ -1,6 +1,4 @@
-"use client";
-import Image from "next/image";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowUpRight, Sparkles } from "lucide-react";
 
@@ -63,7 +61,7 @@ export default function ProductsSection() {
             </p>
           </div>
           <Link
-            href="/contact"
+            to="/contact"
             className="btn-ghost rounded-full px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2 self-start md:self-auto"
           >
             Request a quote <ArrowUpRight size={16} />
@@ -83,11 +81,11 @@ export default function ProductsSection() {
             >
               <div className="absolute -inset-px rounded-[24px] bg-gradient-to-br from-[var(--gold)]/30 via-white/5 to-emerald-400/20 opacity-0 group-hover:opacity-100 blur-md transition" />
               <Link
-                href={p.link}
+                to={p.link}
                 className="relative block glass-card overflow-hidden h-full"
               >
                 <div className="relative h-56 w-full overflow-hidden">
-                  <Image
+                  <img
                     src={p.img}
                     alt={p.name}
                     fill
@@ -135,7 +133,7 @@ export default function ProductsSection() {
               </p>
             </div>
             <Link
-              href="/contact"
+              to="/contact"
               className="mt-6 btn-gold rounded-full px-5 py-2.5 text-sm font-semibold inline-flex items-center justify-center gap-2"
             >
               Talk to sourcing <ArrowUpRight size={16} />

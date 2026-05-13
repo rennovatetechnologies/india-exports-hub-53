@@ -1,19 +1,18 @@
-"use client";
 import { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const router = useNavigate();
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const onSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => router.push("/dashboard"), 700);
+    setTimeout(() => router("/dashboard"), 700);
   };
 
   return (
@@ -23,7 +22,7 @@ export default function LoginPage() {
       footer={
         <>
           New to VISTARA?{" "}
-          <Link href="/signup" className="text-[var(--gold)] hover:underline">Create an account</Link>
+          <Link to="/signup" className="text-[var(--gold)] hover:underline">Create an account</Link>
         </>
       }
     >
@@ -45,7 +44,7 @@ export default function LoginPage() {
           <label className="inline-flex items-center gap-2 text-white/60">
             <input type="checkbox" className="h-3.5 w-3.5 rounded border-white/20 bg-white/5" /> Remember me
           </label>
-          <Link href="/forgot-password" className="text-white/60 hover:text-white">Forgot password?</Link>
+          <Link to="/forgot-password" className="text-white/60 hover:text-white">Forgot password?</Link>
         </div>
 
         <button

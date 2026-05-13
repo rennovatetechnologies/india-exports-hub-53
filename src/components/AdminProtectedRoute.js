@@ -1,13 +1,12 @@
-"use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 
 /**
  * Guard component for Admin routes
  */
 export default function AdminProtectedRoute({ children }) {
-    const router = useRouter();
+    const router = useNavigate();
     const [authorized, setAuthorized] = useState(false);
     const [loading, setLoading] = useState(true);
 
@@ -18,7 +17,7 @@ export default function AdminProtectedRoute({ children }) {
 
                 if (!token) {
                     console.log("No token found, redirecting to login");
-                    router.push("/admin/login");
+                    router("/admin/login");
                     return;
                 }
 
@@ -29,21 +28,21 @@ export default function AdminProtectedRoute({ children }) {
                 if (decoded.exp < currentTime) {
                     console.log("Token expired");
                     localStorage.removeItem("adminToken");
-                    router.push("/admin/login");
+                    router("/admin/login");
                     return;
                 }
 
                 // Check for admin role
                 if (decoded.role !== "admin") {
                     console.log("User is not an admin");
-                    router.push("/unauthorized");
+                    router("/unauthorized");
                     return;
                 }
 
                 setAuthorized(true);
             } catch (error) {
                 console.error("Auth verification failed:", error);
-                router.push("/admin/login");
+                router("/admin/login");
             } finally {
                 setLoading(false);
             }

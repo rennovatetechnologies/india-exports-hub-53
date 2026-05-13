@@ -1,22 +1,21 @@
-"use client";
 import { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Mail, Lock, User, Building2, ArrowRight } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
 
 const inputCls = "w-full rounded-xl bg-white/5 border border-white/10 focus:border-[var(--gold)]/60 focus:bg-white/[0.07] outline-none pl-10 pr-3 py-2.5 text-sm placeholder:text-white/30 transition";
 
 export default function SignupPage() {
-  const router = useRouter();
+  const router = useNavigate();
   const [loading, setLoading] = useState(false);
   return (
     <AuthShell
       title="Create your workspace"
       subtitle="Start your export journey in under a minute"
-      footer={<>Already with us? <Link href="/login" className="text-[var(--gold)] hover:underline">Sign in</Link></>}
+      footer={<>Already with us? <Link to="/login" className="text-[var(--gold)] hover:underline">Sign in</Link></>}
     >
-      <form onSubmit={(e) => { e.preventDefault(); setLoading(true); setTimeout(() => router.push("/verify"), 600); }} className="space-y-4">
+      <form onSubmit={(e) => { e.preventDefault(); setLoading(true); setTimeout(() => router("/verify"), 600); }} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="relative col-span-2">
             <Building2 size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />

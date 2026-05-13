@@ -1,5 +1,4 @@
-"use client";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   TrendingUp, FileCheck2, Workflow, Clock, ArrowUpRight,
@@ -36,7 +35,7 @@ export default function DashboardOverview() {
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">Good evening, Rohit</h1>
           <p className="mt-1 text-sm text-white/55">Here's where your export operation stands today.</p>
         </div>
-        <Link href="/dashboard/kyc" className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-black">
+        <Link to="/dashboard/kyc" className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-black">
           Continue KYC <ArrowUpRight size={15} />
         </Link>
       </div>
@@ -74,7 +73,7 @@ export default function DashboardOverview() {
               <h2 className="text-lg font-semibold">Shipment workflow</h2>
               <p className="text-xs text-white/45">Case #VST-2041 · Spices to Rotterdam</p>
             </div>
-            <Link href="/dashboard/workflow" className="text-xs text-[var(--gold)] hover:underline">View timeline →</Link>
+            <Link to="/dashboard/workflow" className="text-xs text-[var(--gold)] hover:underline">View timeline →</Link>
           </div>
 
           <ol className="mt-6 space-y-5">

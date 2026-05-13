@@ -1,5 +1,4 @@
-"use client";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ShieldCheck, Globe2, Sparkles } from "lucide-react";
 
@@ -15,7 +14,7 @@ export default function AuthShell({ title, subtitle, footer, children }) {
         <div className="grid gap-10 lg:grid-cols-12 lg:items-center">
           {/* Left brand panel */}
           <div className="hidden lg:block lg:col-span-6">
-            <Link href="/" className="inline-flex items-center gap-2 text-sm text-white/60 hover:text-white transition">
+            <Link to="/" className="inline-flex items-center gap-2 text-sm text-white/60 hover:text-white transition">
               ← Back to vistara.com
             </Link>
             <h2 className="mt-8 text-5xl font-semibold tracking-tight leading-[1.05]">

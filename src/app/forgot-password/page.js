@@ -1,6 +1,5 @@
-"use client";
 import { useState } from "react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { Mail, ArrowRight, CheckCircle2 } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
 
@@ -21,7 +20,7 @@ export default function ForgotPasswordPage() {
       footer={
         <>
           Remembered it?{" "}
-          <Link href="/login" className="text-[var(--gold)] hover:underline">Back to sign in</Link>
+          <Link to="/login" className="text-[var(--gold)] hover:underline">Back to sign in</Link>
         </>
       }
     >

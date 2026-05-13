@@ -1,4 +1,3 @@
-"use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { User, Building2, Bell, Lock, Users, Trash2, Plus, Mail } from "lucide-react";

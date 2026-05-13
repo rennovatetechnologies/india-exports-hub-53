@@ -1,4 +1,3 @@
-"use client";
 import { motion } from "framer-motion";
 import { Users, Briefcase, IndianRupee, AlertTriangle, ArrowUpRight, Clock, CheckCircle2 } from "lucide-react";
 

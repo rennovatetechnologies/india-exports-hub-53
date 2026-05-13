@@ -1,12 +1,10 @@
-"use client";
 import { useEffect, useState } from "react";
 import { ArrowUp, MessageCircle, Mail, Phone, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-
+import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 export default function Footer() {
-  const pathname = usePathname();
+  const pathname = useLocation().pathname;
   const [showTop, setShowTop] = useState(false);
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 400);
@@ -25,7 +23,7 @@ export default function Footer() {
         <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8 py-16">
           <div className="grid gap-12 lg:grid-cols-12">
             <div className="lg:col-span-5">
-              <Link href="/" className="inline-flex items-center gap-2">
+              <Link to="/" className="inline-flex items-center gap-2">
                 <span className="text-2xl font-semibold tracking-tight">
                   VISTARA <span className="text-white/40">· New India Export</span>
                 </span>
@@ -111,7 +109,7 @@ function FooterCol({ title, links }) {
       <ul className="mt-3 space-y-2 text-sm text-white/55">
         {links.map(([label, href]) => (
           <li key={label}>
-            <Link href={href} className="hover:text-white transition">{label}</Link>
+            <Link to={href} className="hover:text-white transition">{label}</Link>
           </li>
         ))}
       </ul>

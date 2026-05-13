@@ -1,4 +1,3 @@
-"use client";
 import { motion } from "framer-motion";
 import { Globe2, Layers, Sparkles, ShieldCheck, Users2, Zap } from "lucide-react";
 

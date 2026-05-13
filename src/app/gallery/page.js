@@ -1,5 +1,3 @@
-"use client";
-import Image from "next/image";
 import { motion } from "framer-motion";
 
 export default function GalleryPage() {
@@ -35,7 +33,7 @@ export default function GalleryPage() {
     <main className="flex flex-col min-h-screen bg-[#fdf3e6]">
       {/* ==== HEADER SECTION ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
-        <Image
+        <img
           src="/Hero.jpg"
           alt="Gallery Header"
           fill
@@ -71,7 +69,7 @@ export default function GalleryPage() {
               viewport={{ once: true }}
               className="relative overflow-hidden rounded-xl shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer"
             >
-              <Image
+              <img
                 src={img}
                 alt={`Gallery Image ${i + 1}`}
                 width={900}

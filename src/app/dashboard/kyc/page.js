@@ -1,6 +1,5 @@
-"use client";
 import { useState } from "react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   CheckCircle2, Circle, Building2, IdCard, Banknote, FileBadge, Upload,
@@ -64,7 +63,7 @@ export default function KycWizardPage() {
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">KYC & Onboarding</h1>
           <p className="mt-1 text-sm text-white/55">Complete five steps to unlock DGFT &amp; ICEGATE workflows.</p>
         </div>
-        <Link href="/dashboard" className="text-xs text-white/55 hover:text-white">← Back to overview</Link>
+        <Link to="/dashboard" className="text-xs text-white/55 hover:text-white">← Back to overview</Link>
       </div>
 
       {/* Stepper */}

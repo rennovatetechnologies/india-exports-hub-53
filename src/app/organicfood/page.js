@@ -1,9 +1,6 @@
-"use client";
-import Image from "next/image";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
-
+import { Link } from "react-router-dom";
 export default function OrganicFoodsPage() {
   const categories = [
     { name: "VEGETABLES", img: "/veg1.jpg", link: "/fruitsandvegetables" },
@@ -17,7 +14,7 @@ export default function OrganicFoodsPage() {
     <main className="flex flex-col min-h-screen bg-[#fdf3e6] text-[#2e2e2e]">
       {/* ==== HEADER ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
-        <Image
+        <img
           src="/Hero.jpg"
           alt="Organic Foods Header"
           fill
@@ -65,7 +62,7 @@ export default function OrganicFoodsPage() {
                 className="relative w-full h-64 sm:h-72"
                 onClick={() => setSelectedImg(cat.img)}
               >
-                <Image
+                <img
                   src={cat.img}
                   alt={cat.name}
                   fill
@@ -77,7 +74,7 @@ export default function OrganicFoodsPage() {
               <div className="p-4 sm:p-6 text-center">
                 <h3 className="text-2xl font-semibold text-[#2f5233] mb-2">{cat.name}</h3>
                 <Link
-                  href={cat.link}
+                  to={cat.link}
                   className="inline-block px-6 py-2 mt-2 rounded-full bg-[#16a34a] text-white font-semibold text-sm hover:bg-green-700 transition"
                 >
                   Click Here
@@ -104,7 +101,7 @@ export default function OrganicFoodsPage() {
               exit={{ scale: 0.8 }}
               className="relative w-[90%] max-w-4xl h-[80%]"
             >
-              <Image
+              <img
                 src={selectedImg}
                 alt="Full Organic Food"
                 fill

@@ -1,5 +1,3 @@
-"use client";
-import Image from "next/image";
 import { useState } from "react";
 
 export default function BookingPage() {
@@ -34,7 +32,7 @@ Country: ${country}`;
   return (
     <div className="min-h-screen bg-gray-100">
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
-        <Image
+        <img
           src="/Hero.jpg"
           alt="Booking Header"
           fill

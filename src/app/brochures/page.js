@@ -1,5 +1,3 @@
-"use client";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { X } from "lucide-react";
@@ -31,7 +29,7 @@ export default function BrochuresPage() {
     <main className="flex flex-col min-h-screen bg-[#fdf3e6]">
       {/* ==== HEADER SECTION ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
-        <Image
+        <img
           src="/Hero.jpg"
           alt="New India Export Brochures"
           fill
@@ -68,7 +66,7 @@ export default function BrochuresPage() {
               className="relative w-full h-[60vh] sm:h-[80vh] overflow-hidden rounded-xl shadow-md bg-white/30 backdrop-blur-sm cursor-pointer"
               onClick={() => setSelectedImage(img)}
             >
-              <Image
+              <img
                 src={img}
                 alt={`Brochure ${i + 1}`}
                 fill
@@ -90,7 +88,7 @@ export default function BrochuresPage() {
             <X className="text-white w-6 h-6" />
           </button>
           <div className="relative w-full max-w-4xl h-[80vh]">
-            <Image
+            <img
               src={selectedImage}
               alt="Fullscreen view"
               fill

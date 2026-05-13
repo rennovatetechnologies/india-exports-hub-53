@@ -1,6 +1,4 @@
-"use client";
 import { useState } from "react";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { Calendar, MapPin, Users, Check } from "lucide-react";
 
@@ -24,7 +22,7 @@ export default function EventsPage() {
           return (
             <motion.article key={ev.id} whileHover={{ y: -3 }} className="glass-card overflow-hidden">
               <div className="relative h-52 w-full">
-                <Image src={ev.img} alt={ev.title} fill className="object-cover" />
+                <img src={ev.img} alt={ev.title} fill className="object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                 <span className="absolute left-4 top-4 rounded-full bg-black/50 backdrop-blur px-2.5 py-1 text-[10px] uppercase tracking-wider text-[var(--gold)]">Featured</span>
               </div>

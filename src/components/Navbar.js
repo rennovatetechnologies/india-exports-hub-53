@@ -1,7 +1,6 @@
-"use client";
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Download } from "lucide-react";
 
@@ -13,7 +12,7 @@ export default function Navbar() {
   const [mobileProductsOpen, setMobileProductsOpen] = useState(false);
   const [desktopBrochuresOpen, setDesktopBrochuresOpen] = useState(false);
   const [mobileBrochuresOpen, setMobileBrochuresOpen] = useState(false);
-  const pathname = usePathname();
+  const pathname = useLocation().pathname;
 
   useEffect(() => {
     setMounted(true);
@@ -133,7 +132,7 @@ export default function Navbar() {
 
     return (
       <Link
-        href={item.path}
+        to={item.path}
         onClick={() => {
           setMobileOpen(false);
           setDesktopBrochuresOpen(false);
@@ -162,7 +161,7 @@ export default function Navbar() {
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
             <Link
-              href="/"
+              to="/"
               className="flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md"
               aria-label="VISTARA Home"
             >
@@ -219,7 +218,7 @@ export default function Navbar() {
                             ) : (
                               <Link
                                 key={sub.name}
-                                href={sub.path}
+                                to={sub.path}
                                 className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 hover:text-white transition-colors ${isActive(sub.path) ? "bg-white/5 text-white" : ""
                                   }`}
                               >
@@ -234,7 +233,7 @@ export default function Navbar() {
                 ) : (
                   <Link
                     key={item.name}
-                    href={item.path}
+                    to={item.path}
                     className={`relative group text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md px-1 ${scrolled ? "text-zinc-300 hover:text-white" : "text-zinc-200 hover:text-white"
                       }`}
                   >
@@ -356,7 +355,7 @@ export default function Navbar() {
                                 ) : (
                                   <Link
                                     key={sub.name}
-                                    href={sub.path}
+                                    to={sub.path}
                                     onClick={() => setMobileOpen(false)}
                                     className={`block rounded-md px-3.5 py-2 text-sm text-zinc-300 hover:bg-white/5 hover:text-white ${isActive(sub.path) ? "bg-white/5 text-white" : ""
                                       }`}
@@ -373,7 +372,7 @@ export default function Navbar() {
                   ) : (
                     <Link
                       key={item.name}
-                      href={item.path}
+                      to={item.path}
                       onClick={() => setMobileOpen(false)}
                       className={`mx-2 mt-1 block rounded-lg px-3.5 py-3 text-base font-medium text-zinc-200 hover:bg-white/5 hover:text-white ${isActive(item.path) ? "bg-white/5 text-white" : ""
                         }`}

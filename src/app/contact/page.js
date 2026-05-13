@@ -1,5 +1,3 @@
-"use client";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { Phone, Mail, MapPin, Send } from "lucide-react";
 import { useState } from "react";
@@ -23,7 +21,7 @@ export default function ContactPage() {
     <main className="flex flex-col min-h-screen bg-[#fdf3e6] text-gray-800">
       {/* ==== HEADER SECTION ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
-        <Image
+        <img
           src="/Hero.jpg"
           alt="Contact Header"
           fill

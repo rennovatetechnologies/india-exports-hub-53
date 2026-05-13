@@ -1,5 +1,3 @@
-"use client";
-import Image from "next/image";
 import { motion } from "framer-motion";
 
 export default function CerealsAndPulsesPage() {
@@ -42,7 +40,7 @@ export default function CerealsAndPulsesPage() {
     <main className="flex flex-col min-h-screen bg-[#fdf3e6] text-[#2e2e2e]">
       {/* ==== HEADER ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
-        <Image
+        <img
           src="/Hero.jpg"
           alt="Cereals and Pulses Header"
           fill
@@ -76,7 +74,7 @@ export default function CerealsAndPulsesPage() {
         </motion.h2>
 
         <div className="relative w-full h-[50vh] sm:h-[60vh] mb-10 rounded-lg overflow-hidden shadow-md">
-          <Image
+          <img
             src="/cereals/basmati.jpg"
             alt="Basmati Rice"
             fill
@@ -121,7 +119,7 @@ export default function CerealsAndPulsesPage() {
         </motion.h2>
 
         <div className="relative w-full h-[50vh] sm:h-[60vh] mb-10 rounded-lg overflow-hidden shadow-md">
-          <Image
+          <img
             src="/cereals/nonbasmati.jpg"
             alt="Non-Basmati Rice"
             fill
@@ -160,7 +158,7 @@ export default function CerealsAndPulsesPage() {
               className="relative bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center"
             >
               <div className="relative w-full h-40 mb-4 rounded-lg overflow-hidden">
-                <Image
+                <img
                   src={item.img}
                   alt={item.name}
                   fill

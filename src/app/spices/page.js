@@ -1,5 +1,3 @@
-"use client";
-import Image from "next/image";
 import { motion } from "framer-motion";
 
 export default function SpicesPage() {
@@ -50,7 +48,7 @@ export default function SpicesPage() {
     <main className="flex flex-col min-h-screen bg-[#fdf3e6]">
       {/* ==== HEADER SECTION ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
-        <Image
+        <img
           src="/Hero.jpg"
           alt="Spices Header"
           fill
@@ -90,7 +88,7 @@ export default function SpicesPage() {
             >
               {/* Image */}
               <div className="relative w-full lg:w-1/2 h-[350px] rounded-2xl overflow-hidden shadow-lg">
-                <Image
+                <img
                   src={item.img}
                   alt={item.name}
                   fill

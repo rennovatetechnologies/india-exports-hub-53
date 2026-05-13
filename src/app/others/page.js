@@ -1,5 +1,3 @@
-"use client";
-import Image from "next/image";
 import { motion } from "framer-motion";
 
 export default function OthersPage() {
@@ -7,7 +5,7 @@ export default function OthersPage() {
     <main className="flex flex-col min-h-screen bg-[#fdf3e6] text-[#2e2e2e]">
       {/* ==== HEADER ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
-        <Image
+        <img
           src="/Hero.jpg"
           alt="Others Header"
           fill
@@ -54,7 +52,7 @@ export default function OthersPage() {
           transition={{ delay: 0.4 }}
           className="mt-10"
         >
-          <Image
+          <img
             src="/Others.jpg"
             alt="Coming Soon"
             width={300}

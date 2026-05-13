@@ -1,13 +1,7 @@
-"use client";
-
 import { motion, AnimatePresence } from "framer-motion";
 import { FaMapMarkerAlt, FaCalendarAlt, FaClock, FaDownload, FaChevronRight, FaStar, FaChevronDown, FaTimes } from "react-icons/fa";
 import { FiCheckCircle } from "react-icons/fi";
-import Link from "next/link";
-import Image from "next/image";
-
-
-
+import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 
 export default function EventPage() {
@@ -415,7 +409,7 @@ export default function EventPage() {
             >
               <div className="relative aspect-square rounded-2xl lg:rounded-3xl overflow-hidden border border-neutral-800 bg-neutral-900">
 
-                <Image
+                <img
                   src="/event2.webp"
                   alt="World Trade Virtual Summit 2026"
                   fill

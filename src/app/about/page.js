@@ -1,7 +1,5 @@
-"use client";
-import Image from "next/image";
 import { motion } from "framer-motion";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { Globe, Star, Leaf, Handshake, Package } from "lucide-react";
 
 export default function AboutPage() {
@@ -9,7 +7,7 @@ export default function AboutPage() {
     <main className="flex flex-col min-h-screen bg-[#fdf3e6] text-gray-800">
       {/* ==== HEADER SECTION ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
-        <Image
+        <img
           src="/Hero.jpg"
           alt="About Header"
           fill
@@ -182,7 +180,7 @@ export default function AboutPage() {
         whileTap={{ scale: 0.97 }}
       >
         <Link
-          href={btn.link}
+          to={btn.link}
           className="
             block
             px-4 py-2.5

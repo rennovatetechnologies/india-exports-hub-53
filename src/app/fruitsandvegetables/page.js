@@ -1,5 +1,3 @@
-"use client";
-import Image from "next/image";
 import { motion } from "framer-motion";
 
 export default function FruitsVegetablesPage() {
@@ -62,7 +60,7 @@ Available in multiple varieties — long, round, and striped.`,
     <main className="flex flex-col min-h-screen bg-[#fdf5e6]">
       {/* ==== HEADER SECTION ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
-        <Image
+        <img
           src="/Hero.jpg"
           alt="Fruits and Vegetables"
           fill
@@ -100,7 +98,7 @@ Available in multiple varieties — long, round, and striped.`,
           >
             {/* Product Image */}
             <div className="relative w-full md:w-1/2 h-[350px] sm:h-[450px] overflow-hidden rounded-2xl shadow-lg">
-              <Image
+              <img
                 src={product.image}
                 alt={product.name}
                 fill

@@ -1,6 +1,4 @@
-"use client";
-import Image from "next/image";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Calendar, Clock, MapPin, ArrowUpRight, Sparkles } from "lucide-react";
 
@@ -43,7 +41,7 @@ export default function EventsHighlight() {
             </p>
           </div>
           <Link
-            href="/events"
+            to="/events"
             className="btn-ghost rounded-full px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2 self-start"
           >
             All events <ArrowUpRight size={16} />
@@ -63,11 +61,11 @@ export default function EventsHighlight() {
             >
               <div className="absolute -inset-px rounded-[24px] bg-gradient-to-br from-[var(--gold)]/30 via-white/5 to-cyan-300/15 opacity-0 group-hover:opacity-100 blur-md transition" />
               <Link
-                href={e.href}
+                to={e.href}
                 className="relative grid grid-cols-5 glass-card overflow-hidden h-full"
               >
                 <div className="relative col-span-2 min-h-[220px]">
-                  <Image
+                  <img
                     src={e.img}
                     alt={e.title}
                     fill

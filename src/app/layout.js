@@ -1,4 +1,3 @@
-import Script from "next/script";
 import Footer from "@/components/Footer";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
@@ -16,7 +15,6 @@ export default function RootLayout({ children }) {
         className="min-h-screen bg-[var(--background)] text-[var(--foreground)] antialiased"
         suppressHydrationWarning
       >
-        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="beforeInteractive" />
         <Navbar />
         <main className="relative">{children}</main>
         <Footer />

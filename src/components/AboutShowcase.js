@@ -1,7 +1,5 @@
-"use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function AboutShowcase() {
@@ -32,7 +30,7 @@ export default function AboutShowcase() {
   return (
     <section className="relative w-full min-h-screen overflow-hidden flex items-center justify-center py-8 md:py-0">
       {/* Background */}
-      <Image
+      <img
         src="/f.jpg"
         alt="Background"
         fill
@@ -59,7 +57,7 @@ export default function AboutShowcase() {
               transition={{ duration: 0.9, ease: "easeInOut" }}
               className="absolute inset-0 flex items-center justify-center"
             >
-              <Image
+              <img
                 src={slides[index]}
                 alt={`Slide ${index}`}
                 fill

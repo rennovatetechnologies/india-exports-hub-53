@@ -1,18 +1,17 @@
-"use client";
 import { useState, useRef } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
 
 export default function VerifyPage() {
-  const router = useRouter();
+  const router = useNavigate();
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const refs = useRef([]);
 
   const setDigit = (i, v) => {
-    const val = v.replace(/\D/g, "").slice(-1);
+    const val = v(/\D/g, "", { replace: true }).slice(-1);
     const next = [...code];
     next[i] = val;
     setCode(next);
@@ -22,7 +21,7 @@ export default function VerifyPage() {
   const onSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => router.push("/dashboard"), 700);
+    setTimeout(() => router("/dashboard"), 700);
   };
 
   return (
@@ -61,7 +60,7 @@ export default function VerifyPage() {
           <ArrowRight size={15} />
         </button>
         <div className="text-center text-xs text-white/50">
-          <Link href="/login" className="hover:text-white">← Back to sign in</Link>
+          <Link to="/login" className="hover:text-white">← Back to sign in</Link>
         </div>
       </form>
     </AuthShell>
