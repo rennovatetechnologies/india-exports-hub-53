@@ -1,29 +1,38 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Mail, ArrowRight } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
-import { setSession, safeNextPath, hasCompletedKyc } from "@/lib/authSession";
+import { startEmailOtp, OTP_PURPOSE, safeNextPath } from "@/lib/authSession";
 
 export default function LoginPage() {
   const router = useNavigate();
   const [searchParams] = useSearchParams();
-  const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [email, setEmail] = useState("");
 
   const onSubmit = (e) => {
     e.preventDefault();
-    setLoading(true);
+    setError("");
+    const trimmed = email.trim();
+    if (!trimmed) return;
     const next = safeNextPath(searchParams.get("next"));
-    setSession({ email, name: "", phone: "" });
-    const dest = hasCompletedKyc(email) ? next : "/dashboard/kyc";
-    setTimeout(() => router(dest), 700);
+    const { ok } = startEmailOtp(trimmed, OTP_PURPOSE.CUSTOMER_LOGIN);
+    if (!ok) {
+      setError("Could not start sign-in. Try again.");
+      return;
+    }
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      router(`/verify?mode=login&next=${encodeURIComponent(next)}`);
+    }, 400);
   };
 
   return (
     <AuthShell
       title="Welcome back"
-      subtitle="Sign in to your VISTARA workspace"
+      subtitle="We’ll email you a one-time code — no password"
       footer={
         <>
           New to VISTARA?{" "}
@@ -44,30 +53,19 @@ export default function LoginPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <Field
-          icon={Lock}
-          type={show ? "text" : "password"}
-          placeholder="••••••••"
-          label="Password"
-          right={
-            <button type="button" onClick={() => setShow(!show)} className="text-white/50 hover:text-white">
-              {show ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          }
-        />
 
         <div className="flex items-center justify-between text-xs">
-          <label className="inline-flex items-center gap-2 text-white/60">
-            <input type="checkbox" className="h-3.5 w-3.5 rounded border-white/20 bg-white/5" /> Remember me
-          </label>
-          <Link to="/forgot-password" className="text-white/60 hover:text-white">Forgot password?</Link>
+          <span className="text-white/50">Sign-in is always email + OTP.</span>
+          <Link to="/forgot-password" className="text-white/60 hover:text-white">Didn’t get a code?</Link>
         </div>
+
+        {error && <p className="text-xs text-rose-300">{error}</p>}
 
         <button
           disabled={loading}
           className="btn-gold w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold disabled:opacity-60"
         >
-          {loading ? "Signing in…" : "Sign in"}
+          {loading ? "Sending code…" : "Email me a sign-in code"}
           <ArrowRight size={15} />
         </button>
       </form>
@@ -75,7 +73,7 @@ export default function LoginPage() {
   );
 }
 
-function Field({ icon: Icon, label, right, ...rest }) {
+function Field({ icon: Icon, label, ...rest }) {
   return (
     <label className="block">
       <span className="text-[11px] uppercase tracking-wider text-white/55">{label}</span>
@@ -84,9 +82,8 @@ function Field({ icon: Icon, label, right, ...rest }) {
         <input
           {...rest}
           required
-          className="w-full bg-transparent pl-9 pr-10 py-3 text-sm text-white placeholder:text-white/30 outline-none"
+          className="w-full bg-transparent pl-9 pr-3 py-3 text-sm text-white placeholder:text-white/30 outline-none"
         />
-        {right && <div className="absolute right-3">{right}</div>}
       </div>
     </label>
   );

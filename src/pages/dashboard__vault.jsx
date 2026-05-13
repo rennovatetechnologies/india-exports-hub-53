@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -8,16 +8,18 @@ import {
 } from "lucide-react";
 import { getSession, ROLES } from "@/lib/authSession";
 import {
-  WORKFLOW_CASES,
-  WORKFLOW_VAULT_DOCS,
   getCaseById,
   loadVaultDocsFromStorage,
+  loadWorkflowCasesWithOverrides,
   saveVaultDocsToStorage,
+  sortWorkflowCases,
+  workflowCaseMatchesPreset,
+  workflowCaseMatchesSmartQuery,
 } from "@/lib/workflowVault";
 
 const STATUS = {
   verified: { label: "Verified", icon: CheckCircle2, cls: "bg-emerald-400/10 text-emerald-300" },
-  review:   { label: "In review", icon: Clock3,      cls: "bg-amber-400/10 text-amber-300" },
+  review:   { label: "In review", icon: Clock3,      cls: "bg-sky-500/12 text-sky-200" },
   missing:  { label: "Missing",   icon: AlertCircle, cls: "bg-rose-400/10 text-rose-300" },
   rejected: { label: "Rejected",  icon: AlertCircle, cls: "bg-rose-500/15 text-rose-200" },
 };
@@ -27,6 +29,48 @@ function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const DOC_SORT_RANK = { review: 0, rejected: 1, missing: 2, verified: 3 };
+
+function docSmartHaystack(d) {
+  const statusLabel = STATUS[d.status]?.label ?? d.status ?? "";
+  const bits = [d.name, statusLabel, d.status, d.size, d.updated, d.opsComment, d.opsAction]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const aliases = [];
+  if (d.status === "verified") aliases.push("done", "ok", "cleared", "approved");
+  if (d.status === "review") aliases.push("pending", "queue", "ops", "uploaded");
+  if (d.status === "missing") aliases.push("gap", "need", "todo", "awaiting");
+  if (d.status === "rejected") aliases.push("rework", "failed", "redo");
+  return `${bits} ${aliases.join(" ")}`;
+}
+
+function parseDocSmartTokens(raw) {
+  const parts = String(raw || "")
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  const free = [];
+  let statusFilter = null;
+  for (const p of parts) {
+    if (p.startsWith("status:") && p.length > 7) {
+      statusFilter = p.slice(7);
+      continue;
+    }
+    free.push(p);
+  }
+  return { free, statusFilter };
+}
+
+function docMatchesSmartFilter(d, raw) {
+  const { free, statusFilter } = parseDocSmartTokens(raw);
+  if (statusFilter && !String(d.status).toLowerCase().includes(statusFilter)) return false;
+  if (!free.length) return true;
+  const hay = docSmartHaystack(d);
+  return free.every((t) => hay.includes(t));
 }
 
 function todayLabel() {
@@ -41,6 +85,41 @@ export default function VaultPage() {
 
   const [q, setQ] = useState("");
   const [rowsByCase, setRowsByCase] = useState(() => loadVaultDocsFromStorage());
+  const [vaultListQuery, setVaultListQuery] = useState("");
+  const [vaultPreset, setVaultPreset] = useState(
+    /** @type {"all" | "attention" | "active" | "complete" | "pending_docs"} */ ("all")
+  );
+  const [vaultSort, setVaultSort] = useState(/** @type {"smart" | "caseId" | "stage"} */ ("smart"));
+  const [vaultListTick, setVaultListTick] = useState(0);
+  const refreshVaultList = useCallback(() => setVaultListTick((t) => t + 1), []);
+
+  useEffect(() => {
+    const h = () => refreshVaultList();
+    window.addEventListener("iehub-workflow-updated", h);
+    window.addEventListener("iehub-vault-docs-updated", h);
+    return () => {
+      window.removeEventListener("iehub-workflow-updated", h);
+      window.removeEventListener("iehub-vault-docs-updated", h);
+    };
+  }, [refreshVaultList]);
+
+  const vaultHomeData = useMemo(() => {
+    const cases = loadWorkflowCasesWithOverrides();
+    const docsByCase = loadVaultDocsFromStorage();
+    return { cases, docsByCase };
+  }, [vaultListTick]);
+
+  const filteredVaultHomeCases = useMemo(() => {
+    const { cases, docsByCase } = vaultHomeData;
+    const narrowed = cases.filter((c) => {
+      if (vaultPreset === "pending_docs") {
+        return (docsByCase[c.id] ?? []).some((d) => d.status !== "verified");
+      }
+      return workflowCaseMatchesPreset(c, vaultPreset);
+    });
+    const searched = narrowed.filter((c) => workflowCaseMatchesSmartQuery(c, vaultListQuery));
+    return sortWorkflowCases(searched, vaultSort);
+  }, [vaultHomeData, vaultListQuery, vaultPreset, vaultSort]);
 
   const setRowsByCasePersist = (updater) => {
     setRowsByCase((prev) => {
@@ -62,10 +141,18 @@ export default function VaultPage() {
     setQ("");
   }, [workflowId]);
 
-  const docs = useMemo(
-    () => rows.filter((d) => d.name.toLowerCase().includes(q.toLowerCase())),
-    [rows, q]
-  );
+  const docs = useMemo(() => {
+    const entries = rows
+      .map((doc, index) => ({ doc, index }))
+      .filter(({ doc }) => docMatchesSmartFilter(doc, q));
+    entries.sort((a, b) => {
+      const ra = DOC_SORT_RANK[a.doc.status] ?? 99;
+      const rb = DOC_SORT_RANK[b.doc.status] ?? 99;
+      if (ra !== rb) return ra - rb;
+      return a.index - b.index;
+    });
+    return entries.map(({ doc }) => doc);
+  }, [rows, q]);
 
   const pendingCount = useMemo(
     () => rows.filter((d) => d.status !== "verified").length,
@@ -76,7 +163,7 @@ export default function VaultPage() {
   const [uploadTargetIndex, setUploadTargetIndex] = useState(null);
   const session = getSession();
   const isOps =
-    session?.role === ROLES.OPERATIONS || session?.role === ROLES.SUPER;
+    session?.role === ROLES.OPERATIONS || session?.role === ROLES.ADMIN;
   const [rejectingIndex, setRejectingIndex] = useState(null);
   const [rejectReasonDraft, setRejectReasonDraft] = useState("");
 
@@ -162,21 +249,64 @@ export default function VaultPage() {
           </p>
         </div>
 
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex min-w-[200px] flex-1 items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-white/60">
+            <Search size={14} className="shrink-0 text-white/40" />
+            <input
+              value={vaultListQuery}
+              onChange={(e) => setVaultListQuery(e.target.value)}
+              placeholder="Smart search: case id, buyer, sla:breached, words…"
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-white/30"
+            />
+          </div>
+          <select
+            value={vaultSort}
+            onChange={(e) => setVaultSort(/** @type {"smart" | "caseId" | "stage"} */ (e.target.value))}
+            className="shrink-0 rounded-xl border border-white/10 bg-zinc-950/80 px-3 py-2 text-xs text-white/80 outline-none focus:border-cyan-400/35"
+          >
+            <option value="smart">Sort: Smart</option>
+            <option value="caseId">Sort: Case ID</option>
+            <option value="stage">Sort: Stage</option>
+          </select>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { id: "all", label: "All" },
+            { id: "attention", label: "SLA risk" },
+            { id: "active", label: "Active" },
+            { id: "complete", label: "Done" },
+            { id: "pending_docs", label: "Pending docs" },
+          ].map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setVaultPreset(id)}
+              className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider transition ${
+                vaultPreset === id
+                  ? "border-cyan-400/45 bg-cyan-500/15 text-cyan-100"
+                  : "border-white/10 bg-white/[0.04] text-white/45 hover:border-white/20 hover:text-white/70"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {WORKFLOW_CASES.map((c) => {
-            const n = (WORKFLOW_VAULT_DOCS[c.id] ?? []).filter((d) => d.status !== "verified").length;
+          {filteredVaultHomeCases.map((c) => {
+            const n = (vaultHomeData.docsByCase[c.id] ?? []).filter((d) => d.status !== "verified").length;
             return (
               <li key={c.id}>
                 <Link
                   to={`/dashboard/vault/${c.id}`}
-                  className="glass-card flex h-full flex-col p-5 transition hover:ring-1 hover:ring-[var(--gold)]/40"
+                  className="glass-card flex h-full flex-col p-5 transition hover:ring-1 hover:ring-cyan-400/30"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-[var(--gold)]">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-200/95">
                       <Workflow size={18} />
                     </span>
                     {n > 0 && (
-                      <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-200">
+                      <span className="rounded-full bg-sky-500/12 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-sky-200/95">
                         {n} pending
                       </span>
                     )}
@@ -192,6 +322,9 @@ export default function VaultPage() {
             );
           })}
         </ul>
+        {filteredVaultHomeCases.length === 0 && (
+          <p className="text-center text-sm text-white/45">No workflows match your search.</p>
+        )}
 
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-xs text-white/55">
           <p className="font-medium text-white/80">Tip</p>
@@ -222,7 +355,7 @@ export default function VaultPage() {
             {pendingCount === 0 ? "All listed documents are verified." : `${pendingCount} document${pendingCount === 1 ? "" : "s"} still need upload or review.`}
           </p>
           {isOps ? (
-            <p className="mt-2 text-xs text-amber-200/85">
+            <p className="mt-2 text-xs text-cyan-100/80">
               Signed in as operations — use <strong className="text-white/90">Approve</strong> or <strong className="text-white/90">Reject</strong> in the Actions column (same as the case panel in the ops console).
             </p>
           ) : null}
@@ -258,7 +391,7 @@ export default function VaultPage() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search this workflow’s documents…"
+              placeholder="Smart search: filename, status:review, missing …"
               className="flex-1 bg-transparent outline-none placeholder:text-white/30"
             />
           </div>
@@ -309,7 +442,7 @@ export default function VaultPage() {
                             ) : null}
                           </div>
                           {d.opsComment ? (
-                            <p className="mt-1 max-w-md text-[11px] leading-snug text-amber-200/80">
+                            <p className="mt-1 max-w-md text-[11px] leading-snug text-slate-300/90">
                               <span className="text-white/40">Operations note · </span>
                               {d.opsComment}
                             </p>
@@ -424,9 +557,9 @@ export default function VaultPage() {
             <div>
               <p className="font-medium text-white">Upload policy</p>
               <p className="mt-1 leading-relaxed">
-                You can upload or replace files while a document is <strong className="text-amber-200/90">in review</strong>,{" "}
+                You can upload or replace files while a document is <strong className="text-sky-200/90">in review</strong>,{" "}
                 <strong className="text-rose-200/90">missing</strong>, or <strong className="text-rose-200/90">rejected</strong> by operations.
-                Verified documents stay locked until operations marks the row <strong className="text-amber-200/90">in review</strong> again for rework.
+                Verified documents stay locked until operations marks the row <strong className="text-sky-200/90">in review</strong> again for rework.
                 If operations <strong className="text-white/90">flags</strong> a file or sets an <strong className="text-violet-200/90">action</strong>, you will see it under the file name.
               </p>
             </div>

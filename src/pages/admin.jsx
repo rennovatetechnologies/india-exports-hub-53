@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Users, Briefcase, IndianRupee, AlertTriangle, ArrowUpRight, ChevronRight } from "lucide-react";
 import {
-  WORKFLOW_STAGE_LABELS,
-  WORKFLOW_STAGE_TOTAL,
   loadWorkflowCasesWithOverrides,
+  sortWorkflowCases,
+  workflowCaseMatchesPreset,
+  workflowCaseMatchesSmartQuery,
+  workflowCaseStageLabel,
 } from "@/lib/workflowVault";
 
 const STATS = [
@@ -24,11 +26,6 @@ const slaColor = (s) =>
         ? "bg-amber-400/10 text-amber-300"
         : "bg-emerald-400/10 text-emerald-300";
 
-function stageLabel(stageIdx) {
-  if (stageIdx >= WORKFLOW_STAGE_TOTAL) return "Completed";
-  return WORKFLOW_STAGE_LABELS[stageIdx] ?? "—";
-}
-
 export default function AdminPage() {
   const navigate = useNavigate();
   const [tick, setTick] = useState(0);
@@ -42,19 +39,15 @@ export default function AdminPage() {
 
   const cases = useMemo(() => loadWorkflowCasesWithOverrides(), [tick]);
   const [caseQuery, setCaseQuery] = useState("");
+  const [casePreset, setCasePreset] = useState(/** @type {"all" | "attention" | "active" | "complete"} */ ("all"));
+  const [caseSort, setCaseSort] = useState(/** @type {"smart" | "caseId" | "stage"} */ ("smart"));
 
   const filteredCases = useMemo(() => {
-    const q = caseQuery.trim().toLowerCase();
-    if (!q) return cases;
-    return cases.filter(
-      (c) =>
-        c.id.toLowerCase().includes(q) ||
-        (c.accountName && c.accountName.toLowerCase().includes(q)) ||
-        (c.accountCompany && c.accountCompany.toLowerCase().includes(q)) ||
-        c.title.toLowerCase().includes(q) ||
-        stageLabel(c.stage).toLowerCase().includes(q)
-    );
-  }, [cases, caseQuery]);
+    const narrowed = cases
+      .filter((c) => workflowCaseMatchesPreset(c, casePreset))
+      .filter((c) => workflowCaseMatchesSmartQuery(c, caseQuery));
+    return sortWorkflowCases(narrowed, caseSort);
+  }, [cases, casePreset, caseQuery, caseSort]);
 
   return (
     <div className="space-y-8">
@@ -86,16 +79,51 @@ export default function AdminPage() {
 
       <section className="grid gap-6">
         <div className="glass-card p-6">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <h3 className="text-sm font-semibold uppercase tracking-wider text-white/55">Active workflows</h3>
-            <input
-              value={caseQuery}
-              onChange={(e) => setCaseQuery(e.target.value)}
-              placeholder="Search cases…"
-              className="min-w-0 flex-1 max-w-xs rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-white placeholder:text-white/30 outline-none focus:border-[var(--gold)]/50"
-            />
+            <div className="flex min-w-0 flex-1 flex-col gap-2 sm:max-w-md sm:flex-row sm:items-center sm:justify-end">
+              <input
+                value={caseQuery}
+                onChange={(e) => setCaseQuery(e.target.value)}
+                placeholder="Smart search · sla:breached owner:riya …"
+                className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-white placeholder:text-white/30 outline-none focus:border-[var(--gold)]/50"
+              />
+              <select
+                value={caseSort}
+                onChange={(e) => setCaseSort(/** @type {"smart" | "caseId" | "stage"} */ (e.target.value))}
+                className="shrink-0 rounded-lg border border-white/10 bg-zinc-950/80 px-2 py-1.5 text-[11px] text-white/80 outline-none focus:border-[var(--gold)]/40"
+              >
+                <option value="smart">Sort: Smart</option>
+                <option value="caseId">Sort: Case ID</option>
+                <option value="stage">Sort: Stage</option>
+              </select>
+            </div>
           </div>
-          <p className="mt-2 text-[11px] text-white/40">Open a case to approve or reject the current stage and comment on the workflow.</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {[
+              { id: "all", label: "All" },
+              { id: "attention", label: "SLA risk" },
+              { id: "active", label: "Active" },
+              { id: "complete", label: "Done" },
+            ].map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setCasePreset(id)}
+                className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider transition ${
+                  casePreset === id
+                    ? "border-[var(--gold)]/50 bg-[var(--gold)]/15 text-[var(--gold)]"
+                    : "border-white/10 bg-white/[0.04] text-white/45 hover:border-white/20 hover:text-white/70"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-white/40">
+            Open a case to approve or reject the current stage. Use multiple words (all must match) or field filters like{" "}
+            <code className="text-white/55">sla:due</code>, <code className="text-white/55">stage:iec</code>.
+          </p>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-[11px] uppercase tracking-wider text-white/40">
@@ -128,7 +156,7 @@ export default function AdminPage() {
                       <div className="text-white">{c.accountName ?? "—"}</div>
                       <div className="text-[11px] text-white/45">{c.accountCompany ?? c.title}</div>
                     </td>
-                    <td className="py-3 pr-4">{stageLabel(c.stage)}</td>
+                    <td className="py-3 pr-4">{workflowCaseStageLabel(c.stage)}</td>
                     <td className="py-3 pr-4">
                       <span className={`rounded-full px-2 py-0.5 text-[10px] ${slaColor(c.sla)}`}>{c.sla}</span>
                     </td>

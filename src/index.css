@@ -20,6 +20,8 @@
   --navy: #0a1428;
 
   --grad-gold: linear-gradient(135deg, #f7d488 0%, #d99c3e 100%);
+  /* Progress / in-motion accent (pairs with gold without extra yellow) */
+  --grad-progress-muted: linear-gradient(135deg, rgba(103, 232, 249, 0.45) 0%, rgba(45, 212, 191, 0.28) 100%);
   --grad-aurora: linear-gradient(135deg, #f4c46a 0%, #e0a64a 35%, #34d399 100%);
   --grad-mesh:
     radial-gradient(60% 80% at 15% 10%, rgba(244,196,106,0.18) 0%, transparent 60%),

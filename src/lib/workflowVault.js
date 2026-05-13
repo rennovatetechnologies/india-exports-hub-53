@@ -192,3 +192,108 @@ export function loadWorkflowCaseActivity(caseId) {
 export function getCaseById(caseId) {
   return loadWorkflowCasesWithOverrides().find((c) => c.id === caseId) ?? null;
 }
+
+/** @param {number} stageIdx */
+export function workflowCaseStageLabel(stageIdx) {
+  if (stageIdx >= WORKFLOW_STAGE_TOTAL) return "Completed";
+  return WORKFLOW_STAGE_LABELS[stageIdx] ?? "—";
+}
+
+function workflowSlaSortRank(sla) {
+  if (!sla || sla === "—" || sla === "–") return 3;
+  if (sla === "Breached") return 0;
+  if (sla === "Due today") return 1;
+  return 2;
+}
+
+/**
+ * Lowercase bag of words for fuzzy / multi-token search (includes light synonyms).
+ * @param {typeof WORKFLOW_CASES[number]} c
+ */
+export function workflowCaseSearchHaystack(c) {
+  const stageLab = workflowCaseStageLabel(c.stage);
+  const bits = [c.id, c.title, c.buyer, c.value, c.accountName, c.accountCompany, c.opsOwner, c.sla, stageLab]
+    .filter(Boolean)
+    .map((x) => String(x).toLowerCase());
+  const extra = [];
+  if (c.sla === "Breached") extra.push("breach", "breached", "overdue", "late", "risk", "escalation");
+  if (c.sla === "Due today") extra.push("due", "today", "urgent", "deadline");
+  if (c.sla === "On track") extra.push("healthy", "ok", "green");
+  if (c.stage >= WORKFLOW_STAGE_TOTAL) extra.push("complete", "completed", "done", "finished", "closed");
+  else extra.push("active", "open", "in progress", "pipeline");
+  return [...bits, ...extra].join(" ");
+}
+
+/**
+ * @returns {{ freeTokens: string[]; fieldPredicates: { key: string; val: string }[] }}
+ */
+export function parseWorkflowSmartTokens(raw) {
+  const parts = String(raw || "")
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  const freeTokens = [];
+  const fieldPredicates = [];
+  for (const p of parts) {
+    const idx = p.indexOf(":");
+    if (idx > 0 && idx < p.length - 1) {
+      const key = p.slice(0, idx);
+      const val = p.slice(idx + 1);
+      if (["sla", "owner", "stage", "buyer", "company"].includes(key)) fieldPredicates.push({ key, val });
+      else freeTokens.push(p);
+    } else freeTokens.push(p);
+  }
+  return { freeTokens, fieldPredicates };
+}
+
+/**
+ * Multi-token AND search plus optional `sla:`, `owner:`, `stage:`, `buyer:`, `company:` filters.
+ * @param {typeof WORKFLOW_CASES[number]} c
+ */
+export function workflowCaseMatchesSmartQuery(c, rawQuery) {
+  const { freeTokens, fieldPredicates } = parseWorkflowSmartTokens(rawQuery);
+  for (const { key, val } of fieldPredicates) {
+    if (key === "sla" && !(c.sla && String(c.sla).toLowerCase().includes(val))) return false;
+    if (key === "owner" && !(c.opsOwner && String(c.opsOwner).toLowerCase().includes(val))) return false;
+    if (key === "buyer" && !(c.buyer && String(c.buyer).toLowerCase().includes(val))) return false;
+    if (key === "company" && !(c.accountCompany && String(c.accountCompany).toLowerCase().includes(val))) return false;
+    if (key === "stage" && !workflowCaseStageLabel(c.stage).toLowerCase().includes(val)) return false;
+  }
+  if (!freeTokens.length) return true;
+  const hay = workflowCaseSearchHaystack(c);
+  return freeTokens.every((t) => hay.includes(t));
+}
+
+/**
+ * @param {typeof WORKFLOW_CASES[number]} c
+ * @param {"all" | "attention" | "active" | "complete"} preset
+ */
+export function workflowCaseMatchesPreset(c, preset) {
+  if (!preset || preset === "all") return true;
+  if (preset === "attention") return c.sla === "Breached" || c.sla === "Due today";
+  if (preset === "active") return c.stage < WORKFLOW_STAGE_TOTAL;
+  if (preset === "complete") return c.stage >= WORKFLOW_STAGE_TOTAL;
+  return true;
+}
+
+/**
+ * @param {typeof WORKFLOW_CASES} cases
+ * @param {"smart" | "caseId" | "stage"} mode
+ */
+export function sortWorkflowCases(cases, mode = "smart") {
+  const out = [...cases];
+  const idCmp = (a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: "base" });
+  if (mode === "caseId" || mode === "case-id") return out.sort(idCmp);
+  if (mode === "stage") return out.sort((a, b) => b.stage - a.stage || idCmp(a, b));
+  return out.sort((a, b) => {
+    const ra = workflowSlaSortRank(a.sla);
+    const rb = workflowSlaSortRank(b.sla);
+    if (ra !== rb) return ra - rb;
+    const doneA = a.stage >= WORKFLOW_STAGE_TOTAL;
+    const doneB = b.stage >= WORKFLOW_STAGE_TOTAL;
+    if (doneA !== doneB) return doneA ? 1 : -1;
+    if (!doneA && a.stage !== b.stage) return b.stage - a.stage;
+    return idCmp(a, b);
+  });
+}

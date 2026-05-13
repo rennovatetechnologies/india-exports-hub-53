@@ -14,6 +14,7 @@ import {
   ClipboardList,
   MessageSquare,
   Paperclip,
+  Search,
   XCircle,
 } from "lucide-react";
 import { getSession } from "@/lib/authSession";
@@ -23,7 +24,6 @@ import {
   appendWorkflowCaseActivity,
   getCaseById,
   loadWorkflowCaseActivity,
-  loadWorkflowCasesWithOverrides,
   loadVaultDocsFromStorage,
   persistWorkflowStage,
   saveVaultDocsToStorage,
@@ -48,6 +48,61 @@ const DOC_STATUS_BADGE = {
   missing: "bg-rose-400/10 text-rose-300",
   rejected: "bg-rose-500/15 text-rose-200",
 };
+
+const DOC_STATUS_LABEL = {
+  verified: "Verified",
+  review: "In review",
+  missing: "Missing",
+  rejected: "Rejected",
+};
+
+/** Lower = earlier in list: actionable / pending docs before verified. */
+const VAULT_DOC_SORT_RANK = {
+  review: 0,
+  rejected: 1,
+  missing: 2,
+  verified: 3,
+};
+
+function docSmartHaystack(doc) {
+  const statusLabel = DOC_STATUS_LABEL[doc.status] ?? doc.status ?? "";
+  const bits = [doc.name, statusLabel, doc.status, doc.updated, doc.size, doc.opsComment]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const aliases = [];
+  if (doc.status === "verified") aliases.push("done", "ok", "cleared");
+  if (doc.status === "review") aliases.push("pending", "queue", "ops");
+  if (doc.status === "missing") aliases.push("gap", "need", "todo");
+  if (doc.status === "rejected") aliases.push("rework", "failed");
+  return `${bits} ${aliases.join(" ")}`;
+}
+
+function parseDocSmartTokens(raw) {
+  const parts = String(raw || "")
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  const free = [];
+  let statusFilter = null;
+  for (const p of parts) {
+    if (p.startsWith("status:") && p.length > 7) {
+      statusFilter = p.slice(7);
+      continue;
+    }
+    free.push(p);
+  }
+  return { free, statusFilter };
+}
+
+function docMatchesSmartFilter(doc, raw) {
+  const { free, statusFilter } = parseDocSmartTokens(raw);
+  if (statusFilter && !String(doc.status).toLowerCase().includes(statusFilter)) return false;
+  if (!free.length) return true;
+  const hay = docSmartHaystack(doc);
+  return free.every((t) => hay.includes(t));
+}
 
 function activityTone(kind) {
   if (kind === "approve") return "text-emerald-300/90";
@@ -78,6 +133,7 @@ export default function AdminWorkflowPage() {
   const [docCommentDraft, setDocCommentDraft] = useState({});
   const [feedback, setFeedback] = useState(null);
   const [vaultDocsByCase, setVaultDocsByCase] = useState(loadVaultDocsFromStorage);
+  const [vaultDocQuery, setVaultDocQuery] = useState("");
 
   useEffect(() => {
     const syncVault = () => setVaultDocsByCase(loadVaultDocsFromStorage());
@@ -88,6 +144,7 @@ export default function AdminWorkflowPage() {
   useEffect(() => {
     setDocRejectDraft({});
     setDocCommentDraft({});
+    setVaultDocQuery("");
   }, [caseId]);
 
   const activity = useMemo(
@@ -96,6 +153,18 @@ export default function AdminWorkflowPage() {
   );
 
   const caseVaultDocs = active ? vaultDocsByCase[active.id] ?? [] : [];
+
+  const filteredVaultDocEntries = useMemo(() => {
+    return caseVaultDocs
+      .map((doc, index) => ({ doc, index }))
+      .filter(({ doc }) => docMatchesSmartFilter(doc, vaultDocQuery))
+      .sort((a, b) => {
+        const ra = VAULT_DOC_SORT_RANK[a.doc.status] ?? 99;
+        const rb = VAULT_DOC_SORT_RANK[b.doc.status] ?? 99;
+        if (ra !== rb) return ra - rb;
+        return a.index - b.index;
+      });
+  }, [caseVaultDocs, vaultDocQuery]);
 
   const showFeedback = (message) => {
     setFeedback(message);
@@ -236,20 +305,24 @@ export default function AdminWorkflowPage() {
 
   return (
     <div className="space-y-8">
-      <div>
+      <div className="flex items-start gap-3">
         <button
           type="button"
           onClick={() => navigate("/admin")}
-          className="inline-flex items-center gap-2 text-xs text-white/50 hover:text-white"
+          title="Back to workflows"
+          aria-label="Back to workflows"
+          className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
         >
-          <ArrowLeft size={14} /> Operations home
+          <ArrowLeft size={18} />
         </button>
-        <p className="mt-4 text-xs uppercase tracking-[0.25em] text-white/40">Workflow</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">{active.id}</h1>
-        <p className="mt-1 text-sm text-white/55">{active.title}</p>
-        <p className="mt-0.5 text-xs text-white/45">
-          {active.accountName} · {active.accountCompany} · Owner {active.opsOwner}
-        </p>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs uppercase tracking-[0.25em] text-white/40">Workflow</p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">{active.id}</h1>
+          <p className="mt-1 text-sm text-white/55">{active.title}</p>
+          <p className="mt-0.5 text-xs text-white/45">
+            {active.accountName} · {active.accountCompany} · Owner {active.opsOwner}
+          </p>
+        </div>
       </div>
 
       {feedback && (
@@ -258,13 +331,13 @@ export default function AdminWorkflowPage() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className={caseVaultDocs.length > 0 ? "grid gap-6 lg:grid-cols-[1fr_320px]" : "grid gap-6"}>
         <div className="space-y-6">
           <div className="glass-card p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <div className="text-xs text-white/45">Current gate</div>
-                <h2 className="mt-1 text-lg font-semibold text-[var(--gold)]">{currentStageLabel}</h2>
+                <h2 className="mt-1 text-lg font-semibold text-sky-100">{currentStageLabel}</h2>
                 <p className="mt-1 text-xs text-white/50">
                   Buyer {active.buyer} · Value {active.value} · SLA{" "}
                   <span className="text-white/70">{active.sla}</span>
@@ -322,7 +395,7 @@ export default function AdminWorkflowPage() {
                   nextIdx < stageIdx
                     ? "bg-emerald-400/45"
                     : nextIdx === stageIdx && !allDone
-                      ? "bg-gradient-to-b from-emerald-400/45 via-[var(--gold)]/50 to-white/12"
+                      ? "bg-gradient-to-b from-emerald-400/45 via-sky-400/35 to-white/12"
                       : "bg-white/[0.08]";
                 return (
                   <motion.li
@@ -338,11 +411,11 @@ export default function AdminWorkflowPage() {
                           done
                             ? "border-emerald-400/35 bg-emerald-400/15 text-emerald-300"
                             : cur
-                              ? "border-[var(--gold)]/50 bg-[var(--grad-gold)] text-black"
+                              ? "border-sky-400/45 bg-sky-500/15 text-sky-100 ring-1 ring-[var(--gold)]/35"
                               : "border-white/10 bg-white/[0.06] text-white/40"
                         }`}
                       >
-                        {done ? <CheckCircle2 size={18} /> : cur ? <Loader2 size={18} className="animate-spin" /> : <s.icon size={18} />}
+                        {done ? <CheckCircle2 size={18} /> : cur ? <Loader2 size={18} className="animate-spin text-sky-100" /> : <s.icon size={18} />}
                       </span>
                       {!isLast && (
                         <div className={`mt-2 w-px flex-1 min-h-[20px] rounded-full ${lineClass}`} aria-hidden />
@@ -351,7 +424,7 @@ export default function AdminWorkflowPage() {
                     <div
                       className={`min-w-0 flex-1 rounded-xl border p-4 ${
                         cur
-                          ? "border-[var(--gold)]/40 bg-white/[0.04]"
+                          ? "border-sky-400/25 bg-sky-500/[0.06]"
                           : done
                             ? "border-emerald-400/20 bg-emerald-400/[0.04]"
                             : "border-white/5 bg-white/[0.02]"
@@ -361,7 +434,7 @@ export default function AdminWorkflowPage() {
                         <div className="text-sm font-medium">{s.label}</div>
                         <span
                           className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                            done ? "text-emerald-300/90" : cur ? "text-[var(--gold)]" : "text-white/35"
+                            done ? "text-emerald-300/90" : cur ? "text-sky-200/95" : "text-white/35"
                           }`}
                         >
                           {done ? "Completed" : cur ? "In progress" : "Pending"}
@@ -383,7 +456,7 @@ export default function AdminWorkflowPage() {
                 <li key={`${n.when}-${i}`} className="flex gap-3">
                   <span
                     className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
-                      n.kind === "approve" ? "bg-emerald-400" : n.kind === "reject" ? "bg-rose-400" : "bg-[var(--gold)]"
+                      n.kind === "approve" ? "bg-emerald-400" : n.kind === "reject" ? "bg-rose-400" : "bg-sky-400/90"
                     }`}
                   />
                   <div>
@@ -418,32 +491,22 @@ export default function AdminWorkflowPage() {
           </div>
         </div>
 
-        <aside className="space-y-4">
-          <div className="glass-card p-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-white/55">Other workflows</h3>
-            <ul className="mt-3 max-h-[min(60vh,24rem)] space-y-2 overflow-y-auto">
-              {loadWorkflowCasesWithOverrides()
-                .filter((c) => c.id !== active.id)
-                .map((c) => (
-                  <li key={c.id}>
-                    <Link
-                      to={`/admin/workflow/${c.id}`}
-                      className="block rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs hover:border-[var(--gold)]/30 hover:bg-white/[0.04]"
-                    >
-                      <span className="font-medium text-white">{c.id}</span>
-                      <span className="mt-0.5 block text-[11px] text-white/45 line-clamp-2">{c.title}</span>
-                    </Link>
-                  </li>
-                ))}
-            </ul>
-          </div>
-
-          {caseVaultDocs.length > 0 && (
+        {caseVaultDocs.length > 0 ? (
+          <aside className="space-y-4">
             <div className="glass-card p-5">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-white/55">Vault documents</h3>
               <p className="mt-1 text-[11px] text-white/45">Approve, reject, or comment on uploads.</p>
+              <div className="mt-2 flex items-center gap-2 rounded-lg bg-white/5 px-2 py-1.5 text-[11px] text-white/55">
+                <Search size={12} className="shrink-0 text-white/35" />
+                <input
+                  value={vaultDocQuery}
+                  onChange={(e) => setVaultDocQuery(e.target.value)}
+                  placeholder="Smart search: name, status:review, missing…"
+                  className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-white/25"
+                />
+              </div>
               <ul className="mt-3 max-h-[min(52vh,28rem)] space-y-3 overflow-y-auto pr-1">
-                {caseVaultDocs.map((doc, index) => {
+                {filteredVaultDocEntries.map(({ doc, index }) => {
                   const canApprove = doc.status === "review" || doc.status === "rejected";
                   const statusCls = DOC_STATUS_BADGE[doc.status] ?? "bg-white/10 text-white/50";
                   return (
@@ -507,9 +570,12 @@ export default function AdminWorkflowPage() {
                   );
                 })}
               </ul>
+              {vaultDocQuery.trim() && filteredVaultDocEntries.length === 0 && (
+                <p className="mt-2 text-center text-[11px] text-white/40">No documents match.</p>
+              )}
             </div>
-          )}
-        </aside>
+          </aside>
+        ) : null}
       </div>
     </div>
   );

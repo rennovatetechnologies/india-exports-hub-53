@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { User, Building2, Bell, Lock, Users, Trash2, Plus, Mail } from "lucide-react";
+import { User, Building2, Bell, Lock, Users, Trash2, Plus } from "lucide-react";
 
 const TABS = [
   { id: "profile", label: "Profile", icon: User },
@@ -139,22 +139,27 @@ export default function SettingsPage() {
           {tab === "security" && (
             <>
               <h2 className="text-lg font-semibold">Security</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div><label className={labelCls}>Current password</label><input type="password" className={inputCls} placeholder="••••••••" /></div>
-                <div />
-                <div><label className={labelCls}>New password</label><input type="password" className={inputCls} /></div>
-                <div><label className={labelCls}>Confirm new password</label><input type="password" className={inputCls} /></div>
+              <p className="text-sm text-white/60">
+                VISTARA does not use passwords. You always sign in with your email and a one-time code. To use a different email, sign out and sign in again from the home page.
+              </p>
+              <div className="rounded-xl bg-white/[0.03] p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-sm">Email sign-in</div>
+                    <div className="text-xs text-white/45">OTP delivered to your inbox each time you sign in</div>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-emerald-400/15 px-2.5 py-1 text-[11px] font-medium text-emerald-300">Active</span>
+                </div>
               </div>
               <div className="rounded-xl bg-white/[0.03] p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-sm">Two-factor authentication</div>
-                    <div className="text-xs text-white/45">Authenticator app (TOTP)</div>
+                    <div className="text-sm">Authenticator (TOTP)</div>
+                    <div className="text-xs text-white/45">Optional extra step when your org enables it</div>
                   </div>
-                  <button className="rounded-lg glass px-3 py-1.5 text-xs">Enable</button>
+                  <button type="button" className="rounded-lg glass px-3 py-1.5 text-xs">Enable</button>
                 </div>
               </div>
-              <div className="flex justify-end"><button className="btn-gold rounded-xl px-5 py-2.5 text-sm font-semibold text-black">Update password</button></div>
             </>
           )}
         </motion.div>

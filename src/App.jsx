@@ -1,4 +1,4 @@
-import { Routes, Route, Outlet, useLocation } from "react-router-dom";
+import { Routes, Route, Outlet, useLocation, Navigate } from "react-router-dom";
 import { useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -120,7 +120,8 @@ export default function App() {
         <Route path="/admin" element={<ChromeLayout />}>
           <Route index element={<Admin />} />
           <Route path="workflow/:caseId" element={<AdminWorkflow />} />
-          <Route path="super" element={<AdminSuper />} />
+          <Route path="platform" element={<AdminSuper />} />
+          <Route path="super" element={<Navigate to="/admin/platform" replace />} />
         </Route>
       </Routes>
     </>

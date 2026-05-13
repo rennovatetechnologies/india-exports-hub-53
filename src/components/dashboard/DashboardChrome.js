@@ -1,6 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, getSession, ROLES } from "@/lib/authSession";
+import {
+  loadWorkflowCasesWithOverrides,
+  sortWorkflowCases,
+  workflowCaseMatchesSmartQuery,
+  workflowCaseStageLabel,
+} from "@/lib/workflowVault";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, FileCheck2, Folder, Workflow, CalendarDays,
@@ -23,8 +29,8 @@ const OPS_NAV = [
   { href: "/dashboard/vault", label: "Document review", icon: Folder, matchPrefix: true },
 ];
 
-const SUPER_NAV = [
-  { href: "/admin/super", label: "Control center", icon: Crown },
+const ADMIN_NAV = [
+  { href: "/admin/platform", label: "Control center", icon: Crown },
   { href: "/admin", label: "Operations", icon: Briefcase },
   { href: "/dashboard/billing", label: "Revenue", icon: BarChart3 },
   { href: "/dashboard/events", label: "Events", icon: CalendarDays },
@@ -37,7 +43,7 @@ const FOOTER_NAV = [
 ];
 
 function roleMeta(role) {
-  if (role === ROLES.SUPER) return { label: "Super Admin", chip: "bg-[var(--gold)]/15 text-[var(--gold)]", icon: Crown };
+  if (role === ROLES.ADMIN) return { label: "Admin", chip: "bg-[var(--gold)]/15 text-[var(--gold)]", icon: Crown };
   if (role === ROLES.OPERATIONS) return { label: "Operations", chip: "bg-cyan-300/15 text-cyan-200", icon: ShieldCheck };
   return { label: "Customer", chip: "bg-emerald-300/15 text-emerald-200", icon: LayoutDashboard };
 }
@@ -46,8 +52,18 @@ export default function DashboardChrome({ children }) {
   const pathname = useLocation().pathname;
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [workspaceQ, setWorkspaceQ] = useState("");
+  const [workflowTick, setWorkflowTick] = useState(0);
+  const workspaceSearchRef = useRef(null);
+  const workspaceWrapRef = useRef(null);
   const session = getSession();
-  const role = session?.role || (pathname.startsWith("/admin/super") ? ROLES.SUPER : pathname.startsWith("/admin") ? ROLES.OPERATIONS : ROLES.CUSTOMER);
+  const role =
+    session?.role ||
+    (pathname.startsWith("/admin/platform") || pathname.startsWith("/admin/super")
+      ? ROLES.ADMIN
+      : pathname.startsWith("/admin")
+        ? ROLES.OPERATIONS
+        : ROLES.CUSTOMER);
   const meta = roleMeta(role);
   const customerNav = useMemo(() => {
     if (role !== ROLES.CUSTOMER || !session || session.kycComplete) return CUSTOMER_NAV_BASE;
@@ -55,7 +71,40 @@ export default function DashboardChrome({ children }) {
     const rest = CUSTOMER_NAV_BASE.filter((i) => i.href !== "/dashboard/kyc");
     return kycItem ? [kycItem, ...rest] : CUSTOMER_NAV_BASE;
   }, [role, session?.kycComplete]);
-  const NAV = role === ROLES.SUPER ? SUPER_NAV : role === ROLES.OPERATIONS ? OPS_NAV : customerNav;
+  const NAV = role === ROLES.ADMIN ? ADMIN_NAV : role === ROLES.OPERATIONS ? OPS_NAV : customerNav;
+
+  const refreshWorkflowCases = useCallback(() => setWorkflowTick((t) => t + 1), []);
+  useEffect(() => {
+    const h = () => refreshWorkflowCases();
+    window.addEventListener("iehub-workflow-updated", h);
+    return () => window.removeEventListener("iehub-workflow-updated", h);
+  }, [refreshWorkflowCases]);
+
+  const workspaceCases = useMemo(() => loadWorkflowCasesWithOverrides(), [workflowTick]);
+  const workspaceMatches = useMemo(() => {
+    const q = workspaceQ.trim();
+    if (!q) return [];
+    const hits = workspaceCases.filter((c) => workflowCaseMatchesSmartQuery(c, q));
+    return sortWorkflowCases(hits, "smart").slice(0, 10);
+  }, [workspaceCases, workspaceQ]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key !== "k") return;
+      e.preventDefault();
+      workspaceSearchRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    const onDown = (e) => {
+      if (!workspaceWrapRef.current?.contains(e.target)) setWorkspaceQ((q) => (q ? "" : q));
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, []);
 
   const isAdminShell = pathname.startsWith("/admin");
   const sessionEmail = session?.email;
@@ -126,11 +175,11 @@ export default function DashboardChrome({ children }) {
         <p className="mt-3 text-[11px] text-white/45">IEC issued · AD code pending</p>
       </div>
       )}
-      {role === ROLES.SUPER && (
+      {role === ROLES.ADMIN && (
         <div className="rounded-2xl glass p-4">
           <div className="flex items-center justify-between text-xs text-white/60">
             <span>Pending approvals</span>
-            <Link to="/admin/super" className="text-[var(--gold)] hover:underline">Review →</Link>
+            <Link to="/admin/platform" className="text-[var(--gold)] hover:underline">Review →</Link>
           </div>
           <p className="mt-2 text-[11px] text-white/45">3 admin requests · 2 KYC escalations</p>
         </div>
@@ -198,10 +247,80 @@ export default function DashboardChrome({ children }) {
               <Menu size={18} />
             </button>
 
-            <div className="hidden flex-1 items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-white/60 sm:flex">
-              <Search size={15} />
-              <input className="flex-1 bg-transparent outline-none placeholder:text-white/30" placeholder="Search shipments, documents, plans…" />
-              <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">⌘K</kbd>
+            <div ref={workspaceWrapRef} className="relative hidden min-w-0 flex-1 sm:block">
+              <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-white/60">
+                <Search size={15} className="shrink-0" />
+                <input
+                  ref={workspaceSearchRef}
+                  value={workspaceQ}
+                  onChange={(e) => setWorkspaceQ(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" || !workspaceMatches[0]) return;
+                    e.preventDefault();
+                    const c = workspaceMatches[0];
+                    if (role === ROLES.CUSTOMER) {
+                      navigate(`/dashboard/workflow?case=${encodeURIComponent(c.id)}`);
+                    } else {
+                      navigate(`/admin/workflow/${encodeURIComponent(c.id)}`);
+                    }
+                    setWorkspaceQ("");
+                    workspaceSearchRef.current?.blur();
+                  }}
+                  className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-white/30"
+                  placeholder="Smart search: id, buyer, sla:breached, words…"
+                  aria-autocomplete="list"
+                  aria-expanded={Boolean(workspaceQ.trim())}
+                  aria-controls="workspace-search-results"
+                />
+                <kbd className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">⌘K</kbd>
+              </div>
+              {workspaceMatches.length > 0 && (
+                <ul
+                  id="workspace-search-results"
+                  className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-72 overflow-y-auto rounded-xl border border-white/10 bg-zinc-950/95 py-1 text-sm shadow-xl backdrop-blur-md"
+                  role="listbox"
+                >
+                  {workspaceMatches.map((c) => (
+                    <li key={c.id} role="option" className="border-b border-white/5 last:border-0">
+                      <div className="flex flex-col gap-1 px-3 py-2">
+                        <div className="text-xs text-white/45">
+                          {c.id} · <span className="text-white/70">{workflowCaseStageLabel(c.stage)}</span>
+                        </div>
+                        <div className="font-medium text-white">{c.title}</div>
+                        <div className="flex flex-wrap gap-2 text-[11px]">
+                          <Link
+                            to={
+                              role === ROLES.CUSTOMER
+                                ? `/dashboard/workflow?case=${encodeURIComponent(c.id)}`
+                                : `/admin/workflow/${encodeURIComponent(c.id)}`
+                            }
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => setWorkspaceQ("")}
+                            className="text-[var(--gold)] hover:underline"
+                          >
+                            Workflow
+                          </Link>
+                          <span className="text-white/25">·</span>
+                          <Link
+                            to={`/dashboard/vault/${encodeURIComponent(c.id)}`}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => setWorkspaceQ("")}
+                            className="text-cyan-200/90 hover:underline"
+                          >
+                            Vault
+                          </Link>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {workspaceQ.trim() && workspaceMatches.length === 0 && (
+                <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 rounded-xl border border-white/10 bg-zinc-950/95 px-3 py-3 text-xs text-white/50 backdrop-blur-md">
+                  No cases match. Try multiple words (all must match), <span className="text-white/60">sla:breached</span>, or{" "}
+                  <span className="text-white/60">stage:kyc</span>.
+                </div>
+              )}
             </div>
             <div className="flex flex-1 sm:hidden" />
 

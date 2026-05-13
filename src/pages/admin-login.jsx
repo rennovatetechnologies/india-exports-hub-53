@@ -1,46 +1,36 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, Lock, ArrowRight, Loader2, ShieldCheck, Workflow } from "lucide-react";
+import { Mail, ArrowRight } from "lucide-react";
 import AdminAuthShell from "@/components/auth/AdminAuthShell";
-import { setSession, ROLES, ADMIN_STATUS, workspaceFor } from "@/lib/authSession";
-
-const STAGES = [
-  { label: "Verifying access", icon: ShieldCheck },
-  { label: "Fetching workspace", icon: Workflow },
-  { label: "Redirecting to dashboard", icon: ArrowRight },
-];
+import { startEmailOtp, OTP_PURPOSE } from "@/lib/authSession";
 
 export default function AdminLoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [stage, setStage] = useState(-1);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const detectRole = (mail) => {
-    const m = mail.toLowerCase();
-    if (m.startsWith("super") || m.includes("super.admin")) return ROLES.SUPER;
-    return ROLES.OPERATIONS;
-  };
 
   const onSubmit = (e) => {
     e.preventDefault();
-    if (!email || !password) return;
     setError("");
-    setStage(0);
-    setTimeout(() => setStage(1), 650);
-    setTimeout(() => setStage(2), 1250);
+    const trimmed = email.trim();
+    if (!trimmed) return;
+    const { ok } = startEmailOtp(trimmed, OTP_PURPOSE.STAFF_LOGIN);
+    if (!ok) {
+      setError("Could not send code. Try again.");
+      return;
+    }
+    setLoading(true);
     setTimeout(() => {
-      const role = detectRole(email);
-      setSession({ email, name: "", phone: "", role, status: ADMIN_STATUS.ACTIVE });
-      navigate(workspaceFor(role));
-    }, 1900);
+      setLoading(false);
+      navigate("/verify?mode=staff");
+    }, 400);
   };
 
   return (
     <AdminAuthShell
       title="Sign in to operations"
-      subtitle="Use your VISTARA work credentials"
+      subtitle="Official email + one-time code — no password"
       footer={
         <>
           New team member?{" "}
@@ -48,43 +38,19 @@ export default function AdminLoginPage() {
         </>
       }
     >
-      {stage >= 0 ? (
-        <div className="space-y-3">
-          {STAGES.map(({ label, icon: Icon }, i) => {
-            const active = i === stage;
-            const done = i < stage;
-            return (
-              <div
-                key={label}
-                className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm transition ${
-                  done
-                    ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-200"
-                    : active
-                    ? "border-cyan-300/30 bg-cyan-300/5 text-white"
-                    : "border-white/10 bg-white/[0.02] text-white/40"
-                }`}
-              >
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white/[0.04]">
-                  {active ? <Loader2 size={14} className="animate-spin" /> : <Icon size={14} />}
-                </span>
-                {label}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <form onSubmit={onSubmit} className="space-y-4">
-          <Field icon={Mail} label="Official email" type="email" placeholder="you@vistara.in" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <Field icon={Lock} label="Password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
-          {error && <p className="text-xs text-rose-300">{error}</p>}
-          <button className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-300 to-cyan-300 px-5 py-3 text-sm font-semibold text-black hover:opacity-90">
-            Continue <ArrowRight size={15} />
-          </button>
-          <p className="text-center text-[11px] text-white/40">
-            Tip: emails starting with <span className="text-white/70">super.</span> route to the Super Admin workspace.
-          </p>
-        </form>
-      )}
+      <form onSubmit={onSubmit} className="space-y-4">
+        <Field icon={Mail} label="Official email" type="email" placeholder="you@vistara.in" value={email} onChange={(e) => setEmail(e.target.value)} />
+        {error && <p className="text-xs text-rose-300">{error}</p>}
+        <button
+          disabled={loading}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-300 to-cyan-300 px-5 py-3 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-60"
+        >
+          {loading ? "Sending code…" : (<>Email me a sign-in code <ArrowRight size={15} /></>)}
+        </button>
+        <p className="text-center text-[11px] text-white/40">
+          Your role (operations or admin) comes from your <span className="text-white/70">approved</span> access request — same as production once the API is wired.
+        </p>
+      </form>
     </AdminAuthShell>
   );
 }
