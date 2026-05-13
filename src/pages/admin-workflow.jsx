@@ -16,6 +16,8 @@ import {
   Paperclip,
   Search,
   XCircle,
+  Download,
+  Eye,
 } from "lucide-react";
 import { getSession } from "@/lib/authSession";
 import {
@@ -28,6 +30,12 @@ import {
   persistWorkflowStage,
   saveVaultDocsToStorage,
 } from "@/lib/workflowVault";
+import {
+  downloadBlobAsFile,
+  openBlobInNewTab,
+  resolveVaultDocumentBlob,
+  vaultDocIsDownloadable,
+} from "@/lib/vaultDownloads";
 
 const STAGE_ICONS = [
   Building2,
@@ -525,6 +533,32 @@ export default function AdminWorkflowPage() {
                           ) : null}
                         </div>
                         <div className="flex shrink-0 flex-wrap gap-1">
+                          {vaultDocIsDownloadable(doc) ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void resolveVaultDocumentBlob(active.id, index, doc).then((blob) =>
+                                    downloadBlobAsFile(blob, doc.name)
+                                  )
+                                }
+                                className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-semibold text-white/85 hover:bg-white/10"
+                              >
+                                <Download size={11} /> Download
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void resolveVaultDocumentBlob(active.id, index, doc).then((blob) =>
+                                    openBlobInNewTab(blob)
+                                  )
+                                }
+                                className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-semibold text-white/85 hover:bg-white/10"
+                              >
+                                <Eye size={11} /> View
+                              </button>
+                            </>
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => approveVaultDoc(active.id, index)}

@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   FileText, Search, Upload, Download, MoreHorizontal,
   ShieldCheck, Clock3, CheckCircle2, AlertCircle, Image as ImageIcon,
-  Workflow, ChevronRight, Flag,
+  Workflow, ChevronRight, Flag, Eye, Loader2,
 } from "lucide-react";
 import { getSession, ROLES } from "@/lib/authSession";
 import {
@@ -16,6 +16,13 @@ import {
   workflowCaseMatchesPreset,
   workflowCaseMatchesSmartQuery,
 } from "@/lib/workflowVault";
+import {
+  downloadBlobAsFile,
+  openBlobInNewTab,
+  putVaultUploadBlob,
+  resolveVaultDocumentBlob,
+  vaultDocIsDownloadable,
+} from "@/lib/vaultDownloads";
 
 const STATUS = {
   verified: { label: "Verified", icon: CheckCircle2, cls: "bg-emerald-400/10 text-emerald-300" },
@@ -166,6 +173,7 @@ export default function VaultPage() {
     session?.role === ROLES.OPERATIONS || session?.role === ROLES.ADMIN;
   const [rejectingIndex, setRejectingIndex] = useState(null);
   const [rejectReasonDraft, setRejectReasonDraft] = useState("");
+  const [bulkDownloadBusy, setBulkDownloadBusy] = useState(false);
 
   useEffect(() => {
     setRejectingIndex(null);
@@ -200,6 +208,38 @@ export default function VaultPage() {
       };
       return { ...prev, [workflowId]: list };
     });
+    void putVaultUploadBlob(workflowId, idx, file);
+  };
+
+  const handleDownloadDoc = async (index, doc) => {
+    if (!workflowId) return;
+    const blob = await resolveVaultDocumentBlob(workflowId, index, doc);
+    downloadBlobAsFile(blob, doc.name);
+  };
+
+  const handleViewDoc = async (index, doc) => {
+    if (!workflowId) return;
+    const blob = await resolveVaultDocumentBlob(workflowId, index, doc);
+    openBlobInNewTab(blob);
+  };
+
+  const downloadAllInCase = async () => {
+    if (!workflowId) return;
+    const entries = rows
+      .map((doc, index) => ({ doc, index }))
+      .filter(({ doc }) => vaultDocIsDownloadable(doc));
+    if (!entries.length) return;
+    setBulkDownloadBusy(true);
+    try {
+      for (let i = 0; i < entries.length; i++) {
+        const { doc, index } = entries[i];
+        const blob = await resolveVaultDocumentBlob(workflowId, index, doc);
+        downloadBlobAsFile(blob, doc.name);
+        if (i < entries.length - 1) await new Promise((r) => setTimeout(r, 180));
+      }
+    } finally {
+      setBulkDownloadBusy(false);
+    }
   };
 
   const approveDocRow = (idx) => {
@@ -356,7 +396,7 @@ export default function VaultPage() {
           </p>
           {isOps ? (
             <p className="mt-2 text-xs text-cyan-100/80">
-              Signed in as operations — use <strong className="text-white/90">Approve</strong> or <strong className="text-white/90">Reject</strong> in the Actions column (same as the case panel in the ops console).
+              Signed in as operations — use <strong className="text-white/90">Download</strong> or <strong className="text-white/90">View</strong> on each row (or <strong className="text-white/90">Download all</strong> above). Use <strong className="text-white/90">Approve</strong> or <strong className="text-white/90">Reject</strong> in the Actions column (same as the case panel in the ops console).
             </p>
           ) : null}
         </div>
@@ -373,6 +413,18 @@ export default function VaultPage() {
           >
             Workflow board
           </Link>
+          {isOps ? (
+            <button
+              type="button"
+              onClick={() => void downloadAllInCase()}
+              disabled={bulkDownloadBusy || !rows.some((d) => vaultDocIsDownloadable(d))}
+              title="Download every non-missing document in this case (one file at a time)"
+              className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2.5 text-sm font-medium text-cyan-100 hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {bulkDownloadBusy ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              Download all
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -416,6 +468,7 @@ export default function VaultPage() {
                 const canUpload = d.status !== "verified";
                 const canOpsApprove = d.status === "review" || d.status === "rejected";
                 const canOpsReject = d.status !== "verified";
+                const canDownload = vaultDocIsDownloadable(d);
                 return (
                   <motion.tr
                     key={`${d.name}-${globalIndex}`}
@@ -469,10 +522,25 @@ export default function VaultPage() {
                               <Upload size={12} /> Upload
                             </button>
                           )}
-                          {d.status === "verified" && (
-                            <button type="button" className="rounded-md p-1.5 text-white/50 hover:bg-white/5 hover:text-white" title="Download">
-                              <Download size={14} />
-                            </button>
+                          {canDownload && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => void handleDownloadDoc(globalIndex, d)}
+                                className="inline-flex items-center gap-1 rounded-md bg-white/5 px-2 py-1.5 text-[11px] text-white/80 hover:bg-white/10"
+                                title="Download"
+                              >
+                                <Download size={12} /> Download
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleViewDoc(globalIndex, d)}
+                                className="inline-flex items-center gap-1 rounded-md bg-white/5 px-2 py-1.5 text-[11px] text-white/80 hover:bg-white/10"
+                                title="Open in a new tab"
+                              >
+                                <Eye size={12} /> View
+                              </button>
+                            </>
                           )}
                           {isOps && (
                             <>
