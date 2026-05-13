@@ -5,6 +5,7 @@ import WhyChooseUs from "@/components/WhyChooseUs";
 import PlansSection from "@/components/PlansSection";
 import TestimonialsSection from "@/components/TestimonialsSection";
 import ProductsSection from "@/components/ProductsSection";
+import EventsHighlight from "@/components/EventsHighlight";
 
 export default function Home() {
   return (
@@ -15,6 +16,7 @@ export default function Home() {
       <WhyChooseUs />
       <PlansSection />
       <ProductsSection />
+      <EventsHighlight />
       <TestimonialsSection />
     </>
   );
