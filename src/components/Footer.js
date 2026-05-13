@@ -42,9 +42,9 @@ export default function Footer() {
 
             <FooterCol title="Platform" links={[
               ["Plans", "/#plans"],
-              ["Workflow", "/#workflow"],
               ["Events", "/events"],
               ["Brochures", "/brochures"],
+              ["Contact", "/contact"],
             ]} />
             <FooterCol title="Company" links={[
               ["About", "/about"],

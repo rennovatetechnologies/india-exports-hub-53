@@ -35,9 +35,6 @@ export default function Navbar() {
     }
   }, [mobileOpen]);
 
-  const hideOnDashboard = pathname?.startsWith("/dashboard") || pathname?.startsWith("/admin") || ["/login", "/signup", "/verify", "/forgot-password"].some((p) => pathname?.startsWith(p));
-  if (hideOnDashboard) return null;
-
   useEffect(() => {
     const onResize = () => window.innerWidth >= 768 && setMobileOpen(false);
     const onKey = (e) => {
@@ -62,7 +59,10 @@ export default function Navbar() {
     setDesktopProductsOpen(false);
     setDesktopBrochuresOpen(false);
   }, [pathname]);
-    
+
+  // Dashboard and admin use their own chrome; keep the public navbar on auth pages so users can always reach the rest of the site.
+  const hideForDedicatedChrome = pathname?.startsWith("/dashboard") || pathname?.startsWith("/admin");
+  if (hideForDedicatedChrome) return null;
 
   const brochures = [
     {
@@ -108,7 +108,8 @@ export default function Navbar() {
 
   const handleBrochureClick = (item) => {
     if (item.type === "download") {
-      window.open(item.path, "_blank", "noopener,noreferrer");
+      const url = item.path.split("/").map((seg) => encodeURIComponent(seg)).join("/");
+      window.open(url, "_blank", "noopener,noreferrer");
     }
     setMobileOpen(false);
     setDesktopBrochuresOpen(false);
@@ -158,11 +159,11 @@ export default function Navbar() {
           }`}
       >
         <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            {/* Logo */}
+          <div className="flex h-16 items-center gap-3">
+            {/* Logo — stays left; does not shrink */}
             <Link
               to="/"
-              className="flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md"
+              className="flex shrink-0 items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md"
               aria-label="VISTARA Home"
             >
               <span className="text-xl md:text-2xl font-semibold tracking-tight text-white">
@@ -171,13 +172,15 @@ export default function Navbar() {
               </span>
             </Link>
 
-            {/* Desktop Menu */}
-            <div className="hidden md:flex items-center gap-7">
+            {/* Desktop: nav scrolls if needed; Log in stays visible on the right */}
+            <div className="hidden md:flex flex-1 min-w-0 items-center justify-end gap-2 lg:gap-3">
+              <div className="flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex min-h-16 shrink-0 items-center justify-end gap-4 lg:gap-7 pr-1">
               {navItems.map((item) =>
                 item.sub ? (
                   <div
                     key={item.name}
-                    className="relative group"
+                    className="relative group shrink-0"
                     onMouseEnter={() => {
                       if (item.name === "Products") setDesktopProductsOpen(true);
                       if (item.name === "Brochures") setDesktopBrochuresOpen(true);
@@ -234,7 +237,7 @@ export default function Navbar() {
                   <Link
                     key={item.name}
                     to={item.path}
-                    className={`relative group text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md px-1 ${scrolled ? "text-zinc-300 hover:text-white" : "text-zinc-200 hover:text-white"
+                    className={`relative group shrink-0 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md px-1 ${scrolled ? "text-zinc-300 hover:text-white" : "text-zinc-200 hover:text-white"
                       }`}
                   >
                     <span className={`${isActive(item.path) ? "text-white" : ""}`}>{item.name}</span>
@@ -250,6 +253,16 @@ export default function Navbar() {
                   </Link>
                 )
               )}
+                </div>
+              </div>
+              <div className="shrink-0 border-l border-white/10 pl-4 lg:pl-6 ml-1">
+                <Link
+                  to="/login"
+                  className={`inline-flex text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md px-2 py-1.5 ${scrolled ? "text-zinc-300 hover:text-white" : "text-zinc-200 hover:text-white"}`}
+                >
+                  Log in
+                </Link>
+              </div>
             </div>
 
             {/* Mobile Menu Button */}
@@ -381,6 +394,22 @@ export default function Navbar() {
                     </Link>
                   )
                 )}
+                <div className="mx-2 mt-4 border-t border-white/10 pt-4 space-y-1 px-2">
+                  <Link
+                    to="/login"
+                    onClick={() => setMobileOpen(false)}
+                    className="block rounded-lg px-3.5 py-3 text-base font-medium text-zinc-200 hover:bg-white/5 hover:text-white"
+                  >
+                    Log in
+                  </Link>
+                  <Link
+                    to="/signup"
+                    onClick={() => setMobileOpen(false)}
+                    className="block rounded-lg px-3.5 py-3 text-base font-medium text-zinc-200 hover:bg-white/5 hover:text-white"
+                  >
+                    Sign up
+                  </Link>
+                </div>
               </nav>
             </motion.aside>
           </>

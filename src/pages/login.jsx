@@ -1,18 +1,22 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
+import { setSession, safeNextPath } from "@/lib/authSession";
 
 export default function LoginPage() {
   const router = useNavigate();
+  const [searchParams] = useSearchParams();
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
 
   const onSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => router("/dashboard"), 700);
+    const next = safeNextPath(searchParams.get("next"));
+    setSession({ email, name: "", phone: "" });
+    setTimeout(() => router(next), 700);
   };
 
   return (
@@ -27,7 +31,14 @@ export default function LoginPage() {
       }
     >
       <form onSubmit={onSubmit} className="space-y-4">
-        <Field icon={Mail} type="email" placeholder="you@company.com" label="Work email" />
+        <Field
+          icon={Mail}
+          type="email"
+          placeholder="you@company.com"
+          label="Work email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
         <Field
           icon={Lock}
           type={show ? "text" : "password"}
@@ -53,17 +64,6 @@ export default function LoginPage() {
         >
           {loading ? "Signing in…" : "Sign in"}
           <ArrowRight size={15} />
-        </button>
-
-        <div className="relative my-2">
-          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
-          <div className="relative flex justify-center text-[10px] uppercase tracking-widest text-white/40">
-            <span className="bg-[var(--background)] px-3">or continue with</span>
-          </div>
-        </div>
-
-        <button type="button" className="btn-ghost w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-medium">
-          <span className="text-base">G</span> Continue with Google
         </button>
       </form>
     </AuthShell>

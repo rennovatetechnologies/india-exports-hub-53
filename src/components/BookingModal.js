@@ -1,19 +1,20 @@
 import { useState, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ArrowRight, Ship, Plane, Box, PackageSearch, User, Weight } from "lucide-react";
+import { X, ArrowRight, Ship, Plane, Box, PackageSearch, Weight } from "lucide-react";
+import { getSession, isAuthenticated } from "@/lib/authSession";
 
 export default function BookingModal({ open, setOpen }) {
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [form, setForm] = useState({
     shipment: "",
     category: "",
     subProducts: [],
     quantity: "",
-    name: "",
-    phone: "",
-    email: "",
     address: "",
     country: "",
   });
@@ -58,6 +59,17 @@ export default function BookingModal({ open, setOpen }) {
     });
 
   const send = async () => {
+    if (!isAuthenticated()) {
+      const next = `${location.pathname}${location.search || ""}`;
+      navigate(`/login?next=${encodeURIComponent(next || "/")}`);
+      return;
+    }
+    const session = getSession();
+    if (!session?.email) {
+      alert("Please sign in again.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -72,9 +84,9 @@ export default function BookingModal({ open, setOpen }) {
         body: JSON.stringify({
           amount: 100, // 1 INR in paise
           customerDetails: {
-            name: form.name,
-            email: form.email,
-            phone: form.phone,
+            name: session.name,
+            email: session.email,
+            phone: session.phone || undefined,
             address: form.address,
             country: form.country,
           },
@@ -119,9 +131,9 @@ export default function BookingModal({ open, setOpen }) {
               category: form.category,
               subProducts: form.subProducts.join(", "),
               quantity: form.quantity,
-              name: form.name,
-              phone: form.phone,
-              email: form.email,
+              name: session.name,
+              phone: session.phone || "",
+              email: session.email,
               country: form.country,
               address: form.address,
               subject: `PAID Booking Request - ${form.category}`,
@@ -144,9 +156,6 @@ export default function BookingModal({ open, setOpen }) {
                 category: "",
                 subProducts: [],
                 quantity: "",
-                name: "",
-                phone: "",
-                email: "",
                 address: "",
                 country: "",
               });
@@ -158,9 +167,9 @@ export default function BookingModal({ open, setOpen }) {
           }
         },
         prefill: {
-          name: form.name,
-          email: form.email,
-          contact: form.phone,
+          name: session.name,
+          email: session.email,
+          ...(session.phone ? { contact: session.phone } : {}),
         },
         theme: {
           color: "#000000",
@@ -322,7 +331,15 @@ export default function BookingModal({ open, setOpen }) {
 
                   <button
                     disabled={!form.quantity}
-                    onClick={() => setStep(4)}
+                    onClick={() => {
+                      if (!isAuthenticated()) {
+                        const next = `${location.pathname}${location.search || ""}`;
+                        navigate(`/login?next=${encodeURIComponent(next || "/")}`);
+                        setOpen(false);
+                        return;
+                      }
+                      setStep(4);
+                    }}
                     className="flex items-center gap-2 text-sm bg-black text-white px-4 py-2 rounded-md disabled:bg-gray-300"
                   >
                     Continue <ArrowRight size={16} />
@@ -331,21 +348,23 @@ export default function BookingModal({ open, setOpen }) {
               </>
             )}
 
-            {/* STEP 4 - USER DETAILS */}
+            {/* STEP 4 - SHIPMENT ADDRESS (account contact comes from your sign-in) */}
             {step === 4 && (
               <>
-                <h2 className="text-xl font-semibold">Your Details</h2>
+                <h2 className="text-xl font-semibold">Shipment details</h2>
+
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm mb-3">
+                  <span className="text-gray-500 text-xs uppercase tracking-wide">Account</span>
+                  <div className="font-medium text-gray-900">{getSession()?.name}</div>
+                  <div className="text-gray-600">{getSession()?.email}</div>
+                </div>
 
                 <div className="space-y-3">
                   {[
-                    { key: "name", placeholder: "Full Name", icon: User },
-                    { key: "phone", placeholder: "Phone Number" },
-                    { key: "email", placeholder: "Email" },
                     { key: "country", placeholder: "Country" },
-                    { key: "address", placeholder: "Full Address" },
-                  ].map(({ key, placeholder, icon: Icon }) => (
+                    { key: "address", placeholder: "Full pickup / delivery address" },
+                  ].map(({ key, placeholder }) => (
                     <div key={key} className="flex items-center gap-2 border rounded-xl p-3">
-                      {Icon && <Icon size={18} className="text-gray-600" />}
                       <input
                         placeholder={placeholder}
                         value={form[key]}
@@ -357,12 +376,13 @@ export default function BookingModal({ open, setOpen }) {
                 </div>
 
                 <div className="flex justify-between mt-4">
-                  <button onClick={() => setStep(3)} className="text-sm text-gray-600">
+                  <button type="button" onClick={() => setStep(3)} className="text-sm text-gray-600">
                     ← Back
                   </button>
 
                   <button
-                    disabled={!form.name || !form.phone}
+                    type="button"
+                    disabled={!form.address || !form.country}
                     onClick={() => setStep(5)}
                     className="bg-black text-white px-4 py-2 rounded-md disabled:bg-gray-300 text-sm"
                   >
@@ -382,15 +402,14 @@ export default function BookingModal({ open, setOpen }) {
                   <p><strong>Category:</strong> {form.category}</p>
                   <p><strong>Products:</strong> {form.subProducts.join(", ")}</p>
                   <p><strong>Quantity:</strong> {form.quantity}</p>
-                  <p><strong>Name:</strong> {form.name}</p>
-                  <p><strong>Phone:</strong> {form.phone}</p>
-                  {form.email && <p><strong>Email:</strong> {form.email}</p>}
+                  <p><strong>Account:</strong> {getSession()?.name} · {getSession()?.email}</p>
+                  {getSession()?.phone ? <p><strong>Phone:</strong> {getSession().phone}</p> : null}
                   {form.country && <p><strong>Country:</strong> {form.country}</p>}
                   {form.address && <p><strong>Address:</strong> {form.address}</p>}
                 </div>
 
                 <div className="flex justify-between mt-4">
-                  <button onClick={() => setStep(4)} className="text-sm text-gray-600">
+                  <button type="button" onClick={() => setStep(4)} className="text-sm text-gray-600">
                     ← Back
                   </button>
 

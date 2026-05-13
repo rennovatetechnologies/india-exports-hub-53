@@ -10,7 +10,7 @@ const events = [
     place: "Online · Zoom",
     img: "/event.png",
     tag: "Live cohort",
-    href: "/events",
+    href: "/events#register",
   },
   {
     title: "Export Summit · Nagpur",
@@ -64,13 +64,12 @@ export default function EventsHighlight() {
                 to={e.href}
                 className="relative grid grid-cols-5 glass-card overflow-hidden h-full"
               >
-                <div className="relative col-span-2 min-h-[220px]">
+                <div className="relative col-span-2 min-h-[220px] overflow-hidden">
                   <img
                     src={e.img}
-                    alt={e.title}
-                    fill
-                    sizes="(max-width:768px) 40vw, 280px"
-                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    alt=""
+                    aria-hidden
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#06080d]/70" />
                 </div>

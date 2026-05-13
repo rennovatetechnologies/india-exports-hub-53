@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import { Check, Minus, Sparkles } from "lucide-react";
+import { isAuthenticated } from "@/lib/authSession";
 
 const plans = [
   {
@@ -94,7 +96,12 @@ export default function PlansSection() {
         </div>
 
         <div className="mt-14 grid gap-6 lg:grid-cols-3">
-          {plans.map((p, idx) => (
+          {plans.map((p, idx) => {
+            const contactPath = `/contact?plan=${encodeURIComponent(p.name)}`;
+            const planHref = isAuthenticated()
+              ? contactPath
+              : `/login?next=${encodeURIComponent(contactPath)}`;
+            return (
             <motion.div
               key={p.name}
               initial={{ opacity: 0, y: 18 }}
@@ -153,16 +160,18 @@ export default function PlansSection() {
                   ))}
                 </ul>
 
-                <button
+                <Link
+                  to={planHref}
                   className={`mt-7 inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold transition ${
                     p.featured ? "btn-gold" : "btn-ghost"
                   }`}
                 >
                   {p.featured ? "Get Premium" : `Choose ${p.name}`}
-                </button>
+                </Link>
               </div>
             </motion.div>
-          ))}
+            );
+          })}
         </div>
 
         <p className="mt-8 text-center text-xs text-white/40">* T&C applied · Inclusive of standard government processing</p>

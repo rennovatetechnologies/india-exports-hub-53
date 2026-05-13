@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { clearSession } from "@/lib/authSession";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, FileCheck2, Folder, Workflow, CalendarDays,
@@ -23,7 +23,13 @@ const FOOTER_NAV = [
 
 export default function DashboardChrome({ children }) {
   const pathname = useLocation().pathname;
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+
+  const signOut = () => {
+    clearSession();
+    navigate("/");
+  };
 
   const SideContent = (
     <div className="flex h-full flex-col gap-6 p-5">
@@ -74,9 +80,13 @@ export default function DashboardChrome({ children }) {
             <Icon size={15} /> {label}
           </Link>
         ))}
-        <Link to="/login" className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white/60 hover:bg-white/5 hover:text-white">
+        <button
+          type="button"
+          onClick={signOut}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-white/60 hover:bg-white/5 hover:text-white"
+        >
           <LogOut size={15} /> Sign out
-        </Link>
+        </button>
       </div>
     </div>
   );

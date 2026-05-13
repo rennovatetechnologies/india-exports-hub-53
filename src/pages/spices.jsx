@@ -45,35 +45,35 @@ export default function SpicesPage() {
   ];
 
   return (
-    <main className="flex flex-col min-h-screen bg-[#fdf3e6]">
+    <div className="flex flex-col min-h-screen text-[var(--foreground)]">
       {/* ==== HEADER SECTION ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
         <img
           src="/Hero.jpg"
           alt="Spices Header"
-          fill
-          priority
-          quality={100}
-          className="object-cover brightness-75 blur-[2px]"
+          loading="eager"
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover brightness-75 blur-[2px]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/70 via-transparent to-[var(--background)]/80" />
 
         <div className="relative z-10 text-white px-4 mt-16 sm:mt-20">
           <div className="inline-block mb-4">
-            <div className="w-20 h-1 bg-[#16a34a] mx-auto mb-3"></div>
-            <h1 className="text-4xl sm:text-6xl font-bold mb-3 tracking-tight text-[#ffffff]">
+            <div className="w-20 h-1 bg-[var(--gold)] mx-auto mb-3" />
+            <h1 className="text-4xl sm:text-6xl font-bold mb-3 tracking-tight text-white">
               Spices
             </h1>
-            <div className="w-20 h-1 bg-[#16a34a] mx-auto"></div>
+            <div className="w-20 h-1 bg-[var(--gold)] mx-auto" />
           </div>
-          <p className="max-w-2xl mx-auto text-white text-base sm:text-lg font-light tracking-wide">
+          <p className="max-w-2xl mx-auto text-base sm:text-lg font-light tracking-wide text-white/85">
             Discover India’s finest spices — rich in aroma, flavor, and heritage.
           </p>
         </div>
       </section>
 
       {/* ==== SPICES LIST ==== */}
-      <section className="py-16 px-4 sm:px-10 bg-[#fdf3e6]">
+      <section className="py-16 px-4 sm:px-10">
         <div className="max-w-6xl mx-auto space-y-20">
           {spices.map((item, i) => (
             <motion.div
@@ -86,22 +86,20 @@ export default function SpicesPage() {
                 i % 2 === 0 ? "lg:flex-row" : "lg:flex-row-reverse"
               } items-center gap-10`}
             >
-              {/* Image */}
-              <div className="relative w-full lg:w-1/2 h-[350px] rounded-2xl overflow-hidden shadow-lg">
+              <div className="relative w-full lg:w-1/2 h-[350px] rounded-2xl overflow-hidden border border-white/10 shadow-xl shadow-black/50">
                 <img
                   src={item.img}
                   alt={item.name}
-                  fill
-                  className="object-cover hover:scale-105 transition-transform duration-500"
+                  loading="lazy"
+                  className="absolute inset-0 h-full w-full object-cover hover:scale-105 transition-transform duration-500"
                 />
               </div>
 
-              {/* Content */}
               <div className="lg:w-1/2 text-center lg:text-left space-y-4">
-                <h2 className="text-3xl font-bold text-[#14532d] tracking-tight">
+                <h2 className="text-3xl font-bold text-[var(--gold)] tracking-tight">
                   {item.name}
                 </h2>
-                <p className="text-gray-700 text-base leading-relaxed">
+                <p className="text-white/70 text-base leading-relaxed">
                   {item.desc}
                 </p>
               </div>
@@ -109,6 +107,6 @@ export default function SpicesPage() {
           ))}
         </div>
       </section>
-    </main>
+    </div>
   );
 }

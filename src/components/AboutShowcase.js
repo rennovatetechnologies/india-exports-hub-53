@@ -33,9 +33,9 @@ export default function AboutShowcase() {
       <img
         src="/f.jpg"
         alt="Background"
-        fill
-        priority
-        className="object-cover brightness-90"
+        loading="eager"
+        decoding="async"
+        className="absolute inset-0 h-full w-full min-h-full object-cover brightness-90"
       />
       <div className="absolute inset-0 bg-black/40" />
 
@@ -60,9 +60,7 @@ export default function AboutShowcase() {
               <img
                 src={slides[index]}
                 alt={`Slide ${index}`}
-                fill
-                className="object-contain"
-                sizes="(max-width: 768px) 90vw, 50vw"
+                className="absolute inset-0 h-full w-full max-h-full object-contain"
               />
             </motion.div>
           </AnimatePresence>

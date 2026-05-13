@@ -33,8 +33,17 @@ import DashWorkflow from "@/pages/dashboard__workflow.jsx";
 import Admin from "@/pages/admin.jsx";
 
 function ScrollToTop() {
-  const { pathname } = useLocation();
-  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  const { pathname, hash } = useLocation();
+  useEffect(() => {
+    if (hash) {
+      const id = hash.slice(1);
+      requestAnimationFrame(() => {
+        document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+      });
+    } else {
+      window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    }
+  }, [pathname, hash]);
   return null;
 }
 
@@ -42,7 +51,18 @@ function PublicLayout() {
   return (
     <>
       <Navbar />
-      <main className="relative"><Outlet /></main>
+      <main className="relative isolate min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+        <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
+          <div className="absolute inset-0 bg-mesh opacity-90" />
+          <div className="absolute inset-0 grid-bg opacity-[0.35]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/85 via-transparent to-[var(--background)]" />
+          <div className="absolute -top-32 -left-24 h-[420px] w-[420px] rounded-full bg-[var(--gold)]/12 blur-3xl" />
+          <div className="absolute top-1/3 -right-24 h-[380px] w-[380px] rounded-full bg-emerald-400/10 blur-3xl" />
+        </div>
+        <div className="relative z-[1]">
+          <Outlet />
+        </div>
+      </main>
       <Footer />
     </>
   );

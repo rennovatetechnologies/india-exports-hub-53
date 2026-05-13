@@ -37,27 +37,27 @@ export default function CerealsAndPulsesPage() {
   ];
 
   return (
-    <main className="flex flex-col min-h-screen bg-[#fdf3e6] text-[#2e2e2e]">
+    <div className="flex flex-col min-h-screen text-[var(--foreground)]">
       {/* ==== HEADER ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
         <img
           src="/Hero.jpg"
           alt="Cereals and Pulses Header"
-          fill
-          priority
-          quality={80}
-          className="object-cover brightness-75 blur-[2px]"
+          loading="eager"
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover brightness-75 blur-[2px]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/70 via-transparent to-[var(--background)]/80" />
         <div className="relative z-10 text-white px-6 mt-16 sm:mt-20">
           <div className="inline-block mb-6">
-            <div className="w-20 h-1 bg-[#16a34a] mx-auto mb-4"></div>
-            <h1 className="text-5xl sm:text-7xl font-bold mb-4 tracking-tight text-[#ffffff]">
+            <div className="w-20 h-1 bg-[var(--gold)] mx-auto mb-4" />
+            <h1 className="text-5xl sm:text-7xl font-bold mb-4 tracking-tight text-white">
               Cereals & Pulses
             </h1>
-            <div className="w-20 h-1 bg-[#16a34a] mx-auto"></div>
+            <div className="w-20 h-1 bg-[var(--gold)] mx-auto" />
           </div>
-          <p className="max-w-2xl mx-auto text-white text-lg sm:text-xl font-light tracking-wide">
+          <p className="max-w-2xl mx-auto text-lg sm:text-xl font-light tracking-wide text-white/85">
             Explore our premium grains and pulses sourced directly from farmers
           </p>
         </div>
@@ -68,39 +68,38 @@ export default function CerealsAndPulsesPage() {
         <motion.h2
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          className="text-3xl sm:text-4xl font-bold mb-8 text-center text-[#2f5233]"
+          className="text-3xl sm:text-4xl font-bold mb-8 text-center text-white"
         >
           Basmati Rice Varieties
         </motion.h2>
 
-        <div className="relative w-full h-[50vh] sm:h-[60vh] mb-10 rounded-lg overflow-hidden shadow-md">
+        <div className="relative w-full h-[50vh] sm:h-[60vh] mb-10 rounded-xl overflow-hidden border border-white/10 shadow-xl shadow-black/40">
           <img
             src="/cereals/basmati.jpg"
             alt="Basmati Rice"
-            fill
-            quality={80}
-            className="object-cover"
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover"
           />
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse border border-gray-300 text-base bg-white rounded-lg overflow-hidden shadow-sm">
-            <thead className="bg-[#16a34a] text-white">
+          <table className="w-full text-left border-collapse text-base rounded-xl overflow-hidden border border-white/10">
+            <thead className="bg-[var(--gold)]/25 text-[var(--gold)] border-b border-white/10">
               <tr>
-                <th className="p-3 border border-gray-300">SR. NO</th>
-                <th className="p-3 border border-gray-300">COMMODITY</th>
-                <th className="p-3 border border-gray-300">LENGTH</th>
+                <th className="p-3 border border-white/10 font-semibold">SR. NO</th>
+                <th className="p-3 border border-white/10 font-semibold">COMMODITY</th>
+                <th className="p-3 border border-white/10 font-semibold">LENGTH</th>
               </tr>
             </thead>
             <tbody>
               {basmatiRice.map((item, i) => (
                 <tr
                   key={i}
-                  className="odd:bg-[#f8f6f2] even:bg-white hover:bg-[#e9f7ef] transition"
+                  className="odd:bg-white/[0.03] even:bg-white/[0.06] hover:bg-[var(--gold)]/10 transition text-white/85"
                 >
-                  <td className="p-3 border border-gray-300 text-center">{i + 1}</td>
-                  <td className="p-3 border border-gray-300 font-medium">{item[0]}</td>
-                  <td className="p-3 border border-gray-300 text-center">{item[1]}</td>
+                  <td className="p-3 border border-white/10 text-center">{i + 1}</td>
+                  <td className="p-3 border border-white/10 font-medium">{item[0]}</td>
+                  <td className="p-3 border border-white/10 text-center">{item[1]}</td>
                 </tr>
               ))}
             </tbody>
@@ -113,25 +112,24 @@ export default function CerealsAndPulsesPage() {
         <motion.h2
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          className="text-3xl sm:text-4xl font-bold mb-8 text-center text-[#2f5233]"
+          className="text-3xl sm:text-4xl font-bold mb-8 text-center text-white"
         >
           Non-Basmati Rice Varieties
         </motion.h2>
 
-        <div className="relative w-full h-[50vh] sm:h-[60vh] mb-10 rounded-lg overflow-hidden shadow-md">
+        <div className="relative w-full h-[50vh] sm:h-[60vh] mb-10 rounded-xl overflow-hidden border border-white/10 shadow-xl shadow-black/40">
           <img
             src="/cereals/nonbasmati.jpg"
             alt="Non-Basmati Rice"
-            fill
-            quality={80}
-            className="object-cover"
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover"
           />
         </div>
 
-        <ul className="bg-white p-6 rounded-lg shadow-md space-y-3 text-lg leading-relaxed">
+        <ul className="glass-card p-6 space-y-3 text-lg leading-relaxed text-white/80">
           {nonBasmati.map((item, i) => (
             <li key={i} className="flex items-center">
-              <span className="text-[#16a34a] font-semibold mr-2">{i + 1}.</span> {item}
+              <span className="text-[var(--gold)] font-semibold mr-2">{i + 1}.</span> {item}
             </li>
           ))}
         </ul>
@@ -142,7 +140,7 @@ export default function CerealsAndPulsesPage() {
         <motion.h2
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          className="text-3xl sm:text-4xl font-bold mb-10 text-center text-[#2f5233]"
+          className="text-3xl sm:text-4xl font-bold mb-10 text-center text-white"
         >
           Other Cereals and Pulses
         </motion.h2>
@@ -155,21 +153,21 @@ export default function CerealsAndPulsesPage() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
               viewport={{ once: true }}
-              className="relative bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-center"
+              className="relative glass-card hover:border-[var(--gold)]/20 transition-all p-4 text-center"
             >
               <div className="relative w-full h-40 mb-4 rounded-lg overflow-hidden">
                 <img
                   src={item.img}
                   alt={item.name}
-                  fill
-                  className="object-cover"
+                  loading="lazy"
+                  className="absolute inset-0 h-full w-full object-cover"
                 />
               </div>
-              <h3 className="text-lg font-semibold text-[#2f5233]">{item.name}</h3>
+              <h3 className="text-lg font-semibold text-[var(--gold)]">{item.name}</h3>
             </motion.div>
           ))}
         </div>
       </section>
-    </main>
+    </div>
   );
 }

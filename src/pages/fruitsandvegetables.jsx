@@ -57,27 +57,27 @@ Available in multiple varieties — long, round, and striped.`,
   ];
 
   return (
-    <main className="flex flex-col min-h-screen bg-[#fdf5e6]">
+    <div className="flex flex-col min-h-screen text-[var(--foreground)]">
       {/* ==== HEADER SECTION ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
         <img
           src="/Hero.jpg"
           alt="Fruits and Vegetables"
-          fill
-          priority
-          quality={100}
-          className="object-cover brightness-75 blur-[2px]"
+          loading="eager"
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover brightness-75 blur-[2px]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/70 via-transparent to-[var(--background)]/80" />
         <div className="relative z-10 text-white px-6 mt-16 sm:mt-20">
           <div className="inline-block mb-6">
-            <div className="w-20 h-1 bg-[#16a34a] mx-auto mb-4"></div>
-            <h1 className="text-5xl sm:text-7xl font-bold mb-4 tracking-tight text-[#ffffff]">
+            <div className="w-20 h-1 bg-[var(--gold)] mx-auto mb-4" />
+            <h1 className="text-5xl sm:text-7xl font-bold mb-4 tracking-tight text-white">
               Fruits & Vegetables
             </h1>
-            <div className="w-20 h-1 bg-[#16a34a] mx-auto"></div>
+            <div className="w-20 h-1 bg-[var(--gold)] mx-auto" />
           </div>
-          <p className="max-w-2xl mx-auto text-white text-lg sm:text-xl font-light tracking-wide">
+          <p className="max-w-2xl mx-auto text-lg sm:text-xl font-light tracking-wide text-white/85">
             Freshness from Indian farms — delivered across the world.
           </p>
         </div>
@@ -97,29 +97,29 @@ Available in multiple varieties — long, round, and striped.`,
             }`}
           >
             {/* Product Image */}
-            <div className="relative w-full md:w-1/2 h-[350px] sm:h-[450px] overflow-hidden rounded-2xl shadow-lg">
+            <div className="relative w-full md:w-1/2 h-[350px] sm:h-[450px] overflow-hidden rounded-2xl border border-white/10 shadow-xl shadow-black/50">
               <img
                 src={product.image}
                 alt={product.name}
-                fill
-                className="object-cover rounded-2xl hover:scale-105 transition-transform duration-500"
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover rounded-2xl hover:scale-105 transition-transform duration-500"
               />
             </div>
 
             {/* Product Text */}
-            <div className="w-full md:w-1/2 text-gray-800">
-              <h2 className="text-3xl sm:text-4xl font-bold text-[#166534] mb-4">
+            <div className="w-full md:w-1/2 text-white/80">
+              <h2 className="text-3xl sm:text-4xl font-bold text-[var(--gold)] mb-4">
                 {product.name}
               </h2>
 
-              <h3 className="text-xl font-semibold text-[#14532d] mb-2">
+              <h3 className="text-xl font-semibold text-emerald-300/90 mb-2">
                 SPECIFICATIONS:
               </h3>
               <p className="text-base sm:text-lg leading-relaxed mb-4">
                 {product.specs}
               </p>
 
-              <h3 className="text-xl font-semibold text-[#14532d] mb-2">
+              <h3 className="text-xl font-semibold text-emerald-300/90 mb-2">
                 PACKAGING:
               </h3>
               <p className="text-base sm:text-lg leading-relaxed whitespace-pre-line">
@@ -129,6 +129,6 @@ Available in multiple varieties — long, round, and striped.`,
           </motion.div>
         ))}
       </section>
-    </main>
+    </div>
   );
 }

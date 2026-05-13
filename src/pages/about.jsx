@@ -4,63 +4,61 @@ import { Globe, Star, Leaf, Handshake, Package } from "lucide-react";
 
 export default function AboutPage() {
   return (
-    <main className="flex flex-col min-h-screen bg-[#fdf3e6] text-gray-800">
+    <div className="flex flex-col min-h-screen text-[var(--foreground)]">
       {/* ==== HEADER SECTION ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
         <img
           src="/Hero.jpg"
           alt="About Header"
-          fill
-          priority
-          quality={100}
-          className="object-cover brightness-75 blur-[2px]"
+          className="absolute inset-0 h-full w-full object-cover brightness-75 blur-[2px]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/70 via-transparent to-[var(--background)]/80" />
         <div className="relative z-10 text-white px-4 mt-16 sm:mt-20">
           <div className="inline-block mb-4">
-            <div className="w-20 h-1 bg-[#16a34a] mx-auto mb-3"></div>
-            <h1 className="text-4xl sm:text-6xl font-bold mb-3 tracking-tight text-[#ffffff]">
+            <div className="w-20 h-1 bg-[var(--gold)] mx-auto mb-3" />
+            <h1 className="text-4xl sm:text-6xl font-bold mb-3 tracking-tight text-white">
               About Us
             </h1>
-            <div className="w-20 h-1 bg-[#16a34a] mx-auto"></div>
+            <div className="w-20 h-1 bg-[var(--gold)] mx-auto" />
           </div>
-          <p className="max-w-2xl mx-auto text-white text-base sm:text-lg font-light tracking-wide">
+          <p className="max-w-2xl mx-auto text-base sm:text-lg font-light tracking-wide text-white/85">
             Committed to delivering India's quality worldwide
           </p>
         </div>
       </section>
 
       {/* ==== ABOUT SECTION ==== */}
-      <section className="py-16 px-6 bg-[#fdf3e6]">
+      <section className="py-16 px-6">
         <div className="max-w-6xl mx-auto space-y-12">
           {/* Intro */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7 }}
-            className="bg-white shadow-lg rounded-2xl p-8 sm:p-10 border border-gray-200"
+            className="glass-card p-8 sm:p-10"
           >
-            <h2 className="text-3xl sm:text-4xl font-semibold text-gray-900 mb-6 text-center">
+            <h2 className="text-3xl sm:text-4xl font-semibold text-white mb-6 text-center">
               Who We Are
             </h2>
-            <p className="text-lg text-gray-700 leading-relaxed text-justify">
-              <span className="font-semibold text-[#16a34a]">
+            <p className="text-lg text-white/75 leading-relaxed text-justify">
+              <span className="font-semibold text-[var(--gold)]">
                 NEW INDIA EXPORT
               </span>{" "}
               focuses on exporting premium Indian products to customers all over
               the world. We have built a strong, passionate team that works with
               dedication and courage to fulfill the goals of our company.
             </p>
-            <p className="text-lg text-gray-700 mt-4 leading-relaxed text-justify">
+            <p className="text-lg text-white/75 mt-4 leading-relaxed text-justify">
               Our focus lies in maintaining excellence in{" "}
-              <span className="font-semibold text-[#16a34a]">
+              <span className="font-semibold text-emerald-300/95">
                 quality, quantity, variety, accuracy, and long-term relations.
               </span>{" "}
               All our products meet international and national quality
               standards, reflecting the authenticity and richness of India’s
               agricultural and organic heritage.
             </p>
-            <p className="text-lg text-gray-700 mt-4 leading-relaxed text-justify">
+            <p className="text-lg text-white/75 mt-4 leading-relaxed text-justify">
               We aim to spread India’s diverse culture, taste, and quality
               across the globe — building trust through every shipment we make.
             </p>
@@ -74,19 +72,19 @@ export default function AboutPage() {
             className="grid grid-cols-1 md:grid-cols-2 gap-8"
           >
             {/* Left */}
-            <div className="bg-white rounded-2xl shadow-md p-8 border border-gray-200">
-              <h3 className="text-2xl font-semibold text-[#16a34a] mb-4">
+            <div className="glass-card p-8">
+              <h3 className="text-2xl font-semibold text-[var(--gold)] mb-4">
                 Our Vision
               </h3>
-              <p className="text-gray-700 text-lg leading-relaxed">
+              <p className="text-white/75 text-lg leading-relaxed">
                 To create a strong and reliable platform in the{" "}
-                <span className="font-semibold">Export-Import Community</span>,
+                <span className="font-semibold text-white">Export-Import Community</span>,
                 representing the best of Indian agriculture, spices, and organic
                 excellence globally.
               </p>
-              <p className="text-gray-700 mt-3 text-lg leading-relaxed">
+              <p className="text-white/75 mt-3 text-lg leading-relaxed">
                 We believe that{" "}
-                <span className="font-semibold">
+                <span className="font-semibold text-white">
                   customer satisfaction is our greatest review,
                 </span>{" "}
                 and we strive to achieve it with every transaction.
@@ -94,11 +92,11 @@ export default function AboutPage() {
             </div>
 
             {/* Right */}
-            <div className="bg-white rounded-2xl shadow-md p-8 border border-gray-200">
-              <h3 className="text-2xl font-semibold text-[#16a34a] mb-4">
+            <div className="glass-card p-8">
+              <h3 className="text-2xl font-semibold text-[var(--gold)] mb-4">
                 Our Core Values
               </h3>
-              <ul className="list-disc list-inside text-gray-700 text-lg space-y-2">
+              <ul className="list-disc list-inside text-white/75 text-lg space-y-2 marker:text-[var(--gold)]">
                 <li>No compromises on product quality</li>
                 <li>Building long-lasting client relationships</li>
                 <li>Timely supply and transparent services</li>
@@ -113,9 +111,9 @@ export default function AboutPage() {
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="bg-white rounded-2xl shadow-md p-8 border border-gray-200"
+            className="glass-card p-8"
           >
-            <h3 className="text-2xl font-semibold text-[#16a34a] mb-6 text-center">
+            <h3 className="text-2xl font-semibold text-[var(--gold)] mb-6 text-center">
               Our Specialities
             </h3>
 
@@ -145,11 +143,11 @@ export default function AboutPage() {
                 <motion.div
                   key={i}
                   whileHover={{ y: -5 }}
-                  className="flex flex-col items-center justify-center bg-[#fdf3e6] rounded-xl p-6 shadow-sm hover:shadow-md transition-all"
+                  className="flex flex-col items-center justify-center glass rounded-xl p-6 border border-white/10 hover:border-[var(--gold)]/25 transition-all"
                 >
-                  <item.icon className="w-10 h-10 text-[#16a34a] mb-3" />
-                  <h4 className="text-lg font-semibold mb-2">{item.title}</h4>
-                  <p className="text-sm text-gray-600">{item.desc}</p>
+                  <item.icon className="w-10 h-10 text-[var(--gold)] mb-3" />
+                  <h4 className="text-lg font-semibold mb-2 text-white">{item.title}</h4>
+                  <p className="text-sm text-white/60">{item.desc}</p>
                 </motion.div>
               ))}
             </div>
@@ -162,7 +160,7 @@ export default function AboutPage() {
   transition={{ duration: 0.8, delay: 0.4 }}
   className="text-center px-4"
 >
-  <h3 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-5 sm:mb-6">
+  <h3 className="text-xl sm:text-2xl font-semibold text-white mb-5 sm:mb-6">
     Explore Our Products
   </h3>
 
@@ -181,18 +179,7 @@ export default function AboutPage() {
       >
         <Link
           to={btn.link}
-          className="
-            block
-            px-4 py-2.5
-            sm:px-6 sm:py-3
-            rounded-full
-            bg-[#16a34a]
-            text-white
-            text-sm sm:text-base
-            font-medium
-            hover:bg-[#128a3f]
-            transition
-          "
+          className="btn-gold block px-4 py-2.5 sm:px-6 sm:py-3 rounded-full text-sm sm:text-base font-medium text-center"
         >
           {btn.label}
         </Link>
@@ -203,6 +190,6 @@ export default function AboutPage() {
 
         </div>
       </section>
-    </main>
+    </div>
   );
 }

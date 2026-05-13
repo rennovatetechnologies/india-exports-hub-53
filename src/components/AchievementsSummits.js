@@ -49,8 +49,7 @@ export default function AchievementsSummits() {
         <img
           src="/bg.jpg"     // <-- change to whatever bg image you want
           alt="background"
-          fill
-          className="object-cover"
+          className="absolute inset-0 h-full w-full object-cover"
         />
         {/* Dark Blur Overlay */}
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
@@ -77,8 +76,7 @@ export default function AchievementsSummits() {
                 <img
                   src={internationalSlides[intIndex].image}
                   alt="International slide"
-                  fill
-                  className="object-cover"
+                  className="absolute inset-0 h-full w-full object-cover"
                 />
               </motion.div>
             </AnimatePresence>
@@ -130,8 +128,7 @@ export default function AchievementsSummits() {
                 <img
                   src={nationalSlides[natIndex].image}
                   alt="National slide"
-                  fill
-                  className="object-cover"
+                  className="absolute inset-0 h-full w-full object-cover"
                 />
               </motion.div>
             </AnimatePresence>
