@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { clearSession } from "@/lib/authSession";
+import { clearSession, getSession, ROLES } from "@/lib/authSession";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, FileCheck2, Folder, Workflow, CalendarDays,
-  CreditCard, Settings, LifeBuoy, Bell, Search, Menu, X, LogOut, ChevronRight
+  CreditCard, Settings, LifeBuoy, Bell, Search, Menu, X, LogOut, ChevronRight,
+  ShieldCheck, Crown, Briefcase, BarChart3, Users
 } from "lucide-react";
 
-const NAV = [
+const CUSTOMER_NAV = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/kyc", label: "KYC Wizard", icon: FileCheck2 },
   { href: "/dashboard/vault", label: "Document Vault", icon: Folder },
@@ -16,15 +17,41 @@ const NAV = [
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
 ];
 
+const OPS_NAV = [
+  { href: "/admin", label: "Operations", icon: Briefcase },
+  { href: "/dashboard/workflow", label: "Workflow board", icon: Workflow },
+  { href: "/dashboard/vault", label: "Document review", icon: Folder },
+  { href: "/dashboard/kyc", label: "KYC queue", icon: FileCheck2 },
+];
+
+const SUPER_NAV = [
+  { href: "/admin/super", label: "Control center", icon: Crown },
+  { href: "/admin", label: "Operations", icon: Briefcase },
+  { href: "/dashboard/billing", label: "Revenue", icon: BarChart3 },
+  { href: "/dashboard/events", label: "Events", icon: CalendarDays },
+  { href: "/dashboard/settings", label: "RBAC &amp; team", icon: Users },
+];
+
 const FOOTER_NAV = [
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
   { href: "/dashboard/support", label: "Support", icon: LifeBuoy },
 ];
 
+function roleMeta(role) {
+  if (role === ROLES.SUPER) return { label: "Super Admin", chip: "bg-[var(--gold)]/15 text-[var(--gold)]", icon: Crown };
+  if (role === ROLES.OPERATIONS) return { label: "Operations", chip: "bg-cyan-300/15 text-cyan-200", icon: ShieldCheck };
+  return { label: "Customer", chip: "bg-emerald-300/15 text-emerald-200", icon: LayoutDashboard };
+}
+
 export default function DashboardChrome({ children }) {
   const pathname = useLocation().pathname;
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const session = getSession();
+  const role = session?.role || (pathname.startsWith("/admin/super") ? ROLES.SUPER : pathname.startsWith("/admin") ? ROLES.OPERATIONS : ROLES.CUSTOMER);
+  const meta = roleMeta(role);
+  const NAV = role === ROLES.SUPER ? SUPER_NAV : role === ROLES.OPERATIONS ? OPS_NAV : CUSTOMER_NAV;
+  const initials = (session?.name || meta.label).split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 
   const signOut = () => {
     clearSession();
@@ -40,6 +67,10 @@ export default function DashboardChrome({ children }) {
           <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Export OS</div>
         </div>
       </Link>
+
+      <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] uppercase tracking-wider ${meta.chip}`}>
+        <meta.icon size={12} /> {meta.label} workspace
+      </div>
 
       <nav className="flex-1 space-y-1">
         {NAV.map(({ href, label, icon: Icon }) => {
@@ -63,6 +94,7 @@ export default function DashboardChrome({ children }) {
         })}
       </nav>
 
+      {role === ROLES.CUSTOMER && (
       <div className="rounded-2xl glass p-4">
         <div className="flex items-center justify-between text-xs text-white/60">
           <span>Plan progress</span>
@@ -73,6 +105,16 @@ export default function DashboardChrome({ children }) {
         </div>
         <p className="mt-3 text-[11px] text-white/45">IEC issued · AD code pending</p>
       </div>
+      )}
+      {role === ROLES.SUPER && (
+        <div className="rounded-2xl glass p-4">
+          <div className="flex items-center justify-between text-xs text-white/60">
+            <span>Pending approvals</span>
+            <Link to="/admin/super" className="text-[var(--gold)] hover:underline">Review →</Link>
+          </div>
+          <p className="mt-2 text-[11px] text-white/45">3 admin requests · 2 KYC escalations</p>
+        </div>
+      )}
 
       <div className="space-y-1">
         {FOOTER_NAV.map(({ href, label, icon: Icon }) => (
@@ -148,8 +190,9 @@ export default function DashboardChrome({ children }) {
               <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[var(--gold)]" />
             </button>
             <Link to="/dashboard/settings" className="flex h-9 items-center gap-2 rounded-lg glass px-2 pr-3">
-              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--grad-gold)] text-black text-xs font-bold">RA</span>
-              <span className="hidden text-sm sm:inline">Rohit A.</span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--grad-gold)] text-black text-xs font-bold">{initials}</span>
+              <span className="hidden text-sm sm:inline">{session?.name || meta.label}</span>
+              <span className={`hidden md:inline rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider ${meta.chip}`}>{meta.label}</span>
             </Link>
           </div>
         </header>
