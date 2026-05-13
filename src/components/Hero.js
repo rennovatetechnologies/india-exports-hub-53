@@ -1,8 +1,6 @@
-"use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import Image from "next/image";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import BookingModal from "./BookingModal";
 import EventBookingModal from "./EventBookingModal";
 import {
@@ -22,7 +20,7 @@ export default function Hero() {
     <>
       <section className="relative isolate min-h-[100svh] overflow-hidden pt-28 pb-20 md:pt-32 md:pb-28">
         {/* Background image (very subtle) */}
-        <Image
+        <img
           src="/Hero.jpg"
           alt=""
           fill
@@ -89,7 +87,7 @@ export default function Hero() {
                   <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
                 </button>
                 <Link
-                  href="#plans"
+                  to="#plans"
                   className="btn-ghost inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-medium"
                 >
                   Explore Plans

@@ -1,7 +1,5 @@
-"use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function AchievementsSummits() {
@@ -48,7 +46,7 @@ export default function AchievementsSummits() {
     >
       {/* BACKGROUND IMAGE */}
       <div className="absolute inset-0 -z-10">
-        <Image
+        <img
           src="/bg.jpg"     // <-- change to whatever bg image you want
           alt="background"
           fill
@@ -76,7 +74,7 @@ export default function AchievementsSummits() {
                 transition={{ duration: 0.6 }}
                 className="absolute inset-0"
               >
-                <Image
+                <img
                   src={internationalSlides[intIndex].image}
                   alt="International slide"
                   fill
@@ -129,7 +127,7 @@ export default function AchievementsSummits() {
                 transition={{ duration: 0.6 }}
                 className="absolute inset-0"
               >
-                <Image
+                <img
                   src={nationalSlides[natIndex].image}
                   alt="National slide"
                   fill

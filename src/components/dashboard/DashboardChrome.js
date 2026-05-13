@@ -1,7 +1,6 @@
-"use client";
 import { useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, FileCheck2, Folder, Workflow, CalendarDays,
@@ -23,12 +22,12 @@ const FOOTER_NAV = [
 ];
 
 export default function DashboardChrome({ children }) {
-  const pathname = usePathname();
+  const pathname = useLocation().pathname;
   const [open, setOpen] = useState(false);
 
   const SideContent = (
     <div className="flex h-full flex-col gap-6 p-5">
-      <Link href="/" className="flex items-center gap-2">
+      <Link to="/" className="flex items-center gap-2">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--grad-gold)] text-black font-bold">V</span>
         <div className="leading-tight">
           <div className="text-sm font-semibold">VISTARA</div>
@@ -42,7 +41,7 @@ export default function DashboardChrome({ children }) {
           return (
             <Link
               key={href}
-              href={href}
+              to={href}
               onClick={() => setOpen(false)}
               className={`group flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition ${
                 active ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
@@ -71,11 +70,11 @@ export default function DashboardChrome({ children }) {
 
       <div className="space-y-1">
         {FOOTER_NAV.map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={href} className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white/60 hover:bg-white/5 hover:text-white">
+          <Link key={href} to={href} className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white/60 hover:bg-white/5 hover:text-white">
             <Icon size={15} /> {label}
           </Link>
         ))}
-        <Link href="/login" className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white/60 hover:bg-white/5 hover:text-white">
+        <Link to="/login" className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white/60 hover:bg-white/5 hover:text-white">
           <LogOut size={15} /> Sign out
         </Link>
       </div>
@@ -138,7 +137,7 @@ export default function DashboardChrome({ children }) {
               <Bell size={16} />
               <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[var(--gold)]" />
             </button>
-            <Link href="/dashboard/settings" className="flex h-9 items-center gap-2 rounded-lg glass px-2 pr-3">
+            <Link to="/dashboard/settings" className="flex h-9 items-center gap-2 rounded-lg glass px-2 pr-3">
               <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--grad-gold)] text-black text-xs font-bold">RA</span>
               <span className="hidden text-sm sm:inline">Rohit A.</span>
             </Link>

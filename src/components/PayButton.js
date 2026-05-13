@@ -1,5 +1,3 @@
-"use client";
-
 export default function PayButton() {
   const loadRazorpayScript = () =>
     new Promise((resolve) => {

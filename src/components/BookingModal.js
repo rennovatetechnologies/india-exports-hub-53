@@ -1,4 +1,3 @@
-"use client";
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ArrowRight, Ship, Plane, Box, PackageSearch, User, Weight } from "lucide-react";

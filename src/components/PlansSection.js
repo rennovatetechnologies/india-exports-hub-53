@@ -1,4 +1,3 @@
-"use client";
 import { motion } from "framer-motion";
 import { Check, Minus, Sparkles } from "lucide-react";
 

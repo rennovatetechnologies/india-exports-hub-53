@@ -1,5 +1,4 @@
-"use client";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Leaf, Truck, Sprout, Award, ArrowUpRight } from "lucide-react";
 
@@ -35,7 +34,7 @@ export default function AboutUsSection() {
             </p>
 
             <Link
-              href="/about"
+              to="/about"
               className="mt-8 inline-flex items-center gap-2 btn-ghost rounded-full px-5 py-2.5 text-sm font-medium"
             >
               Our story <ArrowUpRight size={16} />
