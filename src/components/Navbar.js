@@ -19,7 +19,7 @@ export default function Navbar() {
     setMounted(true);
   }, []);
 
-  const hideOnDashboard = pathname?.startsWith("/dashboard") || ["/login", "/signup", "/verify", "/forgot-password"].some((p) => pathname?.startsWith(p));
+  const hideOnDashboard = pathname?.startsWith("/dashboard") || pathname?.startsWith("/admin") || ["/login", "/signup", "/verify", "/forgot-password"].some((p) => pathname?.startsWith(p));
   if (hideOnDashboard) return null;
 
   useEffect(() => {
