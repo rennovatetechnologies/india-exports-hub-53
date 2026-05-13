@@ -3,14 +3,18 @@ import { useEffect, useState } from "react";
 import { ArrowUp, MessageCircle, Mail, Phone, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function Footer() {
+  const pathname = usePathname();
   const [showTop, setShowTop] = useState(false);
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 400);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+  const hide = pathname?.startsWith("/dashboard") || pathname?.startsWith("/admin") || ["/login", "/signup", "/verify", "/forgot-password"].some((p) => pathname?.startsWith(p));
+  if (hide) return null;
 
   return (
     <>
