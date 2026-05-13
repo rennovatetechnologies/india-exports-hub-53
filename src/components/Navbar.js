@@ -20,7 +20,7 @@ export default function Navbar() {
   }, []);
 
   const hideOnDashboard = pathname?.startsWith("/dashboard") || ["/login", "/signup", "/verify", "/forgot-password"].some((p) => pathname?.startsWith(p));
-  if (hideOnDashboard) return null;
+
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60);
@@ -62,6 +62,7 @@ export default function Navbar() {
     setDesktopProductsOpen(false);
     setDesktopBrochuresOpen(false);
   }, [pathname]);
+    if (hideOnDashboard) return null;
 
   const brochures = [
     {
