@@ -19,9 +19,6 @@ export default function Navbar() {
   }, []);
 
 
-  const hideOnDashboard = pathname?.startsWith("/dashboard") || pathname?.startsWith("/admin") || ["/login", "/signup", "/verify", "/forgot-password"].some((p) => pathname?.startsWith(p));
-  if (hideOnDashboard) return null;
-
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60);
     window.addEventListener("scroll", onScroll);
@@ -37,6 +34,9 @@ export default function Navbar() {
       document.documentElement.classList.remove("drawer-open");
     }
   }, [mobileOpen]);
+
+  const hideOnDashboard = pathname?.startsWith("/dashboard") || pathname?.startsWith("/admin") || ["/login", "/signup", "/verify", "/forgot-password"].some((p) => pathname?.startsWith(p));
+  if (hideOnDashboard) return null;
 
   useEffect(() => {
     const onResize = () => window.innerWidth >= 768 && setMobileOpen(false);
