@@ -27,6 +27,10 @@ export default function LoginPage() {
         <>
           New to VISTARA?{" "}
           <Link to="/signup" className="text-[var(--gold)] hover:underline">Create an account</Link>
+          <div className="mt-3 text-[11px] text-white/45">
+            Internal team?{" "}
+            <Link to="/admin/login" className="text-emerald-300 hover:underline">Operations sign in</Link>
+          </div>
         </>
       }
     >
