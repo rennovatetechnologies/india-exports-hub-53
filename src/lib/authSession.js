@@ -1,5 +1,38 @@
 const STORAGE_KEY = "vistara_session";
 const ADMIN_REQUESTS_KEY = "vistara_admin_requests";
+/** Lowercased emails that finished customer KYC (persists across sessions). */
+const KYC_COMPLETE_KEY = "vistara_kyc_complete_emails";
+
+function parseKycEmailSet() {
+  try {
+    const raw = localStorage.getItem(KYC_COMPLETE_KEY);
+    const arr = JSON.parse(raw || "[]");
+    if (!Array.isArray(arr)) return new Set();
+    return new Set(arr.map((e) => String(e).trim().toLowerCase()).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+/** Whether this email has completed customer KYC (local mock store). */
+export function hasCompletedKyc(email) {
+  const key = normalizeEmail(email);
+  if (!key) return false;
+  return parseKycEmailSet().has(key);
+}
+
+/** Call when the customer submits KYC so they are not forced through the wizard again. */
+export function markKycComplete(email) {
+  const key = normalizeEmail(email);
+  if (!key) return;
+  const next = parseKycEmailSet();
+  next.add(key);
+  localStorage.setItem(KYC_COMPLETE_KEY, JSON.stringify([...next]));
+}
 
 /** Roles supported across the platform. */
 export const ROLES = {
@@ -30,12 +63,16 @@ export function getSession() {
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (!data || typeof data.email !== "string" || !data.email.trim()) return null;
+    const email = data.email.trim();
+    const role = typeof data.role === "string" ? data.role : ROLES.CUSTOMER;
+    const kycComplete = role === ROLES.CUSTOMER ? hasCompletedKyc(email) : true;
     return {
-      email: data.email.trim(),
+      email,
       name: (typeof data.name === "string" && data.name.trim()) || displayNameFromEmail(data.email),
       phone: typeof data.phone === "string" ? data.phone.trim() : "",
-      role: typeof data.role === "string" ? data.role : ROLES.CUSTOMER,
+      role,
       status: typeof data.status === "string" ? data.status : ADMIN_STATUS.ACTIVE,
+      kycComplete,
     };
   } catch {
     return null;

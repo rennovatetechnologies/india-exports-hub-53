@@ -1,9 +1,16 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquare, Mail, Phone, ChevronDown, BookOpen, Sparkles } from "lucide-react";
 
 const CHANNELS = [
-  { icon: MessageSquare, label: "Live chat", desc: "Avg reply 2 min · 9am–9pm IST", cta: "Start chat" },
+  {
+    icon: MessageSquare,
+    label: "Workflow comments",
+    desc: "There is no live chat. Post a note on your shipment case under Activity & notes — our team monitors workflow updates and replies there.",
+    cta: "Open workflow",
+    to: "/dashboard/workflow#workflow-activity",
+  },
   { icon: Mail, label: "Email support", desc: "support@vistaraexports.com · 4h SLA", cta: "Compose email" },
   { icon: Phone, label: "Hotline", desc: "+91 80 4567 1200 · Mon–Sat", cta: "Call now" },
 ];
@@ -32,12 +39,18 @@ export default function SupportPage() {
       </header>
 
       <section className="grid gap-4 md:grid-cols-3">
-        {CHANNELS.map(({ icon: Icon, label, desc, cta }) => (
+        {CHANNELS.map(({ icon: Icon, label, desc, cta, to }) => (
           <motion.div key={label} whileHover={{ y: -2 }} className="glass-card p-5">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--gold)]/15 text-[var(--gold)]"><Icon size={18} /></span>
             <div className="mt-3 text-sm font-semibold">{label}</div>
             <div className="text-xs text-white/55">{desc}</div>
-            <button className="btn-ghost mt-4 w-full rounded-xl px-3 py-2 text-xs">{cta}</button>
+            {to ? (
+              <Link to={to} className="btn-ghost mt-4 flex w-full items-center justify-center rounded-xl px-3 py-2 text-xs">
+                {cta}
+              </Link>
+            ) : (
+              <button type="button" className="btn-ghost mt-4 w-full rounded-xl px-3 py-2 text-xs">{cta}</button>
+            )}
           </motion.div>
         ))}
       </section>

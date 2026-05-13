@@ -1,17 +1,25 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { getSession, markKycComplete } from "@/lib/authSession";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  CheckCircle2, Circle, Building2, IdCard, Banknote, FileBadge, Upload,
+  CheckCircle2, Building2, IdCard, Upload,
   ArrowLeft, ArrowRight, ShieldCheck, X, FileText
 } from "lucide-react";
 
 const STEPS = [
   { id: "business", label: "Business", icon: Building2 },
   { id: "identity", label: "Identity", icon: IdCard },
-  { id: "banking",  label: "Banking",  icon: Banknote },
-  { id: "compliance", label: "Compliance", icon: FileBadge },
-  { id: "review",   label: "Review",   icon: ShieldCheck },
+  { id: "review", label: "Review", icon: ShieldCheck },
+];
+
+/** Shown in the KYC header — all of these must be uploaded before verification. */
+const MANDATORY_KYC_UPLOADS = [
+  "PAN",
+  "Aadhaar",
+  "Bank statement",
+  "Photo",
+  "Electricity bill",
 ];
 
 function Field({ label, hint, children }) {
@@ -48,12 +56,57 @@ function DocDrop({ title, desc, file, onFile }) {
   );
 }
 
+const MANDATORY_DOC_KEYS = ["pan", "aadhaar", "bankStatement", "photo", "electricity"];
+
 export default function KycWizardPage() {
+  const navigate = useNavigate();
+  const session = getSession();
+  const alreadyDone = Boolean(session?.kycComplete);
+
   const [step, setStep] = useState(0);
-  const [docs, setDocs] = useState({ pan: null, aadhaar: null, gst: null, iec: null, bank: null, msme: null });
+  const [docs, setDocs] = useState({
+    pan: null,
+    aadhaar: null,
+    bankStatement: null,
+    photo: null,
+    electricity: null,
+  });
   const set = (k) => (v) => setDocs((d) => ({ ...d, [k]: v }));
 
+  const mandatoryUploaded = MANDATORY_DOC_KEYS.filter((k) => docs[k]).length;
+  const allMandatoryDocs = mandatoryUploaded === MANDATORY_DOC_KEYS.length;
+
   const goto = (i) => setStep(Math.max(0, Math.min(STEPS.length - 1, i)));
+
+  const onSubmitKyc = () => {
+    if (!session?.email || !allMandatoryDocs) return;
+    markKycComplete(session.email);
+    navigate("/dashboard", { replace: true });
+  };
+
+  if (alreadyDone) {
+    return (
+      <div className="space-y-8">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.25em] text-white/40">Compliance</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">KYC complete</h1>
+            <p className="mt-1 text-sm text-white/55">Your workspace is verified. You can continue with exports onboarding.</p>
+          </div>
+          <Link to="/dashboard" className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-black">
+            Go to overview
+          </Link>
+        </div>
+        <div className="glass-card flex items-start gap-4 p-6">
+          <ShieldCheck className="shrink-0 text-emerald-300" size={28} />
+          <div>
+            <p className="font-medium text-white">No further action needed</p>
+            <p className="mt-1 text-sm text-white/55">We keep your submitted documents on file. Open the vault or workflow anytime from the sidebar.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -61,14 +114,24 @@ export default function KycWizardPage() {
         <div>
           <p className="text-xs uppercase tracking-[0.25em] text-white/40">Compliance</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">KYC & Onboarding</h1>
-          <p className="mt-1 text-sm text-white/55">Complete five steps to unlock DGFT &amp; ICEGATE workflows.</p>
+          <p className="mt-1 text-sm text-white/55">Complete three steps to unlock DGFT &amp; ICEGATE workflows.</p>
         </div>
-        <Link to="/dashboard" className="text-xs text-white/55 hover:text-white">← Back to overview</Link>
+        <span className="text-xs text-white/45">Overview unlocks after you submit KYC.</span>
+      </div>
+
+      <div className="rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-4 sm:p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-200/90">KYC upload</p>
+        <p className="mt-2 text-sm text-white/80">The documents below are mandatory for verification.</p>
+        <ul className="mt-3 grid list-inside list-disc gap-1.5 text-sm text-white/70 sm:grid-cols-2 sm:gap-x-8">
+          {MANDATORY_KYC_UPLOADS.map((label) => (
+            <li key={label}>{label}</li>
+          ))}
+        </ul>
       </div>
 
       {/* Stepper */}
       <div className="glass-card p-5">
-        <ol className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <ol className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {STEPS.map((s, i) => {
             const done = i < step;
             const active = i === step;
@@ -140,41 +203,16 @@ export default function KycWizardPage() {
                   <Field label="Aadhaar (last 4)"><input className={inputCls} placeholder="•••• 1234" /></Field>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <DocDrop title="PAN card" desc="PDF or image · max 5MB" file={docs.pan} onFile={set("pan")} />
-                  <DocDrop title="Aadhaar / Passport" desc="Front & back combined" file={docs.aadhaar} onFile={set("aadhaar")} />
+                  <DocDrop title="PAN card" desc="Required · PDF or image · max 5MB" file={docs.pan} onFile={set("pan")} />
+                  <DocDrop title="Aadhaar" desc="Required · front &amp; back combined" file={docs.aadhaar} onFile={set("aadhaar")} />
+                  <DocDrop title="Bank statement" desc="Required · last 3 months · PDF" file={docs.bankStatement} onFile={set("bankStatement")} />
+                  <DocDrop title="Photo" desc="Required · recent passport-size, plain background" file={docs.photo} onFile={set("photo")} />
+                  <DocDrop title="Electricity bill" desc="Required · address proof · last 3 months" file={docs.electricity} onFile={set("electricity")} />
                 </div>
               </>
             )}
 
             {step === 2 && (
-              <>
-                <h2 className="text-lg font-semibold">Banking & AD code</h2>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Bank name"><input className={inputCls} placeholder="ICICI Bank" /></Field>
-                  <Field label="Branch (AD enabled)"><input className={inputCls} placeholder="Nagpur · Sitabuldi" /></Field>
-                  <Field label="Account number"><input className={inputCls} placeholder="•••• •••• 4421" /></Field>
-                  <Field label="IFSC"><input className={inputCls} placeholder="ICIC0000123" /></Field>
-                  <Field label="AD code"><input className={inputCls} placeholder="6390123-4500003" /></Field>
-                  <Field label="SWIFT / BIC"><input className={inputCls} placeholder="ICICINBBCTS" /></Field>
-                </div>
-                <DocDrop title="Cancelled cheque / Bank letter" desc="Required for AD code mapping" file={docs.bank} onFile={set("bank")} />
-              </>
-            )}
-
-            {step === 3 && (
-              <>
-                <h2 className="text-lg font-semibold">Compliance documents</h2>
-                <p className="text-sm text-white/55">Upload mandatory licenses. Optional documents help us pre-fill DGFT &amp; ICEGATE applications.</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <DocDrop title="GST Certificate" desc="Required" file={docs.gst} onFile={set("gst")} />
-                  <DocDrop title="IEC Certificate" desc="Optional · we can apply for you" file={docs.iec} onFile={set("iec")} />
-                  <DocDrop title="MSME / Udyam" desc="Optional" file={docs.msme} onFile={set("msme")} />
-                  <DocDrop title="RCMC (if any)" desc="Optional" file={null} onFile={() => {}} />
-                </div>
-              </>
-            )}
-
-            {step === 4 && (
               <>
                 <h2 className="text-lg font-semibold">Review & submit</h2>
                 <p className="text-sm text-white/55">Our compliance desk verifies submissions within 1 business day.</p>
@@ -182,9 +220,10 @@ export default function KycWizardPage() {
                   {[
                     ["Entity", "Aurora Exports Pvt Ltd"],
                     ["Signatory", "Rohit Agarwal · Director"],
-                    ["Bank", "ICICI · Nagpur · ••4421"],
-                    ["AD Code", "6390123-4500003"],
-                    ["Documents", `${Object.values(docs).filter(Boolean).length} of ${Object.keys(docs).length} uploaded`],
+                    [
+                      "Mandatory KYC",
+                      `${mandatoryUploaded} of ${MANDATORY_DOC_KEYS.length} documents uploaded`,
+                    ],
                     ["SLA", "Verification within 24 hours"],
                   ].map(([k, v]) => (
                     <div key={k} className="rounded-xl bg-white/[0.03] p-4">
@@ -214,7 +253,12 @@ export default function KycWizardPage() {
               Continue <ArrowRight size={14} />
             </button>
           ) : (
-            <button className="btn-gold inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-black">
+            <button
+              type="button"
+              disabled={!allMandatoryDocs}
+              onClick={onSubmitKyc}
+              className="btn-gold inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-45"
+            >
               Submit for verification <CheckCircle2 size={15} />
             </button>
           )}

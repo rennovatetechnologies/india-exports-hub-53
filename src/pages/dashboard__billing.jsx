@@ -3,15 +3,15 @@ import { motion } from "framer-motion";
 import { Check, CreditCard, Smartphone, Building2, Download, Sparkles } from "lucide-react";
 
 const PLANS = [
-  { id: "basic", name: "Basic", monthly: 33999, tagline: "For first-time exporters", features: ["IEC + AD code", "1 product category", "Email support", "Basic KYC review"] },
-  { id: "standard", name: "Standard", monthly: 43999, tagline: "Most exporters pick this", featured: true, features: ["Everything in Basic", "RCMC + DGFT advisory", "5 product categories", "Priority ops support", "Quarterly compliance review"] },
-  { id: "premium", name: "Premium", monthly: 83999, tagline: "Full white-glove desk", features: ["Everything in Standard", "Dedicated success manager", "Unlimited categories", "Buyer matchmaking", "Trade finance intro"] },
+  { id: "basic", name: "Basic", price: 33999, tagline: "For first-time exporters", features: ["IEC + AD code", "1 product category", "Email support", "Basic KYC review"] },
+  { id: "standard", name: "Standard", price: 43999, tagline: "Most exporters pick this", featured: true, features: ["Everything in Basic", "RCMC + DGFT advisory", "5 product categories", "Priority ops support", "Quarterly compliance review"] },
+  { id: "premium", name: "Premium", price: 83999, tagline: "Full white-glove desk", features: ["Everything in Standard", "Dedicated success manager", "Unlimited categories", "Buyer matchmaking", "Trade finance intro"] },
 ];
 
 const INVOICES = [
-  { id: "INV-2041", date: "12 Apr 2026", plan: "Standard (Annual)", amount: 519188, status: "Paid" },
-  { id: "INV-1987", date: "08 Jan 2026", plan: "Standard (Monthly)", amount: 51919, status: "Paid" },
-  { id: "INV-1902", date: "08 Dec 2025", plan: "Basic (Monthly)", amount: 40119, status: "Paid" },
+  { id: "INV-2041", date: "12 Apr 2026", plan: "Standard (one-time)", amount: 519188, status: "Paid" },
+  { id: "INV-1987", date: "08 Jan 2026", plan: "Standard (one-time)", amount: 51919, status: "Paid" },
+  { id: "INV-1902", date: "08 Dec 2025", plan: "Basic (one-time)", amount: 40119, status: "Paid" },
 ];
 
 const PAYMENTS = [
@@ -21,7 +21,6 @@ const PAYMENTS = [
 ];
 
 export default function BillingPage() {
-  const [billing, setBilling] = useState("monthly");
   const [selected, setSelected] = useState("standard");
   const [pay, setPay] = useState("upi");
 
@@ -30,24 +29,13 @@ export default function BillingPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Plans & billing</h1>
-          <p className="mt-1 text-sm text-white/55">Pick a plan, manage invoices and payment methods.</p>
-        </div>
-        <div className="inline-flex rounded-full border border-white/10 bg-white/[0.03] p-1 text-xs">
-          {["monthly", "annual"].map((m) => (
-            <button
-              key={m}
-              onClick={() => setBilling(m)}
-              className={`rounded-full px-4 py-1.5 capitalize transition ${billing === m ? "bg-[var(--gold)] text-black font-semibold" : "text-white/60 hover:text-white"}`}
-            >
-              {m}{m === "annual" && <span className="ml-1 text-[10px]">−15%</span>}
-            </button>
-          ))}
+          <p className="mt-1 text-sm text-white/55">One-time fees per plan. Manage invoices and payment methods.</p>
         </div>
       </header>
 
       <section className="grid gap-5 md:grid-cols-3">
         {PLANS.map((p) => {
-          const base = billing === "annual" ? p.monthly * 12 * 0.85 : p.monthly;
+          const base = p.price;
           const gst = base * 0.18;
           const total = base + gst;
           const active = selected === p.id;
@@ -66,7 +54,7 @@ export default function BillingPage() {
               <div className="mt-1 text-lg font-semibold">{p.name}</div>
               <div className="mt-4 flex items-baseline gap-1">
                 <span className="text-3xl font-semibold">₹{Math.round(base).toLocaleString("en-IN")}</span>
-                <span className="text-xs text-white/45">/{billing === "annual" ? "yr" : "mo"}</span>
+                <span className="text-xs text-white/45">one-time</span>
               </div>
               <div className="mt-1 text-[11px] text-white/40">+ ₹{Math.round(gst).toLocaleString("en-IN")} GST · Total ₹{Math.round(total).toLocaleString("en-IN")}</div>
               <ul className="mt-5 space-y-2 text-sm text-white/70">
@@ -108,12 +96,12 @@ export default function BillingPage() {
 
         <div className="glass-card p-6">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-white/55">Current plan</h3>
-          <div className="mt-3 text-lg font-semibold">Standard · Annual</div>
-          <div className="text-xs text-white/50">Renews 12 Apr 2027</div>
+          <div className="mt-3 text-lg font-semibold">Standard · One-time</div>
+          <div className="text-xs text-white/50">Paid in full · 12 Apr 2026</div>
           <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-white/60">
             Used: 3 of 5 product categories · 2 active shipments
           </div>
-          <button className="btn-ghost mt-4 w-full rounded-xl px-4 py-2 text-xs">Manage subscription</button>
+          <button className="btn-ghost mt-4 w-full rounded-xl px-4 py-2 text-xs">Invoice & receipts</button>
         </div>
       </section>
 

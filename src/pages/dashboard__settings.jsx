@@ -120,7 +120,7 @@ export default function SettingsPage() {
               <ul className="divide-y divide-white/5">
                 {[
                   ["workflow", "Workflow updates", "Stage changes, document approvals, ops messages"],
-                  ["billing", "Billing & invoices", "Payments, renewals, GST invoices"],
+                  ["billing", "Billing & invoices", "Payment receipts, GST invoices"],
                   ["weekly", "Weekly digest", "Every Monday at 9 AM IST"],
                   ["marketing", "Product updates", "New features, events, masterclasses"],
                 ].map(([k, t, d]) => (

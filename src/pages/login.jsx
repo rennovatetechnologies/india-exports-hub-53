@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
-import { setSession, safeNextPath } from "@/lib/authSession";
+import { setSession, safeNextPath, hasCompletedKyc } from "@/lib/authSession";
 
 export default function LoginPage() {
   const router = useNavigate();
@@ -16,7 +16,8 @@ export default function LoginPage() {
     setLoading(true);
     const next = safeNextPath(searchParams.get("next"));
     setSession({ email, name: "", phone: "" });
-    setTimeout(() => router(next), 700);
+    const dest = hasCompletedKyc(email) ? next : "/dashboard/kyc";
+    setTimeout(() => router(dest), 700);
   };
 
   return (

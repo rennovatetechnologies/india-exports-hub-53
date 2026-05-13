@@ -1,17 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { clearSession, getSession, ROLES } from "@/lib/authSession";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, FileCheck2, Folder, Workflow, CalendarDays,
-  CreditCard, Settings, LifeBuoy, Bell, Search, Menu, X, LogOut, ChevronRight,
+  CreditCard, Settings, LifeBuoy, Bell, Search, Menu, LogOut, ChevronRight,
   ShieldCheck, Crown, Briefcase, BarChart3, Users
 } from "lucide-react";
 
-const CUSTOMER_NAV = [
+const CUSTOMER_NAV_BASE = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/kyc", label: "KYC Wizard", icon: FileCheck2 },
-  { href: "/dashboard/vault", label: "Document Vault", icon: Folder },
+  { href: "/dashboard/vault", label: "Document Vault", icon: Folder, matchPrefix: true },
   { href: "/dashboard/workflow", label: "Workflow", icon: Workflow },
   { href: "/dashboard/events", label: "Events", icon: CalendarDays },
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
@@ -20,8 +20,7 @@ const CUSTOMER_NAV = [
 const OPS_NAV = [
   { href: "/admin", label: "Operations", icon: Briefcase },
   { href: "/dashboard/workflow", label: "Workflow board", icon: Workflow },
-  { href: "/dashboard/vault", label: "Document review", icon: Folder },
-  { href: "/dashboard/kyc", label: "KYC queue", icon: FileCheck2 },
+  { href: "/dashboard/vault", label: "Document review", icon: Folder, matchPrefix: true },
 ];
 
 const SUPER_NAV = [
@@ -50,7 +49,28 @@ export default function DashboardChrome({ children }) {
   const session = getSession();
   const role = session?.role || (pathname.startsWith("/admin/super") ? ROLES.SUPER : pathname.startsWith("/admin") ? ROLES.OPERATIONS : ROLES.CUSTOMER);
   const meta = roleMeta(role);
-  const NAV = role === ROLES.SUPER ? SUPER_NAV : role === ROLES.OPERATIONS ? OPS_NAV : CUSTOMER_NAV;
+  const customerNav = useMemo(() => {
+    if (role !== ROLES.CUSTOMER || !session || session.kycComplete) return CUSTOMER_NAV_BASE;
+    const kycItem = CUSTOMER_NAV_BASE.find((i) => i.href === "/dashboard/kyc");
+    const rest = CUSTOMER_NAV_BASE.filter((i) => i.href !== "/dashboard/kyc");
+    return kycItem ? [kycItem, ...rest] : CUSTOMER_NAV_BASE;
+  }, [role, session?.kycComplete]);
+  const NAV = role === ROLES.SUPER ? SUPER_NAV : role === ROLES.OPERATIONS ? OPS_NAV : customerNav;
+
+  const isAdminShell = pathname.startsWith("/admin");
+  const sessionEmail = session?.email;
+  const sessionRole = session?.role;
+  const sessionKycComplete = session?.kycComplete;
+  useEffect(() => {
+    if (isAdminShell) return;
+    if (!sessionEmail) return;
+    const r = sessionRole || ROLES.CUSTOMER;
+    if (r !== ROLES.CUSTOMER) return;
+    if (sessionKycComplete) return;
+    const allowed = ["/dashboard/kyc", "/dashboard/settings", "/dashboard/support"];
+    const ok = allowed.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+    if (!ok) navigate("/dashboard/kyc", { replace: true });
+  }, [isAdminShell, sessionEmail, sessionRole, sessionKycComplete, pathname, navigate]);
   const initials = (session?.name || meta.label).split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 
   const signOut = () => {
@@ -73,8 +93,8 @@ export default function DashboardChrome({ children }) {
       </div>
 
       <nav className="flex-1 space-y-1">
-        {NAV.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
+        {NAV.map(({ href, label, icon: Icon, matchPrefix }) => {
+          const active = matchPrefix ? pathname === href || pathname.startsWith(`${href}/`) : pathname === href;
           return (
             <Link
               key={href}

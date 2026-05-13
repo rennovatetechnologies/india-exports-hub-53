@@ -31,6 +31,7 @@ import DashVault from "@/pages/dashboard__vault.jsx";
 import DashWorkflow from "@/pages/dashboard__workflow.jsx";
 
 import Admin from "@/pages/admin.jsx";
+import AdminWorkflow from "@/pages/admin-workflow.jsx";
 import AdminLogin from "@/pages/admin-login.jsx";
 import AdminRegister from "@/pages/admin-register.jsx";
 import AdminSuper from "@/pages/admin-super.jsx";
@@ -112,12 +113,13 @@ export default function App() {
           <Route path="kyc" element={<DashKyc />} />
           <Route path="settings" element={<DashSettings />} />
           <Route path="support" element={<DashSupport />} />
-          <Route path="vault" element={<DashVault />} />
+          <Route path="vault/:caseId?" element={<DashVault />} />
           <Route path="workflow" element={<DashWorkflow />} />
         </Route>
 
         <Route path="/admin" element={<ChromeLayout />}>
           <Route index element={<Admin />} />
+          <Route path="workflow/:caseId" element={<AdminWorkflow />} />
           <Route path="super" element={<AdminSuper />} />
         </Route>
       </Routes>

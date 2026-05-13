@@ -4,6 +4,7 @@ import {
   TrendingUp, FileCheck2, Workflow, Clock, ArrowUpRight,
   CheckCircle2, Circle, Loader2, Upload, AlertCircle
 } from "lucide-react";
+import { getSession } from "@/lib/authSession";
 
 const STAGES = [
   { label: "IEC Issued", desc: "DGFT · 12 Apr", status: "done" },
@@ -26,6 +27,9 @@ const ACTIVITY = [
 ];
 
 export default function DashboardOverview() {
+  const session = getSession();
+  const kycDone = Boolean(session?.kycComplete);
+
   return (
     <div className="space-y-8">
       {/* Greeting */}
@@ -35,15 +39,21 @@ export default function DashboardOverview() {
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">Good evening, Rohit</h1>
           <p className="mt-1 text-sm text-white/55">Here's where your export operation stands today.</p>
         </div>
-        <Link to="/dashboard/kyc" className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-black">
-          Continue KYC <ArrowUpRight size={15} />
-        </Link>
+        {kycDone ? (
+          <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-2.5 text-sm font-medium text-emerald-200">
+            <CheckCircle2 size={16} /> KYC verified
+          </span>
+        ) : (
+          <Link to="/dashboard/kyc" className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-black">
+            Continue KYC <ArrowUpRight size={15} />
+          </Link>
+        )}
       </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "Active plan", value: "Growth · 12mo", sub: "Renews 12 Mar 2027", icon: TrendingUp, accent: "text-[var(--gold)]" },
+          { label: "Active plan", value: "Standard · one-time", sub: "Paid in full · 12 Apr 2026", icon: TrendingUp, accent: "text-[var(--gold)]" },
           { label: "Onboarding", value: "62%", sub: "5 of 8 steps complete", icon: Workflow, accent: "text-emerald-300" },
           { label: "Documents", value: "14 / 22", sub: "8 pending review", icon: FileCheck2, accent: "text-cyan-300" },
           { label: "Avg response", value: "3h 12m", sub: "Success desk SLA", icon: Clock, accent: "text-fuchsia-300" },

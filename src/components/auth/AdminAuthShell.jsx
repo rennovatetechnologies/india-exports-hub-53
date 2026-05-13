@@ -38,7 +38,7 @@ export default function AdminAuthShell({ title, subtitle, badge = "Internal port
               <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-cyan-300"><Activity size={15} /></span>
               <div>
                 <div className="font-medium text-white">Real-time queues</div>
-                <div className="text-white/50">SLA-tracked cases, KYC review and escalations in one place.</div>
+                <div className="text-white/50">SLA-tracked cases and escalations in one place.</div>
               </div>
             </li>
           </ul>

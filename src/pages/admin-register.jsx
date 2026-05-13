@@ -5,7 +5,7 @@ import AdminAuthShell from "@/components/auth/AdminAuthShell";
 import { addAdminRequest, ROLES } from "@/lib/authSession";
 
 const ROLE_OPTIONS = [
-  { value: ROLES.OPERATIONS, label: "Operations Admin", desc: "Run customer cases, KYC and workflow ops." },
+  { value: ROLES.OPERATIONS, label: "Operations Admin", desc: "Run customer cases and workflow ops." },
   { value: ROLES.SUPER, label: "Super Admin", desc: "Restricted — pricing, RBAC and revenue controls.", restricted: true },
 ];
 
