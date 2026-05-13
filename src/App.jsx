@@ -31,6 +31,9 @@ import DashVault from "@/pages/dashboard__vault.jsx";
 import DashWorkflow from "@/pages/dashboard__workflow.jsx";
 
 import Admin from "@/pages/admin.jsx";
+import AdminLogin from "@/pages/admin-login.jsx";
+import AdminRegister from "@/pages/admin-register.jsx";
+import AdminSuper from "@/pages/admin-super.jsx";
 
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
@@ -98,6 +101,8 @@ export default function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/spices" element={<Spices />} />
           <Route path="/verify" element={<Verify />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/register" element={<AdminRegister />} />
         </Route>
 
         <Route path="/dashboard" element={<ChromeLayout />}>
@@ -113,6 +118,7 @@ export default function App() {
 
         <Route path="/admin" element={<ChromeLayout />}>
           <Route index element={<Admin />} />
+          <Route path="super" element={<AdminSuper />} />
         </Route>
       </Routes>
     </>
