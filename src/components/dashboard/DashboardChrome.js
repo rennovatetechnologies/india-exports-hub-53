@@ -132,7 +132,7 @@ export default function DashboardChrome({ children }) {
       <Link to="/" className="flex items-center gap-2">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--grad-gold)] text-black font-bold">V</span>
         <div className="leading-tight">
-          <div className="text-sm font-semibold">VISTARA</div>
+          <div className="text-sm font-semibold">New India Export</div>
           <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Export OS</div>
         </div>
       </Link>

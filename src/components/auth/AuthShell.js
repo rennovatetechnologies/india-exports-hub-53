@@ -15,7 +15,7 @@ export default function AuthShell({ title, subtitle, footer, children }) {
           {/* Left brand panel */}
           <div className="hidden lg:block lg:col-span-6">
             <Link to="/" className="inline-flex items-center gap-2 text-sm text-white/60 hover:text-white transition">
-              ← Back to vistara.com
+              ← Back to home
             </Link>
             <h2 className="mt-8 text-5xl font-semibold tracking-tight leading-[1.05]">
               The export OS for <span className="text-aurora">global India.</span>
@@ -62,7 +62,7 @@ export default function AuthShell({ title, subtitle, footer, children }) {
               <div className="glass-card relative p-7 sm:p-8">
                 <div className="text-center">
                   <span className="inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-white/70">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--gold)]" /> VISTARA Account
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--gold)]" /> New India Export Account
                   </span>
                   <h1 className="mt-4 text-2xl sm:text-3xl font-semibold tracking-tight">{title}</h1>
                   {subtitle && <p className="mt-2 text-sm text-white/55">{subtitle}</p>}

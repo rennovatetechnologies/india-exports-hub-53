@@ -35,7 +35,7 @@ export default function LoginPage() {
       subtitle="We’ll email you a one-time code — no password"
       footer={
         <>
-          New to VISTARA?{" "}
+          New to New India Export?{" "}
           <Link to="/signup" className="text-[var(--gold)] hover:underline">Create an account</Link>
           <div className="mt-3 text-[11px] text-white/45">
             Internal team?{" "}

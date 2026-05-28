@@ -192,7 +192,7 @@ export default function AdminRegisterPage() {
           <Field icon={User} label="Full name" placeholder="Riya Mehta" value={form.name} onChange={update("name")} />
           <Field icon={IdCard} label="Employee ID" placeholder="VST-220" value={form.employeeId} onChange={update("employeeId")} required={false} />
         </div>
-        <Field icon={Mail} label="Official email" type="email" placeholder="you@vistara.in" value={form.email} onChange={update("email")} />
+        <Field icon={Mail} label="Official email" type="email" placeholder="you@newindiaexport.com" value={form.email} onChange={update("email")} />
         <div className="grid grid-cols-2 gap-3">
           <Field icon={Phone} label="Mobile" placeholder="+91 9XXXX XXXXX" value={form.phone} onChange={update("phone")} />
           <Field icon={Building2} label="Department" placeholder="Compliance ops" value={form.department} onChange={update("department")} />

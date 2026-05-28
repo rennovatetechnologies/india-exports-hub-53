@@ -130,11 +130,11 @@ export function workspaceFor(role) {
 /* ---------- Admin registration requests (mock store) ---------- */
 
 const SEED_REQUESTS = [
-  { id: "REQ-1042", name: "Sanjay Rao", email: "sanjay.r@vistara.in", phone: "+91 98100 10001", role: ROLES.ADMIN, department: "Platform governance", employeeId: "VST-001", reason: "Bootstrap platform admin", status: ADMIN_STATUS.APPROVED, emailVerified: true, createdAt: "2025-04-01T08:00:00Z" },
-  { id: "REQ-1041", name: "Aditi Khanna", email: "aditi.k@vistara.in", phone: "+91 98765 11220", role: ROLES.OPERATIONS, department: "Compliance ops", employeeId: "VST-227", reason: "Joining ICEGATE desk", status: ADMIN_STATUS.PENDING, emailVerified: true, createdAt: "2025-05-10T09:14:00Z" },
-  { id: "REQ-1040", name: "Karan Shetty", email: "karan.s@vistara.in", phone: "+91 99820 10044", role: ROLES.OPERATIONS, department: "Customer success", employeeId: "VST-218", reason: "Backfill for outgoing CSM", status: ADMIN_STATUS.PENDING, emailVerified: false, createdAt: "2025-05-09T17:32:00Z" },
-  { id: "REQ-1039", name: "Meera Iyer", email: "meera@vistara.in", phone: "+91 90000 23456", role: ROLES.ADMIN, department: "Finance leadership", employeeId: "VST-104", reason: "Quarter close + pricing controls", status: ADMIN_STATUS.PENDING, emailVerified: true, createdAt: "2025-05-08T11:02:00Z" },
-  { id: "REQ-1038", name: "Rahul Bose", email: "rahul.b@vistara.in", phone: "+91 98111 33221", role: ROLES.OPERATIONS, department: "Documentation", employeeId: "VST-201", reason: "Volume spike in May", status: ADMIN_STATUS.APPROVED, emailVerified: true, createdAt: "2025-05-04T08:00:00Z" },
+  { id: "REQ-1042", name: "Sanjay Rao", email: "sanjay.r@newindiaexport.com", phone: "+91 98100 10001", role: ROLES.ADMIN, department: "Platform governance", employeeId: "VST-001", reason: "Bootstrap platform admin", status: ADMIN_STATUS.APPROVED, emailVerified: true, createdAt: "2025-04-01T08:00:00Z" },
+  { id: "REQ-1041", name: "Aditi Khanna", email: "aditi.k@newindiaexport.com", phone: "+91 98765 11220", role: ROLES.OPERATIONS, department: "Compliance ops", employeeId: "VST-227", reason: "Joining ICEGATE desk", status: ADMIN_STATUS.PENDING, emailVerified: true, createdAt: "2025-05-10T09:14:00Z" },
+  { id: "REQ-1040", name: "Karan Shetty", email: "karan.s@newindiaexport.com", phone: "+91 99820 10044", role: ROLES.OPERATIONS, department: "Customer success", employeeId: "VST-218", reason: "Backfill for outgoing CSM", status: ADMIN_STATUS.PENDING, emailVerified: false, createdAt: "2025-05-09T17:32:00Z" },
+  { id: "REQ-1039", name: "Meera Iyer", email: "meera@newindiaexport.com", phone: "+91 90000 23456", role: ROLES.ADMIN, department: "Finance leadership", employeeId: "VST-104", reason: "Quarter close + pricing controls", status: ADMIN_STATUS.PENDING, emailVerified: true, createdAt: "2025-05-08T11:02:00Z" },
+  { id: "REQ-1038", name: "Rahul Bose", email: "rahul.b@newindiaexport.com", phone: "+91 98111 33221", role: ROLES.OPERATIONS, department: "Documentation", employeeId: "VST-201", reason: "Volume spike in May", status: ADMIN_STATUS.APPROVED, emailVerified: true, createdAt: "2025-05-04T08:00:00Z" },
 ];
 
 function seedIfEmpty() {
@@ -232,7 +232,7 @@ export function startEmailOtp(email, purpose) {
   };
   sessionStorage.setItem(OTP_PENDING_KEY, JSON.stringify(payload));
   if (import.meta.env?.DEV) {
-    console.info(`[VISTARA demo OTP] ${normalized}: ${code}`);
+    console.info(`[New India Export demo OTP] ${normalized}: ${code}`);
   }
   return { ok: true };
 }

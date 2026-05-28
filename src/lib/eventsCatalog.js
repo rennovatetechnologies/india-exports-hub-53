@@ -10,7 +10,7 @@ export const DEFAULT_EVENTS = [
   },
   {
     id: "e2",
-    title: "Vistara Export Summit",
+    title: "New India Export Summit",
     date: "14 Aug 2026",
     city: "Dubai, UAE",
     img: "/event2.webp",

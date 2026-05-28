@@ -13,13 +13,13 @@ export default function AdminAuthShell({ title, subtitle, badge = "Internal port
       <div className="relative mx-auto grid w-full max-w-6xl gap-12 px-5 sm:px-6 lg:grid-cols-12 lg:items-center lg:px-8">
         <div className="hidden lg:col-span-6 lg:block">
           <Link to="/" className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-white/45 hover:text-white">
-            ← vistara.com
+            ← Home
           </Link>
           <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.25em] text-white/65">
             <ShieldCheck size={12} className="text-emerald-300" /> {badge}
           </div>
           <h2 className="mt-6 text-5xl font-semibold leading-[1.05] tracking-tight">
-            Operations console for the <span className="text-aurora">VISTARA desk.</span>
+            Operations console for the <span className="text-aurora">New India Export desk.</span>
           </h2>
           <p className="mt-5 max-w-md text-white/55 leading-relaxed">
             Secure, role-based workspace for the operations and leadership teams that

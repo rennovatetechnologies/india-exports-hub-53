@@ -164,11 +164,10 @@ export default function Navbar() {
             <Link
               to="/"
               className="flex shrink-0 items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md"
-              aria-label="VISTARA Home"
+              aria-label="New India Export Home"
             >
               <span className="text-xl md:text-2xl font-semibold tracking-tight text-white">
-                <span className="text-gold-gradient">VISTARA</span>
-                <span className="text-white/40 font-normal hidden sm:inline"> · New India Export</span>
+                <span className="text-gold-gradient">New India Export</span>
               </span>
             </Link>
 

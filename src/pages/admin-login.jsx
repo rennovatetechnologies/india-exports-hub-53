@@ -39,7 +39,7 @@ export default function AdminLoginPage() {
       }
     >
       <form onSubmit={onSubmit} className="space-y-4">
-        <Field icon={Mail} label="Official email" type="email" placeholder="you@vistara.in" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Field icon={Mail} label="Official email" type="email" placeholder="you@newindiaexport.com" value={email} onChange={(e) => setEmail(e.target.value)} />
         {error && <p className="text-xs text-rose-300">{error}</p>}
         <button
           disabled={loading}

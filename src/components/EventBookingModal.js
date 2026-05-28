@@ -133,7 +133,7 @@ export default function EventBookingModal({ open, setOpen }) {
             {!isAuthenticated() ? (
               <div className="space-y-5">
                 <p className="text-sm text-neutral-300 leading-relaxed">
-                  Sign in to your VISTARA account to reserve a seat. Your work email and profile will be used for
+                  Sign in to your New India Export account to reserve a seat. Your work email and profile will be used for
                   confirmation and payment.
                 </p>
                 <Link

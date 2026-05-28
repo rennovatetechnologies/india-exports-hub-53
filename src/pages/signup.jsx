@@ -58,7 +58,7 @@ export default function SignupPage() {
           </div>
         </div>
         {error && <p className="text-xs text-rose-300">{error}</p>}
-        <p className="text-[11px] text-white/45">By continuing you agree to VISTARA&apos;s Terms and Privacy.</p>
+        <p className="text-[11px] text-white/45">By continuing you agree to New India Export&apos;s Terms and Privacy.</p>
         <button disabled={loading} className="btn-gold w-full inline-flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-black disabled:opacity-60">
           {loading ? "Sending code…" : (<>Continue with email code <ArrowRight size={15} /></>)}
         </button>

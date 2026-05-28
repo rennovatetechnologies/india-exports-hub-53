@@ -11,19 +11,19 @@ const CHANNELS = [
     cta: "Open workflow",
     to: "/dashboard/workflow#workflow-activity",
   },
-  { icon: Mail, label: "Email support", desc: "support@vistaraexports.com · 4h SLA", cta: "Compose email" },
+  { icon: Mail, label: "Email support", desc: "Newindexport@gmail.com · 4h SLA", cta: "Compose email" },
   { icon: Phone, label: "Hotline", desc: "+91 80 4567 1200 · Mon–Sat", cta: "Call now" },
 ];
 
 const FAQS = [
-  { q: "How long does IEC issuance take?", a: "Typically 3–5 working days after we receive complete KYC. Vistara handles the DGFT submission end-to-end." },
+  { q: "How long does IEC issuance take?", a: "Typically 3–5 working days after we receive complete KYC. New India Export handles the DGFT submission end-to-end." },
   { q: "Can I upgrade my plan mid-cycle?", a: "Yes. We pro-rate the difference and apply it to your next invoice. Upgrades activate instantly." },
   { q: "Do you support shipments outside India?", a: "Yes. We coordinate with partner CHAs in Dubai, Rotterdam and Singapore for transshipment workflows." },
   { q: "How do I add a teammate?", a: "Go to Settings → Team and invite by email. Each role (Admin, Ops, Viewer) has scoped permissions." },
 ];
 
 const ARTICLES = [
-  "Getting started with VISTARA in 10 minutes",
+  "Getting started with New India Export in 10 minutes",
   "Uploading PAN, GST and Bank documents securely",
   "Understanding DGFT, AD code and ICEGATE",
   "Reading your shipment workflow timeline",

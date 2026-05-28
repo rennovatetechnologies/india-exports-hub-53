@@ -25,7 +25,7 @@ export default function Footer() {
             <div className="lg:col-span-5">
               <Link to="/" className="inline-flex items-center gap-2">
                 <span className="text-2xl font-semibold tracking-tight">
-                  VISTARA <span className="text-white/40">· New India Export</span>
+                  New India Export
                 </span>
               </Link>
               <p className="mt-4 max-w-md text-sm text-white/55 leading-relaxed">

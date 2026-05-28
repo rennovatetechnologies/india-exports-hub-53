@@ -57,7 +57,7 @@ export default function AdminPage() {
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--gold)]" /> Operations console
           </span>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight">Workspace overview</h1>
-          <p className="mt-1 text-sm text-white/55">Internal command center for the VISTARA ops team.</p>
+          <p className="mt-1 text-sm text-white/55">Internal command center for the New India Export ops team.</p>
         </div>
         <button type="button" className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold">
           New case <ArrowUpRight size={13} />

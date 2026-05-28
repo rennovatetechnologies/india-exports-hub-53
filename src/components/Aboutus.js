@@ -17,7 +17,7 @@ export default function AboutUsSection() {
         <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
           <div className="lg:col-span-5">
             <span className="inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white/70">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--gold)]" /> About VISTARA
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--gold)]" /> About New India Export
             </span>
             <motion.h2
               initial={{ opacity: 0, y: 12 }}
