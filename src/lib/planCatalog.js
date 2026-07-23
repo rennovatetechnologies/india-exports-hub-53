@@ -66,6 +66,25 @@ export function loadPlanCatalog() {
   }
 }
 
+/** Fetch plans from API when available; falls back to local catalog. */
+export async function fetchPlanCatalog() {
+  try {
+    const res = await fetch("/api/plans");
+    if (!res.ok) throw new Error("fail");
+    const data = await res.json();
+    if (Array.isArray(data) && data.length) {
+      const cleaned = data.map(normalizePlan).filter(Boolean);
+      if (cleaned.length) {
+        savePlanCatalog(cleaned);
+        return cleaned;
+      }
+    }
+  } catch {
+    /* fallback */
+  }
+  return loadPlanCatalog();
+}
+
 export function savePlanCatalog(plans) {
   const next = (Array.isArray(plans) ? plans : []).map(normalizePlan).filter(Boolean);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));

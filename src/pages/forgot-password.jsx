@@ -11,22 +11,20 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
     const trimmed = email.trim();
     if (!trimmed) return;
-    const { ok } = startEmailOtp(trimmed, OTP_PURPOSE.CUSTOMER_LOGIN);
+    setLoading(true);
+    const { ok, message } = await startEmailOtp(trimmed, OTP_PURPOSE.CUSTOMER_LOGIN);
     if (!ok) {
-      setError("Could not send a code. Try again.");
+      setError(message || "Could not send a code. Try again.");
+      setLoading(false);
       return;
     }
-    setLoading(true);
     const next = safeNextPath(searchParams.get("next"));
-    setTimeout(() => {
-      setLoading(false);
-      navigate(`/verify?mode=login&next=${encodeURIComponent(next)}`);
-    }, 400);
+    navigate(`/verify?mode=login&next=${encodeURIComponent(next)}`);
   };
 
   return (

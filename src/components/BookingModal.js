@@ -82,7 +82,8 @@ export default function BookingModal({ open, setOpen }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: 100, // 1 INR in paise
+          amount: 100,
+          sku: "booking",
           customerDetails: {
             name: session.name,
             email: session.email,
@@ -100,18 +101,22 @@ export default function BookingModal({ open, setOpen }) {
       });
 
       const order = await orderRes.json();
-      if (!order.id) throw new Error(order.detail || order.error || "Order creation failed");
+      if (!order.id) throw new Error(order.message || order.detail || order.error || "Order creation failed");
+
+      const cfg = await fetch("/api/config/public").then((r) => r.json()).catch(() => ({}));
+      const rzKey = import.meta.env.VITE_RAZORPAY_KEY_ID || cfg.razorpayKeyId;
+      if (!rzKey) throw new Error("Razorpay key not configured");
 
       // 2. Open Razorpay Checkout
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_Sk6wplrNSRrt1d",
+        key: rzKey,
         amount: order.amount,
         currency: order.currency,
         name: "New India Export",
         description: `Booking for ${form.category}`,
         order_id: order.id,
         handler: async function (response) {
-          // 3. Verify Payment via Next.js API route
+          // 3. Verify Payment via API
           const verifyRes = await fetch("/api/verify-payment", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -124,9 +129,8 @@ export default function BookingModal({ open, setOpen }) {
 
           const verifyData = await verifyRes.json();
           if (verifyData.success) {
-            // 4. Submit to Web3Forms after payment success
-            const payload = {
-              access_key: "5dfb3e12-4f27-417a-81d2-c2021ffd842b",
+            // 4. Persist booking server-side (replaces Web3Forms)
+            const bookingPayload = {
               shipment: form.shipment,
               category: form.category,
               subProducts: form.subProducts.join(", "),
@@ -136,18 +140,18 @@ export default function BookingModal({ open, setOpen }) {
               email: session.email,
               country: form.country,
               address: form.address,
-              subject: `PAID Booking Request - ${form.category}`,
-              razorpay_payment_id: response.razorpay_payment_id
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
             };
 
-            const web3Res = await fetch("https://api.web3forms.com/submit", {
+            const bookRes = await fetch("/api/bookings", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
+              body: JSON.stringify(bookingPayload),
             });
 
-            const web3Data = await web3Res.json();
-            if (web3Data.success) {
+            const bookData = await bookRes.json();
+            if (bookRes.ok || bookData.id) {
               alert("Payment Successful & Request Sent!");
               setOpen(false);
               setStep(0);
@@ -160,7 +164,7 @@ export default function BookingModal({ open, setOpen }) {
                 country: "",
               });
             } else {
-              alert("Payment Success but Email Notification failed. Please contact support.");
+              alert("Payment Success but booking save failed. Please contact support.");
             }
           } else {
             alert("Payment verification failed. Please contact support.");

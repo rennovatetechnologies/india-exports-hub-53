@@ -47,7 +47,8 @@ export default function EventPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: 639900, // Workshop price in paise (₹6399.00)
+          amount: 639900,
+          sku: "workshop",
           customerDetails: {
             name: session.name,
             email: session.email,
@@ -61,11 +62,15 @@ export default function EventPage() {
       });
 
       const orderData = await orderRes.json();
-      if (!orderData.id) throw new Error(orderData.detail || orderData.error || "Order creation failed");
+      if (!orderData.id) throw new Error(orderData.message || orderData.detail || orderData.error || "Order creation failed");
+
+      const cfg = await fetch("/api/config/public").then((r) => r.json()).catch(() => ({}));
+      const rzKey = import.meta.env.VITE_RAZORPAY_KEY_ID || cfg.razorpayKeyId;
+      if (!rzKey) throw new Error("Razorpay key not configured");
 
       // 2. Open Razorpay Checkout
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_Sk6wplrNSRrt1d",
+        key: rzKey,
         amount: orderData.amount,
         currency: orderData.currency,
         name: "New India Export",

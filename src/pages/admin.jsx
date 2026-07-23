@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Users, Briefcase, IndianRupee, AlertTriangle, ArrowUpRight, ChevronRight } from "lucide-react";
 import {
   loadWorkflowCasesWithOverrides,
+  fetchWorkflowCases,
   sortWorkflowCases,
   workflowCaseMatchesPreset,
   workflowCaseMatchesSmartQuery,
@@ -29,6 +30,7 @@ const slaColor = (s) =>
 export default function AdminPage() {
   const navigate = useNavigate();
   const [tick, setTick] = useState(0);
+  const [cases, setCases] = useState(() => loadWorkflowCasesWithOverrides());
   const refresh = useCallback(() => setTick((t) => t + 1), []);
 
   useEffect(() => {
@@ -37,7 +39,17 @@ export default function AdminPage() {
     return () => window.removeEventListener("iehub-workflow-updated", h);
   }, [refresh]);
 
-  const cases = useMemo(() => loadWorkflowCasesWithOverrides(), [tick]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const list = await fetchWorkflowCases();
+      if (!cancelled) setCases(list);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tick]);
+
   const [caseQuery, setCaseQuery] = useState("");
   const [casePreset, setCasePreset] = useState(/** @type {"all" | "attention" | "active" | "complete"} */ ("all"));
   const [caseSort, setCaseSort] = useState(/** @type {"smart" | "caseId" | "stage"} */ ("smart"));

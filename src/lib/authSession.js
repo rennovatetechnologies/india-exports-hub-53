@@ -75,13 +75,19 @@ export function getSession() {
     const email = data.email.trim();
     const rawRole = typeof data.role === "string" ? data.role.trim() : ROLES.CUSTOMER;
     const role = rawRole === "super" ? ROLES.ADMIN : rawRole;
-    const kycComplete = role === ROLES.CUSTOMER ? hasCompletedKyc(email) : true;
+    const kycComplete =
+      role === ROLES.CUSTOMER
+        ? typeof data.kycComplete === "boolean"
+          ? data.kycComplete || hasCompletedKyc(email)
+          : hasCompletedKyc(email)
+        : true;
     return {
       email,
       name: (typeof data.name === "string" && data.name.trim()) || displayNameFromEmail(data.email),
       phone: typeof data.phone === "string" ? data.phone.trim() : "",
       role,
       status: typeof data.status === "string" ? data.status : ADMIN_STATUS.ACTIVE,
+      company: typeof data.company === "string" ? data.company : "",
       kycComplete,
     };
   } catch {
@@ -93,23 +99,36 @@ export function isAuthenticated() {
   return getSession() !== null;
 }
 
-export function setSession({ email, name, phone, role, status }) {
+export function setSession({ email, name, phone, role, status, token, kycComplete, company }) {
   const payload = {
     email: String(email || "").trim(),
     name: String(name || "").trim() || displayNameFromEmail(email),
     phone: phone != null ? String(phone).trim() : "",
+    company: company != null ? String(company).trim() : "",
     role: (() => {
       const r = role || ROLES.CUSTOMER;
       return r === "super" ? ROLES.ADMIN : r;
     })(),
     status: status || ADMIN_STATUS.ACTIVE,
   };
+  if (typeof kycComplete === "boolean") payload.kycComplete = kycComplete;
   if (!payload.email) return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  if (token) {
+    try {
+      localStorage.setItem("vistara_token", token);
+    } catch {}
+  }
+  if (payload.kycComplete && payload.role === ROLES.CUSTOMER) {
+    markKycComplete(payload.email);
+  }
 }
 
 export function clearSession() {
   localStorage.removeItem(STORAGE_KEY);
+  try {
+    localStorage.removeItem("vistara_token");
+  } catch {}
 }
 
 /** Avoid open redirects: only same-origin relative paths. */
@@ -152,6 +171,26 @@ export function getAdminRequests() {
   } catch {
     return [];
   }
+}
+
+/** Prefer live staff queue from API when authenticated as admin. */
+export async function fetchAdminRequests() {
+  try {
+    const token = localStorage.getItem("vistara_token");
+    if (!token) return getAdminRequests();
+    const res = await fetch("/api/staff/access-requests", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error("fail");
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      localStorage.setItem(ADMIN_REQUESTS_KEY, JSON.stringify(data));
+      return data;
+    }
+  } catch {
+    /* fallback */
+  }
+  return getAdminRequests();
 }
 
 export function addAdminRequest(req) {
@@ -218,23 +257,65 @@ export const OTP_PURPOSE = {
   STAFF_REGISTER: "staff_register",
 };
 
-/** Start or refresh a pending email OTP in sessionStorage. */
-export function startEmailOtp(email, purpose) {
+function allowAuthMock() {
+  return String(import.meta.env?.VITE_ALLOW_AUTH_MOCK || "").toLowerCase() === "true";
+}
+
+/** Start or refresh a pending email OTP via backend (mock only if VITE_ALLOW_AUTH_MOCK=true). */
+export async function startEmailOtp(email, purpose) {
   if (typeof window === "undefined") return { ok: false };
   const normalized = normalizeEmail(email);
   if (!normalized) return { ok: false };
+  try {
+    const res = await fetch("/api/auth/otp/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: normalized, purpose }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok !== false) {
+      const expiresInMs = (Number(data.expiresInSec) || 600) * 1000;
+      sessionStorage.setItem(
+        OTP_PENDING_KEY,
+        JSON.stringify({
+          email: normalized,
+          purpose,
+          expiresAt: Date.now() + expiresInMs,
+          viaApi: true,
+        })
+      );
+      return { ok: true };
+    }
+    if (!allowAuthMock()) {
+      return {
+        ok: false,
+        message: data.message || data.detail || data.error || "Could not send OTP. Is the backend running?",
+      };
+    }
+  } catch (err) {
+    if (!allowAuthMock()) {
+      return {
+        ok: false,
+        message: "Cannot reach API. Start new-india-exports on :5001 (and MongoDB).",
+      };
+    }
+  }
+  if (!allowAuthMock()) return { ok: false, message: "OTP send failed" };
   const code = String(Math.floor(100000 + Math.random() * 900000));
-  const payload = {
-    email: normalized,
-    code,
-    purpose,
-    expiresAt: Date.now() + 10 * 60 * 1000,
-  };
-  sessionStorage.setItem(OTP_PENDING_KEY, JSON.stringify(payload));
+  sessionStorage.setItem(
+    OTP_PENDING_KEY,
+    JSON.stringify({
+      email: normalized,
+      code,
+      purpose,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+      viaApi: false,
+    })
+  );
   if (import.meta.env?.DEV) {
     console.info(`[New India Export demo OTP] ${normalized}: ${code}`);
   }
-  return { ok: true };
+  return { ok: true, mock: true };
 }
 
 export function getPendingOtpInfo() {
@@ -251,7 +332,7 @@ export function getPendingOtpInfo() {
   }
 }
 
-export function resendPendingEmailOtp() {
+export async function resendPendingEmailOtp() {
   if (typeof window === "undefined") return { ok: false };
   try {
     const raw = sessionStorage.getItem(OTP_PENDING_KEY);
@@ -265,11 +346,10 @@ export function resendPendingEmailOtp() {
 }
 
 /**
- * Verify the 6-digit code for the current pending OTP session.
- * Until email delivery is integrated, any 6-digit code is accepted (pending session must exist and not be expired).
- * @returns {{ ok: true, email: string, purpose: string } | { ok: false, reason: string }}
+ * Verify the 6-digit code for the current pending OTP session (API when viaApi).
+ * @returns {Promise<{ ok: true, email: string, purpose: string, session?: object, token?: string, kind?: string } | { ok: false, reason: string }>}
  */
-export function verifyPendingEmailOtp(code) {
+export async function verifyPendingEmailOtp(code) {
   if (typeof window === "undefined") return { ok: false, reason: "no_window" };
   try {
     const raw = sessionStorage.getItem(OTP_PENDING_KEY);
@@ -279,6 +359,33 @@ export function verifyPendingEmailOtp(code) {
     if (Date.now() > (p.expiresAt || 0)) return { ok: false, reason: "expired" };
     const entered = String(code || "").replace(/\D/g, "");
     if (entered.length !== 6) return { ok: false, reason: "invalid" };
+
+    if (p.viaApi) {
+      const res = await fetch("/api/auth/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: p.email, code: entered, purpose: p.purpose }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) {
+        return { ok: false, reason: data.reason || "invalid" };
+      }
+      sessionStorage.removeItem(OTP_PENDING_KEY);
+      return {
+        ok: true,
+        email: p.email,
+        purpose: p.purpose,
+        session: data.session,
+        token: data.token || data.session?.token,
+        kind: data.kind,
+        api: data,
+      };
+    }
+
+    // Local mock fallback: accept any 6-digit when pending exists
+    if (p.code && entered !== String(p.code) && import.meta.env?.PROD) {
+      return { ok: false, reason: "invalid" };
+    }
     sessionStorage.removeItem(OTP_PENDING_KEY);
     return { ok: true, email: p.email, purpose: p.purpose };
   } catch {

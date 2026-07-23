@@ -162,6 +162,42 @@ export function loadWorkflowCasesWithOverrides() {
   });
 }
 
+/** Load cases from API when authenticated; falls back to local seed. */
+export async function fetchWorkflowCases() {
+  try {
+    const token = localStorage.getItem("vistara_token");
+    if (!token) return loadWorkflowCasesWithOverrides();
+    const res = await fetch("/api/cases", { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error("fail");
+    const data = await res.json();
+    if (Array.isArray(data) && data.length) return data;
+  } catch {
+    /* fallback */
+  }
+  return loadWorkflowCasesWithOverrides();
+}
+
+export async function apiApproveStage(caseId) {
+  const token = localStorage.getItem("vistara_token");
+  const res = await fetch(`/api/cases/${caseId}/stage/approve`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("approve failed");
+  return res.json();
+}
+
+export async function apiRejectStage(caseId, reason = "") {
+  const token = localStorage.getItem("vistara_token");
+  const res = await fetch(`/api/cases/${caseId}/stage/reject`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+  if (!res.ok) throw new Error("reject failed");
+  return res.json();
+}
+
 /** @param {number} stageIndex 0 … WORKFLOW_STAGE_TOTAL (inclusive; total = all steps done). */
 export function persistWorkflowStage(caseId, stageIndex) {
   const s = loadWorkflowState();

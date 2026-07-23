@@ -43,6 +43,7 @@ export default function EventBookingModal({ open, setOpen }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: 639900,
+          sku: "workshop",
           customerDetails: {
             name: session.name,
             email: session.email,
@@ -56,10 +57,14 @@ export default function EventBookingModal({ open, setOpen }) {
       });
 
       const order = await orderRes.json();
-      if (!order.id) throw new Error(order.detail || order.error || "Order creation failed");
+      if (!order.id) throw new Error(order.message || order.detail || order.error || "Order creation failed");
+
+      const cfg = await fetch("/api/config/public").then((r) => r.json()).catch(() => ({}));
+      const rzKey = import.meta.env.VITE_RAZORPAY_KEY_ID || cfg.razorpayKeyId;
+      if (!rzKey) throw new Error("Razorpay key not configured");
 
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_Sk6wplrNSRrt1d",
+        key: rzKey,
         amount: order.amount,
         currency: order.currency,
         name: "New India Export",
@@ -78,6 +83,17 @@ export default function EventBookingModal({ open, setOpen }) {
 
           const verifyData = await verifyRes.json();
           if (verifyData.success) {
+            try {
+              await fetch("/api/workshops/virtual-shipment/register", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${localStorage.getItem("vistara_token") || ""}`,
+                },
+              });
+            } catch {
+              /* ignore */
+            }
             alert("Payment Successful! Your seat has been reserved.");
             setOpen(false);
           } else {

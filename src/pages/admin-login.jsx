@@ -10,21 +10,19 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
     const trimmed = email.trim();
     if (!trimmed) return;
-    const { ok } = startEmailOtp(trimmed, OTP_PURPOSE.STAFF_LOGIN);
+    setLoading(true);
+    const { ok, message } = await startEmailOtp(trimmed, OTP_PURPOSE.STAFF_LOGIN);
     if (!ok) {
-      setError("Could not send code. Try again.");
+      setError(message || "Could not send code. Try again.");
+      setLoading(false);
       return;
     }
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      navigate("/verify?mode=staff");
-    }, 400);
+    navigate("/verify?mode=staff");
   };
 
   return (

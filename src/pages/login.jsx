@@ -11,22 +11,20 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [email, setEmail] = useState("");
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
     const trimmed = email.trim();
     if (!trimmed) return;
     const next = safeNextPath(searchParams.get("next"));
-    const { ok } = startEmailOtp(trimmed, OTP_PURPOSE.CUSTOMER_LOGIN);
+    setLoading(true);
+    const { ok, message } = await startEmailOtp(trimmed, OTP_PURPOSE.CUSTOMER_LOGIN);
     if (!ok) {
-      setError("Could not start sign-in. Try again.");
+      setError(message || "Could not start sign-in. Try again.");
+      setLoading(false);
       return;
     }
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      router(`/verify?mode=login&next=${encodeURIComponent(next)}`);
-    }, 400);
+    router(`/verify?mode=login&next=${encodeURIComponent(next)}`);
   };
 
   return (

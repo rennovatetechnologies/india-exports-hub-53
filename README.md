@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# New India Export — frontend
 
-## Getting Started
+Vite + React SPA for the New India Export customer and ops dashboards.
 
-First, run the development server:
+## Connect to the backend
+
+This app talks to **`new-india-exports`** (FastAPI) over `/api`.
+
+| Service | Default | Notes |
+|---------|---------|--------|
+| Frontend | `http://localhost:5173` | `npm run dev` |
+| Backend | `http://127.0.0.1:5001` | Vite proxies `/api` → `:5001` |
+| MongoDB | `mongodb://127.0.0.1:27017` | Required by the backend |
+
+### 1. Start MongoDB
+
+Backend `.env` expects a local MongoDB (see `new-india-exports/.env.example`).
+
+### 2. Start the API
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd ../new-india-exports
+# prefer the working venv if present
+source .venv1/bin/activate   # or: python3 -m venv .venv && pip install -r requirements.txt
+cp -n .env.example .env      # fill MONGODB_URI / JWT_SECRET if needed
+uvicorn app:app --host 0.0.0.0 --port 5001
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Health check: [http://127.0.0.1:5001/](http://127.0.0.1:5001/)  
+Swagger (dev): [http://127.0.0.1:5001/docs](http://127.0.0.1:5001/docs)
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### 3. Start this frontend
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+cp -n .env.example .env.local
+npm run dev
+```
 
-## Learn More
+Open [http://localhost:5173](http://localhost:5173).
 
-To learn more about Next.js, take a look at the following resources:
+Auth is **email + OTP** against `/api/auth/otp/*`. In development, OTP codes are logged on the **backend** console as `[DEV OTP]`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Seeded admin (after backend seed):** `sanjay.r@newindiaexport.com` via `/admin/login`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Customers:** sign up at `/signup` with any email, then verify with the OTP from the backend logs.
 
-## Deploy on Vercel
+Set `VITE_ALLOW_AUTH_MOCK=true` only if you need the old offline OTP mock (no JWT / no DB).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run dev      # Vite on :5173
+npm run build
+npm run preview
+npm run lint
+```

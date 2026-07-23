@@ -15,7 +15,9 @@ import {
   workspaceFor,
   resolveAdminLoginForEmail,
   ADMIN_STATUS,
+  markKycComplete,
 } from "@/lib/authSession";
+import { api } from "@/lib/api";
 
 export default function VerifyPage() {
   const router = useNavigate();
@@ -47,85 +49,151 @@ export default function VerifyPage() {
     if (val && i < 5) refs.current[i + 1]?.focus();
   };
 
-  const onSubmit = (e) => {
-    e.preventDefault();
-    setError("");
-    const joined = code.join("");
-    const result = verifyPendingEmailOtp(joined);
-    if (!result.ok) {
-      const msg =
-        result.reason === "expired"
-          ? "That code expired. Request a new one."
-          : result.reason === "invalid"
-          ? "Invalid code. Try again."
-          : "Could not verify. Go back and request a new code.";
-      setError(msg);
-      return;
-    }
-
-    const { email, purpose } = result;
-
-    if (purpose === OTP_PURPOSE.CUSTOMER_LOGIN) {
-      const next = safeNextPath(nextParam);
-      setSession({ email, name: "", phone: "" });
-      const dest = hasCompletedKyc(email) ? next : "/dashboard/kyc";
-      setLoading(true);
-      setTimeout(() => router(dest), 500);
-      return;
-    }
-
-    if (purpose === OTP_PURPOSE.CUSTOMER_SIGNUP) {
-      const draft = getSignupDraft();
-      if (!draft || String(draft.email || "").trim().toLowerCase() !== email) {
-        setError("Signup session expired. Start again from sign up.");
-        return;
-      }
-      setSession({
-        email,
-        name: draft.name || "",
-        phone: "",
-      });
-      clearSignupDraft();
-      setLoading(true);
-      setTimeout(() => router(hasCompletedKyc(email) ? "/dashboard" : "/dashboard/kyc"), 500);
-      return;
-    }
-
-    if (purpose === OTP_PURPOSE.STAFF_LOGIN) {
-      const resolved = resolveAdminLoginForEmail(email);
-      if (resolved.kind !== "ok") {
-        const msg =
-          resolved.kind === "no_request"
-            ? "No approved workspace for this email yet. Submit an access request first."
-            : resolved.kind === "pending"
-            ? "Your access request is still pending approval. You’ll get email once it’s activated."
-            : resolved.kind === "rejected"
-            ? "This access request was not approved. Contact your administrator if you believe this is a mistake."
-            : resolved.kind === "suspended"
-            ? "This account is suspended. Contact platform governance."
-            : "Unable to sign in with this email.";
-        setError(msg);
-        return;
-      }
-      const { request: req } = resolved;
-      setSession({
-        email: req.email,
-        name: req.name || "",
-        phone: req.phone || "",
-        role: req.role,
-        status: ADMIN_STATUS.ACTIVE,
-      });
-      setLoading(true);
-      setTimeout(() => router(workspaceFor(req.role)), 500);
-      return;
-    }
-
-    setError("Unknown verification flow. Start again.");
+  const applySession = (session, fallback = {}) => {
+    const s = { ...fallback, ...(session || {}) };
+    setSession({
+      email: s.email,
+      name: s.name || "",
+      phone: s.phone || "",
+      company: s.company || "",
+      role: s.role,
+      status: s.status || ADMIN_STATUS.ACTIVE,
+      token: s.token,
+      kycComplete: s.kycComplete,
+    });
+    if (s.kycComplete && s.email) markKycComplete(s.email);
   };
 
-  const onResend = () => {
+  const onSubmit = async (e) => {
+    e.preventDefault();
     setError("");
-    const r = resendPendingEmailOtp();
+    setLoading(true);
+    const joined = code.join("");
+    try {
+      const result = await verifyPendingEmailOtp(joined);
+      if (!result.ok) {
+        const msg =
+          result.reason === "expired"
+            ? "That code expired. Request a new one."
+            : result.reason === "invalid"
+            ? "Invalid code. Try again."
+            : "Could not verify. Go back and request a new code.";
+        setError(msg);
+        setLoading(false);
+        return;
+      }
+
+      const { email, purpose } = result;
+
+      if (purpose === OTP_PURPOSE.CUSTOMER_LOGIN) {
+        if (result.session) {
+          applySession(result.session, { token: result.token });
+        } else if (result.api?.needsSignup) {
+          setError("No account for this email. Please sign up first.");
+          setLoading(false);
+          return;
+        } else {
+          setError("Sign-in failed. Ensure the backend issued a session for this email.");
+          setLoading(false);
+          return;
+        }
+        const next = safeNextPath(nextParam);
+        const kycOk = result.session?.kycComplete ?? hasCompletedKyc(email);
+        router(kycOk ? next : "/dashboard/kyc");
+        return;
+      }
+
+      if (purpose === OTP_PURPOSE.CUSTOMER_SIGNUP) {
+        const draft = getSignupDraft();
+        if (!draft || String(draft.email || "").trim().toLowerCase() !== email) {
+          setError("Signup session expired. Start again from sign up.");
+          setLoading(false);
+          return;
+        }
+        try {
+          const data = await api("/api/auth/customer/signup", {
+            method: "POST",
+            auth: false,
+            body: {
+              email,
+              name: draft.name || "",
+              company: draft.company || "",
+              phone: draft.phone || "",
+            },
+          });
+          applySession(data.session || { ...data.user, token: data.token }, { token: data.token });
+          clearSignupDraft();
+          const kycOk = data.session?.kycComplete ?? data.kycComplete ?? hasCompletedKyc(email);
+          router(kycOk ? "/dashboard" : "/dashboard/kyc");
+        } catch (err) {
+          setError(err.message || "Could not create account. Is the backend running?");
+          setLoading(false);
+        }
+        return;
+      }
+
+      if (purpose === OTP_PURPOSE.STAFF_LOGIN) {
+        if (result.kind === "ok" || result.api?.kind === "ok") {
+          const apiData = result.api || result;
+          const session = apiData.session;
+          if (session) {
+            applySession(session, { token: result.token || apiData.token });
+            router(workspaceFor(session.role));
+            return;
+          }
+        }
+        if (result.kind && result.kind !== "ok") {
+          const resolved = { kind: result.kind };
+          const msg =
+            resolved.kind === "no_request"
+              ? "No approved workspace for this email yet. Submit an access request first."
+              : resolved.kind === "pending"
+              ? "Your access request is still pending approval. You’ll get email once it’s activated."
+              : resolved.kind === "rejected"
+              ? "This access request was not approved. Contact your administrator if you believe this is a mistake."
+              : resolved.kind === "suspended"
+              ? "This account is suspended. Contact platform governance."
+              : "Unable to sign in with this email.";
+          setError(msg);
+          setLoading(false);
+          return;
+        }
+        // Fallback local resolve
+        const resolved = resolveAdminLoginForEmail(email);
+        if (resolved.kind !== "ok") {
+          const msg =
+            resolved.kind === "no_request"
+              ? "No approved workspace for this email yet. Submit an access request first."
+              : resolved.kind === "pending"
+              ? "Your access request is still pending approval."
+              : "Unable to sign in with this email.";
+          setError(msg);
+          setLoading(false);
+          return;
+        }
+        const { request: req } = resolved;
+        setSession({
+          email: req.email,
+          name: req.name || "",
+          phone: req.phone || "",
+          role: req.role,
+          status: ADMIN_STATUS.ACTIVE,
+        });
+        router(workspaceFor(req.role));
+        return;
+      }
+
+      setError("Unknown verification flow. Start again.");
+      setLoading(false);
+    } catch (err) {
+      setError(err.message || "Verification failed");
+      setLoading(false);
+    }
+  };
+
+  const onResend = async () => {
+    setError("");
+    const r = await resendPendingEmailOtp();
     if (r.ok) {
       setResent(true);
       setTimeout(() => setResent(false), 3000);

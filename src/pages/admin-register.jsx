@@ -37,14 +37,14 @@ export default function AdminRegisterPage() {
 
   const update = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
-  const goToOtp = (e) => {
+  const goToOtp = async (e) => {
     e.preventDefault();
     setOtpError("");
     const em = form.email.trim();
     if (!em) return;
-    const { ok } = startEmailOtp(em, OTP_PURPOSE.STAFF_REGISTER);
+    const { ok, message } = await startEmailOtp(em, OTP_PURPOSE.STAFF_REGISTER);
     if (!ok) {
-      setOtpError("Could not send verification email. Try again.");
+      setOtpError(message || "Could not send verification email. Try again.");
       return;
     }
     setStaffRegisterDraft({ ...form, email: em });
@@ -60,10 +60,10 @@ export default function AdminRegisterPage() {
     if (val && i < 5) refs.current[i + 1]?.focus();
   };
 
-  const submitVerifiedRequest = () => {
+  const submitVerifiedRequest = async () => {
     setOtpError("");
     const joined = code.join("");
-    const result = verifyPendingEmailOtp(joined);
+    const result = await verifyPendingEmailOtp(joined);
     if (!result.ok) {
       const msg =
         result.reason === "expired"
@@ -80,13 +80,32 @@ export default function AdminRegisterPage() {
       setOtpError("Session expired. Start again from the form.");
       return;
     }
-    const created = addAdminRequest({
-      ...draft,
-      emailVerified: true,
-    });
-    clearStaffRegisterDraft();
-    setSubmitted(created);
-    setStep("done");
+    try {
+      const created = await fetch("/api/auth/staff/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...draft,
+          email: key,
+          emailVerified: true,
+        }),
+      }).then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.message || "Register failed");
+        return data;
+      });
+      clearStaffRegisterDraft();
+      setSubmitted(created);
+      setStep("done");
+    } catch {
+      const created = addAdminRequest({
+        ...draft,
+        emailVerified: true,
+      });
+      clearStaffRegisterDraft();
+      setSubmitted(created);
+      setStep("done");
+    }
   };
 
   const cancelOtp = () => {

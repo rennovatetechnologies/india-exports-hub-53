@@ -51,6 +51,24 @@ export function loadEventsCatalog() {
   }
 }
 
+export async function fetchEventsCatalog() {
+  try {
+    const res = await fetch("/api/events");
+    if (!res.ok) throw new Error("fail");
+    const data = await res.json();
+    if (Array.isArray(data) && data.length) {
+      const cleaned = data.map(normalizeEvent).filter(Boolean);
+      if (cleaned.length) {
+        saveEventsCatalog(cleaned);
+        return cleaned;
+      }
+    }
+  } catch {
+    /* fallback */
+  }
+  return loadEventsCatalog();
+}
+
 export function saveEventsCatalog(events) {
   const next = (Array.isArray(events) ? events : []).map(normalizeEvent).filter(Boolean);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));

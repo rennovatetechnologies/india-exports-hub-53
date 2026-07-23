@@ -14,14 +14,16 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
     const em = email.trim();
     if (!em) return;
-    const { ok } = startEmailOtp(em, OTP_PURPOSE.CUSTOMER_SIGNUP);
+    setLoading(true);
+    const { ok, message } = await startEmailOtp(em, OTP_PURPOSE.CUSTOMER_SIGNUP);
     if (!ok) {
-      setError("Could not send verification code. Try again.");
+      setError(message || "Could not send verification code. Try again.");
+      setLoading(false);
       return;
     }
     setSignupDraft({
@@ -29,11 +31,7 @@ export default function SignupPage() {
       name: name.trim(),
       email: em,
     });
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      router("/verify?mode=signup");
-    }, 400);
+    router("/verify?mode=signup");
   };
 
   return (

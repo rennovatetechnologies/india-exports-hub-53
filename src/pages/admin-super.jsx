@@ -4,7 +4,8 @@ import {
   ShieldCheck, Users, IndianRupee, Workflow, Activity, CheckCircle2, XCircle, Clock,
   Search, Filter, ArrowUpRight, Crown, Settings2, BarChart3, AlertTriangle, Mail, Pencil,
 } from "lucide-react";
-import { getAdminRequests, updateAdminRequest, ADMIN_STATUS, ROLES } from "@/lib/authSession";
+import { fetchAdminRequests, updateAdminRequest, ADMIN_STATUS, ROLES } from "@/lib/authSession";
+import { api } from "@/lib/api";
 
 const STATS = [
   { label: "MRR", value: "₹1.42 Cr", delta: "+9.4% MoM", icon: IndianRupee, tone: "text-[var(--gold)]" },
@@ -39,7 +40,14 @@ export default function SuperAdminPage() {
   const [drawerMode, setDrawerMode] = useState("view");
 
   useEffect(() => {
-    setRequests(getAdminRequests());
+    let cancelled = false;
+    (async () => {
+      const list = await fetchAdminRequests();
+      if (!cancelled) setRequests(list);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filtered = useMemo(() => {
@@ -65,9 +73,15 @@ export default function SuperAdminPage() {
     setDrawerMode("view");
   };
 
-  const setStatus = (id, status) => {
-    const list = updateAdminRequest(id, { status });
-    setRequests(list);
+  const setStatus = async (id, status) => {
+    try {
+      await api(`/api/staff/access-requests/${id}`, { method: "PATCH", body: { status } });
+      const list = await fetchAdminRequests();
+      setRequests(list);
+    } catch {
+      const list = updateAdminRequest(id, { status });
+      setRequests(list);
+    }
     setActive((a) => (a && a.id === id ? { ...a, status } : a));
     setDrawerMode("view");
   };
