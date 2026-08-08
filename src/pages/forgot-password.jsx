@@ -23,7 +23,11 @@ export default function ForgotPasswordPage() {
       setLoading(false);
       return;
     }
-    const next = safeNextPath(searchParams.get("next"));
+    const rawNext = safeNextPath(searchParams.get("next"));
+    const next =
+      rawNext.startsWith("/dashboard") || rawNext.startsWith("/admin")
+        ? rawNext
+        : "/dashboard";
     navigate(`/verify?mode=login&next=${encodeURIComponent(next)}`);
   };
 

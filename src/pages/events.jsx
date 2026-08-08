@@ -4,12 +4,17 @@ import { FiCheckCircle } from "react-icons/fi";
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { getSession, isAuthenticated } from "@/lib/authSession";
+import { issueInvoiceForPayment } from "@/lib/invoice";
+import InvoiceModal from "@/components/InvoiceModal";
+
+const WORKSHOP_AMOUNT_INR = 6399;
 
 export default function EventPage() {
   const navigate = useNavigate();
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
-  const loginHref = `/login?next=${encodeURIComponent("/events#register")}`;
+  const [activeInvoice, setActiveInvoice] = useState(null);
+  const loginHref = `/login?next=${encodeURIComponent("/dashboard")}`;
 
   const loadRazorpayScript = () =>
     new Promise((resolve) => {
@@ -73,7 +78,7 @@ export default function EventPage() {
         key: rzKey,
         amount: orderData.amount,
         currency: orderData.currency,
-        name: "New India Export",
+        name: "VIRASTRA INTERNATIONAL EXPORT",
         description: "Virtual Shipment Workshop (5 Days)",
         order_id: orderData.id,
         handler: async function (response) {
@@ -90,7 +95,26 @@ export default function EventPage() {
 
           const verifyData = await verifyRes.json();
           if (verifyData.success) {
-            alert("Payment Successful! Your seat has been reserved. You will receive a confirmation email shortly.");
+            const invoice = issueInvoiceForPayment({
+              paymentId: response.razorpay_payment_id,
+              orderId: response.razorpay_order_id,
+              sku: "workshop",
+              description: "Virtual Shipment Workshop (5 Days)",
+              customer: {
+                name: session.name,
+                email: session.email,
+                phone: session.phone,
+                company: session.company,
+              },
+              totalInclusive: WORKSHOP_AMOUNT_INR,
+              lineItems: [
+                {
+                  description: "Virtual Shipment Workshop (5 Days)",
+                  quantity: 1,
+                },
+              ],
+            });
+            setActiveInvoice(invoice);
             setTermsAccepted(false);
           } else {
             alert("Payment verification failed. Please contact support.");
@@ -128,10 +152,17 @@ export default function EventPage() {
 
 
   return (
+    <>
+    <InvoiceModal
+      open={Boolean(activeInvoice)}
+      invoice={activeInvoice}
+      emailNotice
+      onClose={() => setActiveInvoice(null)}
+    />
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
 
       {/* HERO SECTION - Adjusted for navbar */}
-      <section className="relative min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-24 overflow-hidden pt-16">
+      <section className="relative min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-24 overflow-hidden pt-8">
 
         {/* Background Image */}
         <motion.div
@@ -174,7 +205,7 @@ export default function EventPage() {
           <div className="max-w-4xl">
 
             <p className="text-xs lg:text-sm tracking-[0.25em] uppercase text-[var(--gold)]/80 mb-4 lg:mb-6 font-light">
-              New India Export X Virtual Shipment Workshop (5 Days)
+              VIRASTRA INTERNATIONAL EXPORT X Virtual Shipment Workshop (5 Days)
             </p>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl xl:text-8xl font-serif leading-[1.1] lg:leading-[0.95] mb-6 lg:mb-8 tracking-tight">
@@ -333,7 +364,7 @@ export default function EventPage() {
 
                 <div className="space-y-4 lg:space-y-6 text-neutral-300 text-sm lg:text-lg leading-relaxed">
                   <p>
-                    New India Export presents the Virtual Shipment Workshop,
+                    VIRASTRA INTERNATIONAL EXPORT presents the Virtual Shipment Workshop,
                     an intensive 5-day program from 2nd May to 6th May 2026.
                   </p>
                   <p>
@@ -544,7 +575,7 @@ export default function EventPage() {
                 },
                 {
                   title: "Official Certification",
-                  desc: "Receive a recognized certification from New India Export upon successful completion."
+                  desc: "Receive a recognized certification from VIRASTRA INTERNATIONAL EXPORT upon successful completion."
                 }
               ].map((item, i) => (
                 <motion.div
@@ -690,7 +721,7 @@ export default function EventPage() {
               {!isAuthenticated() ? (
                 <div className="space-y-6 text-left">
                   <p className="text-sm text-neutral-300 leading-relaxed">
-                    Sign in to your New India Export account to reserve a seat. Your work email and profile will be used for
+                    Sign in to your VIRASTRA INTERNATIONAL EXPORT account to reserve a seat. Your work email and profile will be used for
                     confirmation and payment—no need to re-enter contact details here.
                   </p>
                   <Link
@@ -840,7 +871,7 @@ export default function EventPage() {
                   Virtual Shipment Workshop
                 </p>
                 <p className="text-sm lg:text-base text-neutral-400 mt-4 max-w-3xl mx-auto leading-relaxed">
-                  These Terms and Conditions govern participation in the Virtual Shipment Workshop, organized by New India Export.
+                  These Terms and Conditions govern participation in the Virtual Shipment Workshop, organized by VIRASTRA INTERNATIONAL EXPORT.
                   By registering for the event, participants agree to comply with the following terms.
                 </p>
               </div>
@@ -855,7 +886,7 @@ export default function EventPage() {
                   </h3>
                   <div className="pl-11 space-y-2 text-neutral-300 leading-relaxed">
                     <p><strong className="text-neutral-100">Event Name:</strong> Virtual Shipment Workshop</p>
-                    <p><strong className="text-neutral-100">Organizer:</strong> New India Export</p>
+                    <p><strong className="text-neutral-100">Organizer:</strong> VIRASTRA INTERNATIONAL EXPORT</p>
                     <p><strong className="text-neutral-100">Date:</strong> 02 – 06 May 2026</p>
                     <p><strong className="text-neutral-100">Mode:</strong> Virtual Event</p>
                   </div>
@@ -919,7 +950,7 @@ export default function EventPage() {
                     </p>
                     <p className="flex items-start gap-2">
                       <span className="text-[var(--gold)] mt-1">•</span>
-                      <span>Registration is confirmed only after verification by New India Export</span>
+                      <span>Registration is confirmed only after verification by VIRASTRA INTERNATIONAL EXPORT</span>
                     </p>
                   </div>
                 </div>
@@ -1016,7 +1047,7 @@ export default function EventPage() {
                 <div className="pt-8 mt-8 border-t border-neutral-800">
                   <div className="text-center">
                     <p className="text-neutral-400 font-medium mb-2">Organized by:</p>
-                    <p className="text-2xl font-serif text-[var(--gold)]">New India Export</p>
+                    <p className="text-2xl font-serif text-[var(--gold)]">VIRASTRA INTERNATIONAL EXPORT</p>
                   </div>
                 </div>
               </div>
@@ -1026,5 +1057,6 @@ export default function EventPage() {
       )}
 
     </div>
+    </>
   );
 }

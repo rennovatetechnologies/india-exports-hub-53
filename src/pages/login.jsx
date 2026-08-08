@@ -1,8 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, ArrowRight } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
-import { startEmailOtp, OTP_PURPOSE, safeNextPath } from "@/lib/authSession";
+import DemoLoginPanel from "@/components/auth/DemoLoginPanel";
+import {
+  getSession,
+  isStaffSession,
+  startEmailOtp,
+  OTP_PURPOSE,
+  safeNextPath,
+  customerPostLoginPath,
+  workspaceFor,
+} from "@/lib/authSession";
 
 export default function LoginPage() {
   const router = useNavigate();
@@ -11,12 +20,27 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [email, setEmail] = useState("");
 
+  useEffect(() => {
+    const session = getSession();
+    if (!session) return;
+    // Staff already signed in → their workspace. Customers → dashboard (never marketing home).
+    if (isStaffSession(session)) {
+      router(workspaceFor(session.role), { replace: true });
+      return;
+    }
+    router(customerPostLoginPath(searchParams.get("next")), { replace: true });
+  }, [router, searchParams]);
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
     const trimmed = email.trim();
     if (!trimmed) return;
-    const next = safeNextPath(searchParams.get("next"));
+    const rawNext = safeNextPath(searchParams.get("next"));
+    const next =
+      rawNext.startsWith("/dashboard") || rawNext.startsWith("/admin")
+        ? rawNext
+        : "/dashboard";
     setLoading(true);
     const { ok, message } = await startEmailOtp(trimmed, OTP_PURPOSE.CUSTOMER_LOGIN);
     if (!ok) {
@@ -33,7 +57,7 @@ export default function LoginPage() {
       subtitle="We’ll email you a one-time code — no password"
       footer={
         <>
-          New to New India Export?{" "}
+          New to VIRASTRA INTERNATIONAL EXPORT?{" "}
           <Link to="/signup" className="text-[var(--gold)] hover:underline">Create an account</Link>
           <div className="mt-3 text-[11px] text-white/45">
             Internal team?{" "}
@@ -67,6 +91,7 @@ export default function LoginPage() {
           <ArrowRight size={15} />
         </button>
       </form>
+      <DemoLoginPanel />
     </AuthShell>
   );
 }

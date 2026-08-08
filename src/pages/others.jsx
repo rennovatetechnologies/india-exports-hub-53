@@ -13,7 +13,7 @@ export default function OthersPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/30 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/70 via-transparent to-[var(--background)]/80" />
-        <div className="relative z-10 text-white px-6 mt-16 sm:mt-20">
+        <div className="relative z-10 text-white px-6 mt-6 sm:mt-8">
           <div className="inline-block mb-6">
             <div className="w-20 h-1 bg-[var(--gold)] mx-auto mb-4" />
             <h1 className="text-5xl sm:text-7xl font-bold mb-4 tracking-tight text-white">

@@ -1,8 +1,19 @@
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Globe, Star, Leaf, Handshake, Package } from "lucide-react";
+import { PATHS } from "@/lib/routes";
 
 export default function AboutPage() {
+  const { pathname } = useLocation();
+  const inDashboard = pathname.startsWith("/dashboard");
+  const productLinks = [
+    { label: "Spices", link: inDashboard ? PATHS.dashboardProductsSpices : PATHS.spices },
+    { label: "Cereals & Pulses", link: inDashboard ? PATHS.dashboardProductsCereals : PATHS.cereals },
+    { label: "Organic Foods", link: inDashboard ? PATHS.dashboardProductsOrganic : PATHS.organic },
+    { label: "Fruits & Vegetables", link: inDashboard ? PATHS.dashboardProductsFruits : PATHS.fruits },
+    { label: "Others", link: inDashboard ? PATHS.dashboardProductsOthers : PATHS.others },
+  ];
+
   return (
     <div className="flex flex-col min-h-screen text-[var(--foreground)]">
       {/* ==== HEADER SECTION ==== */}
@@ -14,7 +25,7 @@ export default function AboutPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/30 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/70 via-transparent to-[var(--background)]/80" />
-        <div className="relative z-10 text-white px-4 mt-16 sm:mt-20">
+        <div className="relative z-10 text-white px-4 mt-6 sm:mt-8">
           <div className="inline-block mb-4">
             <div className="w-20 h-1 bg-[var(--gold)] mx-auto mb-3" />
             <h1 className="text-4xl sm:text-6xl font-bold mb-3 tracking-tight text-white">
@@ -43,7 +54,7 @@ export default function AboutPage() {
             </h2>
             <p className="text-lg text-white/75 leading-relaxed text-justify">
               <span className="font-semibold text-[var(--gold)]">
-                NEW INDIA EXPORT
+                VIRASTRA INTERNATIONAL EXPORT
               </span>{" "}
               focuses on exporting premium Indian products to customers all over
               the world. We have built a strong, passionate team that works with
@@ -165,13 +176,7 @@ export default function AboutPage() {
   </h3>
 
   <div className="grid grid-cols-2 sm:flex sm:flex-wrap justify-center gap-3 sm:gap-4">
-    {[
-      { label: "Spices", link: "/spices" },
-      { label: "Cereals & Pulses", link: "/cerealsandpulses" },
-      { label: "Organic Foods", link: "/organicfood" },
-      { label: "Fruits & Vegetables", link: "/fruitsandvegetables" },
-      { label: "Others", link: "/others" },
-    ].map((btn, i) => (
+    {productLinks.map((btn, i) => (
       <motion.div
         key={i}
         whileHover={{ scale: 1.05 }}

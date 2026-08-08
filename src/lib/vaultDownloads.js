@@ -94,7 +94,7 @@ export function placeholderBlobForVaultDoc(filename, caseId) {
   const lower = String(filename || "").toLowerCase();
   if (lower.endsWith(".pdf")) return minimalPdfBlob();
   if (/\.(png|jpe?g|webp)$/.test(lower)) return tinyPngBlob();
-  const text = `India Exports Hub — demo vault file\n\nDocument: ${filename}\nCase: ${caseId}\n\nCustomer uploads are stored in this browser. Seed rows use this placeholder until the API is connected.`;
+  const text = `VIRASTRA INTERNATIONAL EXPORT — demo vault file\n\nDocument: ${filename}\nCase: ${caseId}\n\nCustomer uploads are stored in this browser. Seed rows use this placeholder until the API is connected.`;
   return new Blob([text], { type: "text/plain;charset=utf-8" });
 }
 
@@ -138,7 +138,13 @@ export function downloadBlobAsFile(blob, filename) {
  */
 export function openBlobInNewTab(blob) {
   const url = URL.createObjectURL(blob);
-  const w = window.open(url, "_blank", "noopener,noreferrer");
-  if (w) setTimeout(() => URL.revokeObjectURL(url), 120_000);
-  else URL.revokeObjectURL(url);
+  // Do not pass "noopener" as a feature — Chromium then returns null from
+  // window.open, and revoking the blob URL immediately blanks the new tab.
+  const w = window.open(url, "_blank");
+  if (w) {
+    setTimeout(() => URL.revokeObjectURL(url), 120_000);
+    return w;
+  }
+  URL.revokeObjectURL(url);
+  return null;
 }

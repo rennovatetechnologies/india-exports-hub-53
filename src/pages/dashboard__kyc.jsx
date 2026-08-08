@@ -1,26 +1,61 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getSession, markKycComplete } from "@/lib/authSession";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  CheckCircle2, Building2, IdCard, Upload,
-  ArrowLeft, ArrowRight, ShieldCheck, X, FileText
+  CheckCircle2,
+  Building2,
+  IdCard,
+  Upload,
+  ArrowLeft,
+  ArrowRight,
+  ShieldCheck,
+  X,
+  FileText,
+  Clock,
 } from "lucide-react";
+import { getSession } from "@/lib/authSession";
+import {
+  getCustomerCase,
+  getRequiredKycDocs,
+  setKycUpload,
+  clearKycUpload,
+  setKycProfile,
+  submitKyc,
+  fetchMyCase,
+  journeyStatus,
+  CASE_STATUS,
+  KYC_STATUS,
+  getKycActionDocs,
+} from "@/lib/customerCase";
+import { getPlanById } from "@/lib/planCatalog";
+import { api } from "@/lib/api";
+import {
+  KYC_FILE_ACCEPT,
+  validateKycFile,
+  putKycBlob,
+  getKycBlob,
+  deleteKycBlob,
+  formatFileSize,
+} from "@/lib/kycUploads";
 
 const STEPS = [
   { id: "business", label: "Business", icon: Building2 },
-  { id: "identity", label: "Identity", icon: IdCard },
+  { id: "identity", label: "Identity & docs", icon: IdCard },
   { id: "review", label: "Review", icon: ShieldCheck },
 ];
 
-/** Shown in the KYC header — all of these must be uploaded before verification. */
-const MANDATORY_KYC_UPLOADS = [
-  "PAN",
-  "Aadhaar",
-  "Bank statement",
-  "Photo",
-  "Electricity bill",
-];
+const EMPTY_PROFILE = {
+  legalName: "",
+  entityType: "Private Limited",
+  incorporationDate: "",
+  turnover: "₹0 - 1 Cr",
+  registeredAddress: "",
+  operatingCity: "",
+  signatoryName: "",
+  designation: "",
+  panNumber: "",
+  aadhaarLast4: "",
+};
 
 function Field({ label, hint, children }) {
   return (
@@ -31,121 +66,337 @@ function Field({ label, hint, children }) {
     </label>
   );
 }
-const inputCls = "w-full rounded-xl bg-white/5 border border-white/10 focus:border-[var(--gold)]/60 focus:bg-white/[0.07] outline-none px-3.5 py-2.5 text-sm placeholder:text-white/30 transition";
 
-function DocDrop({ title, desc, file, onFile }) {
+const inputCls =
+  "w-full rounded-xl bg-white/5 border border-white/10 focus:border-[var(--gold)]/60 focus:bg-white/[0.07] outline-none px-3.5 py-2.5 text-sm placeholder:text-white/30 transition";
+
+function DocDrop({ title, desc, fileMeta, onPick, onClear, error, needsAction, reviewNote }) {
+  const inputRef = useRef(null);
+  const label = fileMeta?.name;
+  const sizeLabel = fileMeta?.size ? formatFileSize(fileMeta.size) : "";
+  const rejected = fileMeta?.reviewStatus === "rejected" || needsAction;
+  const approved = fileMeta?.reviewStatus === "approved" && !needsAction;
+
   return (
-    <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-medium">{title}</div>
+    <div
+      className={`rounded-2xl border border-dashed p-4 ${
+        rejected
+          ? "border-rose-400/40 bg-rose-400/[0.06]"
+          : approved
+            ? "border-emerald-400/25 bg-emerald-400/[0.04]"
+            : "border-white/15 bg-white/[0.03]"
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-sm font-medium">{title}</div>
+            {rejected && (
+              <span className="rounded-md bg-rose-400/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-rose-200">
+                Needs update
+              </span>
+            )}
+            {approved && (
+              <span className="rounded-md bg-emerald-400/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-emerald-300">
+                Approved
+              </span>
+            )}
+          </div>
           <div className="text-[11px] text-white/45">{desc}</div>
+          {reviewNote && <div className="mt-1 text-[11px] text-rose-200">Ops note: {reviewNote}</div>}
+          {error && <div className="mt-1 text-[11px] text-rose-300">{error}</div>}
         </div>
-        {file ? (
-          <span className="flex items-center gap-2 rounded-lg bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-300">
-            <FileText size={14} /> {file}
-            <button onClick={() => onFile(null)} className="text-emerald-300/70 hover:text-white"><X size={12} /></button>
+        {label && !rejected ? (
+          <span
+            className={`flex max-w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs ${
+              approved ? "bg-emerald-400/10 text-emerald-300" : "bg-emerald-400/10 text-emerald-300"
+            }`}
+          >
+            <FileText size={14} className="shrink-0" />
+            <span className="truncate">
+              {label}
+              {sizeLabel ? ` · ${sizeLabel}` : ""}
+            </span>
+            {!approved && (
+              <button type="button" onClick={onClear} className="shrink-0 text-emerald-300/70 hover:text-white" aria-label="Remove file">
+                <X size={12} />
+              </button>
+            )}
           </span>
         ) : (
-          <button onClick={() => onFile("uploaded.pdf")} className="inline-flex items-center gap-2 rounded-lg glass px-3 py-1.5 text-xs hover:bg-white/10">
-            <Upload size={13} /> Upload
-          </button>
+          <>
+            <input
+              ref={inputRef}
+              type="file"
+              accept={KYC_FILE_ACCEPT}
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) onPick(file);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="inline-flex items-center gap-2 rounded-lg glass px-3 py-1.5 text-xs hover:bg-white/10"
+            >
+              <Upload size={13} /> {rejected && label ? "Replace file" : "Choose file"}
+            </button>
+          </>
         )}
       </div>
+      {rejected && label && (
+        <p className="mt-2 truncate text-[11px] text-white/40">Current file: {label} — replace it to continue</p>
+      )}
     </div>
   );
 }
 
-const MANDATORY_DOC_KEYS = ["pan", "aadhaar", "bankStatement", "photo", "electricity"];
-
 export default function KycWizardPage() {
   const navigate = useNavigate();
   const session = getSession();
-  const alreadyDone = Boolean(session?.kycComplete);
-
+  const [tick, setTick] = useState(0);
   const [step, setStep] = useState(0);
-  const [docs, setDocs] = useState({
-    pan: null,
-    aadhaar: null,
-    bankStatement: null,
-    photo: null,
-    electricity: null,
-  });
-  const set = (k) => (v) => setDocs((d) => ({ ...d, [k]: v }));
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [profile, setProfile] = useState(EMPTY_PROFILE);
+  const [fileErrors, setFileErrors] = useState({});
 
-  const mandatoryUploaded = MANDATORY_DOC_KEYS.filter((k) => docs[k]).length;
-  const allMandatoryDocs = mandatoryUploaded === MANDATORY_DOC_KEYS.length;
+  useEffect(() => {
+    const h = () => setTick((t) => t + 1);
+    window.addEventListener("iehub-case-updated", h);
+    return () => window.removeEventListener("iehub-case-updated", h);
+  }, []);
+
+  const c = session?.email ? getCustomerCase(session.email) : null;
+  const status = c ? journeyStatus(c) : CASE_STATUS.NO_PLAN;
+  const plan = getPlanById(c?.paidPlanId || c?.planId);
+  const required = c ? getRequiredKycDocs(c) : [];
+
+  useEffect(() => {
+    if (!session?.email || !c) return;
+    const saved = c.kycProfile || {};
+    setProfile({
+      ...EMPTY_PROFILE,
+      ...saved,
+      legalName: saved.legalName || session?.company || "",
+      signatoryName: saved.signatoryName || session?.name || "",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.email]);
+
+  useEffect(() => {
+    if (!session?.email) return;
+    if (status === CASE_STATUS.NO_PLAN || status === CASE_STATUS.UNPAID || status === CASE_STATUS.EXPIRED) {
+      navigate("/dashboard/billing", { replace: true });
+    }
+  }, [session?.email, status, navigate]);
+
+  const requiredOnly = useMemo(() => required.filter((d) => d.required !== false), [required]);
+  const actionDocs = useMemo(() => getKycActionDocs(c, required), [c, required]);
+  const actionDocIds = useMemo(() => new Set(actionDocs.map((d) => d.id)), [actionDocs]);
+  const allRequiredUploaded = requiredOnly.every((d) => {
+    const up = c?.kycUploads?.[d.id];
+    if (!up) return false;
+    // Rejected files must be replaced (local status becomes pending after re-pick)
+    if (up.reviewStatus === "rejected") return false;
+    return true;
+  });
+  const actionDocsReady = actionDocs.every((d) => {
+    const up = c?.kycUploads?.[d.id];
+    return up && up.reviewStatus !== "rejected";
+  });
+  const canSubmitDocs = allRequiredUploaded && actionDocsReady;
+
+  const businessOk =
+    profile.legalName.trim() &&
+    profile.registeredAddress.trim() &&
+    profile.operatingCity.trim();
+  const identityOk =
+    profile.signatoryName.trim() &&
+    profile.designation.trim() &&
+    profile.panNumber.trim().length >= 10 &&
+    String(profile.aadhaarLast4).replace(/\D/g, "").length === 4;
 
   const goto = (i) => setStep(Math.max(0, Math.min(STEPS.length - 1, i)));
 
-  const onSubmitKyc = async () => {
-    if (!session?.email || !allMandatoryDocs) return;
-    try {
-      const token = localStorage.getItem("vistara_token") || "";
-      const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-      // Best-effort: mark docs as uploaded locally then submit KYC unlock on API
-      for (const key of MANDATORY_DOC_KEYS) {
-        if (!docs[key]) continue;
-        const fd = new FormData();
-        // Placeholder tiny file when UI only stores filename string
-        const blob = new Blob([`placeholder-${key}`], { type: "application/pdf" });
-        fd.append("file", blob, typeof docs[key] === "string" ? docs[key] : `${key}.pdf`);
-        await fetch(`/api/kyc/me/documents/${key}`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd }).catch(() => null);
-      }
-      await fetch("/api/kyc/me/submit", { method: "POST", headers });
-    } catch {
-      /* local unlock still applies */
-    }
-    markKycComplete(session.email);
-    navigate("/dashboard", { replace: true });
+  const persistProfile = () => {
+    if (session?.email) setKycProfile(session.email, profile);
   };
 
-  if (alreadyDone) {
+  const onPickFile = async (docId, file) => {
+    if (!session?.email) return;
+    const check = validateKycFile(file);
+    if (!check.ok) {
+      setFileErrors((e) => ({ ...e, [docId]: check.message }));
+      return;
+    }
+    setFileErrors((e) => {
+      const next = { ...e };
+      delete next[docId];
+      return next;
+    });
+    try {
+      await putKycBlob(session.email, docId, file);
+      setKycUpload(session.email, docId, {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      });
+    } catch {
+      setFileErrors((e) => ({ ...e, [docId]: "Could not save file. Try again." }));
+    }
+  };
+
+  const onClearFile = async (docId) => {
+    if (!session?.email) return;
+    await deleteKycBlob(session.email, docId).catch(() => null);
+    clearKycUpload(session.email, docId);
+    setFileErrors((e) => {
+      const next = { ...e };
+      delete next[docId];
+      return next;
+    });
+  };
+
+  const onNext = () => {
+    persistProfile();
+    if (step === 0 && !businessOk) return;
+    if (step === 1 && (!identityOk || !canSubmitDocs)) return;
+    goto(step + 1);
+  };
+
+  const onSubmit = async () => {
+    if (!session?.email || !businessOk || !identityOk || !canSubmitDocs) return;
+    setSubmitting(true);
+    setSubmitError("");
+    persistProfile();
+    try {
+      await api("/api/kyc/me/profile", { method: "POST", body: profile });
+      for (const doc of required) {
+        const up = c?.kycUploads?.[doc.id];
+        if (!up) continue;
+        if (up.reviewStatus === "rejected") {
+          throw new Error(`Please replace ${doc.label || doc.id} before submitting.`);
+        }
+        const stored = await getKycBlob(session.email, doc.id);
+        // Keep already-approved server files when the customer did not re-pick them
+        if (!stored) {
+          if (up.fileId || up.driveFileId) continue;
+          throw new Error(`Missing file for ${doc.label || doc.id}. Re-upload and try again.`);
+        }
+        const fd = new FormData();
+        fd.append("file", stored, up.name || `${doc.id}.pdf`);
+        await api(`/api/kyc/me/documents/${doc.id}`, { method: "POST", formData: fd });
+      }
+      await api("/api/kyc/me/submit", { method: "POST", body: {} });
+      submitKyc(session.email);
+      await fetchMyCase({ force: true });
+    } catch (e) {
+      setSubmitError(e?.message || "KYC submit failed. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (status === CASE_STATUS.ACTIVE) {
     return (
       <div className="space-y-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.25em] text-white/40">Compliance</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">KYC complete</h1>
-            <p className="mt-1 text-sm text-white/55">Your workspace is verified. You can continue with exports onboarding.</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">KYC approved</h1>
+            <p className="mt-1 text-sm text-white/55">
+              Your details and documents are on file. Ops is preparing your documentation pack.
+            </p>
           </div>
           <Link to="/dashboard" className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-black">
-            Go to overview
+            Go to Home
           </Link>
-        </div>
-        <div className="glass-card flex items-start gap-4 p-6">
-          <ShieldCheck className="shrink-0 text-emerald-300" size={28} />
-          <div>
-            <p className="font-medium text-white">No further action needed</p>
-            <p className="mt-1 text-sm text-white/55">We keep your submitted documents on file. Open the vault or workflow anytime from the sidebar.</p>
-          </div>
         </div>
       </div>
     );
   }
 
+  if (status === CASE_STATUS.KYC_PENDING) {
+    return (
+      <div className="mx-auto max-w-lg space-y-4 text-center">
+        <Clock className="mx-auto text-[var(--gold)]" size={40} />
+        <h1 className="text-2xl font-semibold">KYC under review</h1>
+        <p className="text-sm text-white/55">
+          {c?.opsName ? `${c.opsName} is reviewing your submission.` : "Operations is reviewing your submission."} You can
+          message your desk or browse Events while you wait.
+        </p>
+        <p className="text-xs text-white/40">
+          Submitted {c?.kycSubmittedAt ? new Date(c.kycSubmittedAt).toLocaleString("en-IN") : ""}
+        </p>
+        <Link
+          to="/dashboard/messages"
+          className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-black"
+        >
+          Open chat
+        </Link>
+      </div>
+    );
+  }
+
+  const setField = (key) => (e) => setProfile((p) => ({ ...p, [key]: e.target.value }));
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-white/40">Compliance</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">KYC & Onboarding</h1>
-          <p className="mt-1 text-sm text-white/55">Complete three steps to unlock DGFT &amp; ICEGATE workflows.</p>
+          <p className="text-xs uppercase tracking-[0.25em] text-white/40">
+            {plan?.name || "Plan"} · Compliance
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+            {c?.kycStatus === KYC_STATUS.NEEDS_MORE ? "Update your KYC" : "KYC & onboarding"}
+          </h1>
+          <p className="mt-1 text-sm text-white/55">
+            {c?.kycStatus === KYC_STATUS.NEEDS_MORE
+              ? "Ops asked for updates on specific documents. Replace those files and resubmit."
+              : "Fill business details, upload your plan’s documents, then submit for ops review."}
+          </p>
         </div>
-        <span className="text-xs text-white/45">Overview unlocks after you submit KYC.</span>
+        <span className="text-xs text-white/45">Workspace unlocks after approval.</span>
       </div>
 
-      <div className="rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-4 sm:p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-200/90">KYC upload</p>
-        <p className="mt-2 text-sm text-white/80">The documents below are mandatory for verification.</p>
-        <ul className="mt-3 grid list-inside list-disc gap-1.5 text-sm text-white/70 sm:grid-cols-2 sm:gap-x-8">
-          {MANDATORY_KYC_UPLOADS.map((label) => (
-            <li key={label}>{label}</li>
-          ))}
-        </ul>
-      </div>
+      {c?.kycStatus === KYC_STATUS.NEEDS_MORE && (
+        <div className="rounded-2xl border border-rose-400/30 bg-rose-400/[0.08] p-4 sm:p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-200/90">Action needed</p>
+          {c.kycRejectReason && <p className="mt-2 text-sm text-white/80">{c.kycRejectReason}</p>}
+          {actionDocs.length > 0 ? (
+            <ul className="mt-3 space-y-2">
+              {actionDocs.map((d) => (
+                <li key={d.id} className="rounded-xl bg-black/20 px-3 py-2 text-sm">
+                  <div className="font-medium text-rose-100">{d.label}</div>
+                  {d.note && <div className="mt-0.5 text-xs text-white/55">{d.note}</div>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-white/60">Please review your document checklist and re-upload unclear files.</p>
+          )}
+        </div>
+      )}
 
-      {/* Stepper */}
+      {required.length > 0 && c?.kycStatus !== KYC_STATUS.NEEDS_MORE && (
+        <div className="rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-4 sm:p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-200/90">
+            {(c?.previousPlanIds || []).length ? "Remaining documents for upgrade" : "Documents for this plan"}
+          </p>
+          <ul className="mt-3 grid list-inside list-disc gap-1.5 text-sm text-white/70 sm:grid-cols-2 sm:gap-x-8">
+            {required.map((d) => (
+              <li key={d.id}>
+                {d.label}
+                {d.required === false ? " (optional)" : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="glass-card p-5">
         <ol className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {STEPS.map((s, i) => {
@@ -154,17 +405,31 @@ export default function KycWizardPage() {
             return (
               <li key={s.id}>
                 <button
-                  onClick={() => goto(i)}
+                  type="button"
+                  onClick={() => {
+                    persistProfile();
+                    goto(i);
+                  }}
                   className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
                     active ? "bg-white/10" : done ? "bg-emerald-400/5" : "bg-white/[0.03]"
                   }`}
                 >
-                  <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${active ? "bg-[var(--grad-gold)] text-black" : done ? "bg-emerald-400/15 text-emerald-300" : "bg-white/5 text-white/40"}`}>
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+                      active
+                        ? "bg-[var(--grad-gold)] text-black"
+                        : done
+                          ? "bg-emerald-400/15 text-emerald-300"
+                          : "bg-white/5 text-white/40"
+                    }`}
+                  >
                     {done ? <CheckCircle2 size={14} /> : <s.icon size={14} />}
                   </span>
                   <div className="leading-tight">
                     <div className="text-[10px] uppercase tracking-[0.18em] text-white/40">Step {i + 1}</div>
-                    <div className={`text-sm ${active ? "text-white" : done ? "text-emerald-200" : "text-white/60"}`}>{s.label}</div>
+                    <div className={`text-sm ${active ? "text-white" : done ? "text-emerald-200" : "text-white/60"}`}>
+                      {s.label}
+                    </div>
                   </div>
                 </button>
               </li>
@@ -180,7 +445,6 @@ export default function KycWizardPage() {
         </div>
       </div>
 
-      {/* Step body */}
       <div className="glass-card relative overflow-hidden p-6 sm:p-8">
         <AnimatePresence mode="wait">
           <motion.div
@@ -195,52 +459,145 @@ export default function KycWizardPage() {
               <>
                 <h2 className="text-lg font-semibold">Business details</h2>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Legal entity name"><input className={inputCls} placeholder="Aurora Exports Pvt Ltd" /></Field>
+                  <Field label="Legal entity name">
+                    <input
+                      className={inputCls}
+                      placeholder="Mehta Spices Pvt Ltd"
+                      value={profile.legalName}
+                      onChange={setField("legalName")}
+                    />
+                  </Field>
                   <Field label="Entity type">
-                    <select className={inputCls}><option>Private Limited</option><option>LLP</option><option>Proprietorship</option><option>Partnership</option></select>
+                    <select className={inputCls} value={profile.entityType} onChange={setField("entityType")}>
+                      <option>Private Limited</option>
+                      <option>LLP</option>
+                      <option>Proprietorship</option>
+                      <option>Partnership</option>
+                    </select>
                   </Field>
-                  <Field label="Date of incorporation"><input type="date" className={inputCls} /></Field>
+                  <Field label="Date of incorporation">
+                    <input
+                      type="date"
+                      className={inputCls}
+                      value={profile.incorporationDate}
+                      onChange={setField("incorporationDate")}
+                    />
+                  </Field>
                   <Field label="Annual turnover">
-                    <select className={inputCls}><option>₹0 - 1 Cr</option><option>₹1 - 10 Cr</option><option>₹10 - 50 Cr</option><option>₹50 Cr+</option></select>
+                    <select className={inputCls} value={profile.turnover} onChange={setField("turnover")}>
+                      <option>₹0 - 1 Cr</option>
+                      <option>₹1 - 10 Cr</option>
+                      <option>₹10 - 50 Cr</option>
+                      <option>₹50 Cr+</option>
+                    </select>
                   </Field>
-                  <Field label="Registered address" hint="As per ROC records"><textarea rows={2} className={inputCls} /></Field>
-                  <Field label="Operating city"><input className={inputCls} placeholder="Nagpur" /></Field>
+                  <Field label="Registered address" hint="As per ROC records">
+                    <textarea
+                      rows={2}
+                      className={inputCls}
+                      value={profile.registeredAddress}
+                      onChange={setField("registeredAddress")}
+                    />
+                  </Field>
+                  <Field label="Operating city">
+                    <input
+                      className={inputCls}
+                      placeholder="Nagpur"
+                      value={profile.operatingCity}
+                      onChange={setField("operatingCity")}
+                    />
+                  </Field>
                 </div>
               </>
             )}
 
             {step === 1 && (
               <>
-                <h2 className="text-lg font-semibold">Authorized signatory & identity</h2>
+                <h2 className="text-lg font-semibold">Authorized signatory &amp; documents</h2>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Full name"><input className={inputCls} placeholder="Rohit Agarwal" /></Field>
-                  <Field label="Designation"><input className={inputCls} placeholder="Director" /></Field>
-                  <Field label="PAN"><input className={inputCls} placeholder="AAACR1234F" /></Field>
-                  <Field label="Aadhaar (last 4)"><input className={inputCls} placeholder="•••• 1234" /></Field>
+                  <Field label="Full name">
+                    <input
+                      className={inputCls}
+                      placeholder="Priya Mehta"
+                      value={profile.signatoryName}
+                      onChange={setField("signatoryName")}
+                    />
+                  </Field>
+                  <Field label="Designation">
+                    <input
+                      className={inputCls}
+                      placeholder="Director"
+                      value={profile.designation}
+                      onChange={setField("designation")}
+                    />
+                  </Field>
+                  <Field label="PAN">
+                    <input
+                      className={inputCls}
+                      placeholder="AAACR1234F"
+                      value={profile.panNumber}
+                      onChange={setField("panNumber")}
+                    />
+                  </Field>
+                  <Field label="Aadhaar (last 4)">
+                    <input
+                      className={inputCls}
+                      placeholder="1234"
+                      maxLength={4}
+                      value={profile.aadhaarLast4}
+                      onChange={setField("aadhaarLast4")}
+                    />
+                  </Field>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <DocDrop title="PAN card" desc="Required · PDF or image · max 5MB" file={docs.pan} onFile={set("pan")} />
-                  <DocDrop title="Aadhaar" desc="Required · front &amp; back combined" file={docs.aadhaar} onFile={set("aadhaar")} />
-                  <DocDrop title="Bank statement" desc="Required · last 3 months · PDF" file={docs.bankStatement} onFile={set("bankStatement")} />
-                  <DocDrop title="Photo" desc="Required · recent passport-size, plain background" file={docs.photo} onFile={set("photo")} />
-                  <DocDrop title="Electricity bill" desc="Required · address proof · last 3 months" file={docs.electricity} onFile={set("electricity")} />
+                  {required.map((doc) => {
+                    const up = c?.kycUploads?.[doc.id] || null;
+                    const needsAction =
+                      actionDocIds.has(doc.id) || up?.reviewStatus === "rejected";
+                    return (
+                      <DocDrop
+                        key={doc.id}
+                        title={`${doc.label}${doc.required === false ? " (optional)" : ""}`}
+                        desc={
+                          needsAction
+                            ? "Please upload a clearer / corrected file · PDF or image · max 5MB"
+                            : doc.required === false
+                              ? "Optional · PDF or image (JPG, PNG, WebP) · max 5MB"
+                              : "Required · PDF or image (JPG, PNG, WebP) · max 5MB"
+                        }
+                        fileMeta={up}
+                        needsAction={needsAction}
+                        reviewNote={up?.reviewNote || (needsAction ? actionDocs.find((a) => a.id === doc.id)?.note : "")}
+                        error={fileErrors[doc.id]}
+                        onPick={(file) => onPickFile(doc.id, file)}
+                        onClear={() => onClearFile(doc.id)}
+                      />
+                    );
+                  })}
+                  {!required.length && (
+                    <p className="text-sm text-white/45 sm:col-span-2">No additional documents for this plan.</p>
+                  )}
                 </div>
               </>
             )}
 
             {step === 2 && (
               <>
-                <h2 className="text-lg font-semibold">Review & submit</h2>
-                <p className="text-sm text-white/55">Our compliance desk verifies submissions within 1 business day.</p>
+                <h2 className="text-lg font-semibold">Review &amp; submit</h2>
+                <p className="text-sm text-white/55">
+                  Our compliance desk verifies submissions within 1 business day. Workspace stays locked until approved.
+                </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {[
-                    ["Entity", "Aurora Exports Pvt Ltd"],
-                    ["Signatory", "Rohit Agarwal · Director"],
+                    ["Entity", profile.legalName || "—"],
+                    ["Type / city", `${profile.entityType} · ${profile.operatingCity || "—"}`],
+                    ["Signatory", `${profile.signatoryName || "—"} · ${profile.designation || "—"}`],
+                    ["PAN", profile.panNumber || "—"],
                     [
-                      "Mandatory KYC",
-                      `${mandatoryUploaded} of ${MANDATORY_DOC_KEYS.length} documents uploaded`,
+                      "Documents",
+                      `${requiredOnly.filter((d) => c?.kycUploads?.[d.id]).length} of ${requiredOnly.length} required uploaded`,
                     ],
-                    ["SLA", "Verification within 24 hours"],
+                    ["Plan", plan?.name || "—"],
                   ].map(([k, v]) => (
                     <div key={k} className="rounded-xl bg-white/[0.03] p-4">
                       <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">{k}</div>
@@ -248,37 +605,52 @@ export default function KycWizardPage() {
                     </div>
                   ))}
                 </div>
-                <div className="flex items-center gap-3 rounded-xl bg-emerald-400/5 p-4 text-sm text-emerald-200">
-                  <ShieldCheck size={18} /> All data is encrypted in transit and at rest. Audit-logged for compliance.
-                </div>
+                {(!businessOk || !identityOk || !canSubmitDocs) && (
+                  <p className="text-xs text-amber-200/90">
+                    Complete business details, signatory fields, and all required documents before submitting.
+                  </p>
+                )}
+                {submitError ? <p className="text-xs text-rose-300">{submitError}</p> : null}
               </>
             )}
           </motion.div>
         </AnimatePresence>
 
-        <div className="mt-8 flex items-center justify-between border-t border-white/5 pt-5">
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
           <button
-            onClick={() => goto(step - 1)}
+            type="button"
             disabled={step === 0}
-            className="inline-flex items-center gap-2 rounded-xl glass px-4 py-2 text-sm disabled:opacity-30"
+            onClick={() => {
+              persistProfile();
+              goto(step - 1);
+            }}
+            className="btn-ghost inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm disabled:opacity-30"
           >
-            <ArrowLeft size={14} /> Back
+            <ArrowLeft size={16} /> Back
           </button>
           {step < STEPS.length - 1 ? (
-            <button onClick={() => goto(step + 1)} className="btn-gold inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-black">
-              Continue <ArrowRight size={14} />
+            <button
+              type="button"
+              onClick={onNext}
+              disabled={(step === 0 && !businessOk) || (step === 1 && (!identityOk || !canSubmitDocs))}
+              className="btn-gold inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-black disabled:opacity-40"
+            >
+              Continue <ArrowRight size={16} />
             </button>
           ) : (
             <button
               type="button"
-              disabled={!allMandatoryDocs}
-              onClick={onSubmitKyc}
-              className="btn-gold inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-45"
+              onClick={onSubmit}
+              disabled={submitting || !businessOk || !identityOk || !canSubmitDocs}
+              className="btn-gold inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-black disabled:opacity-40"
             >
-              Submit for verification <CheckCircle2 size={15} />
+              {submitting ? "Submitting…" : "Submit for review"}
             </button>
           )}
         </div>
+        {submitError && step !== 2 ? (
+          <p className="mt-3 text-xs text-rose-300">{submitError}</p>
+        ) : null}
       </div>
     </div>
   );

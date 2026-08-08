@@ -1,7 +1,123 @@
 const STORAGE_KEY = "vistara_session";
+const TOKEN_KEY = "vistara_token";
 const ADMIN_REQUESTS_KEY = "vistara_admin_requests";
 /** Lowercased emails that finished customer KYC (persists across sessions). */
 const KYC_COMPLETE_KEY = "vistara_kyc_complete_emails";
+/** Fired on the window when session is created or cleared — keep nav/chrome in sync. */
+export const AUTH_CHANGED_EVENT = "iehub-auth-changed";
+
+/** Client session TTL when JWT has no `exp` (demo / legacy). Matches backend JWT_EXPIRE_HOURS=2. */
+export const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
+
+let expiryTimerId = null;
+
+function notifyAuthChanged() {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+  } catch {}
+}
+
+function getStoredToken() {
+  try {
+    return localStorage.getItem(TOKEN_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+/** Decode JWT payload without verifying signature (expiry UX only; API still verifies). */
+export function readJwtPayload(token) {
+  if (!token || typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+/** Absolute expiry timestamp (ms) from JWT `exp`, or null if missing/invalid. */
+export function tokenExpiresAtMs(token) {
+  const payload = readJwtPayload(token);
+  const exp = payload?.exp;
+  if (typeof exp !== "number" || !Number.isFinite(exp)) return null;
+  return exp * 1000;
+}
+
+function clearExpiryTimer() {
+  if (expiryTimerId != null) {
+    clearTimeout(expiryTimerId);
+    expiryTimerId = null;
+  }
+}
+
+/**
+ * Schedule automatic logout at expiresAt. Call on login and app boot.
+ * No-ops when already expired (caller should clearSession).
+ */
+export function scheduleSessionExpiry(expiresAtMs) {
+  clearExpiryTimer();
+  if (typeof window === "undefined") return;
+  const at = Number(expiresAtMs);
+  if (!Number.isFinite(at)) return;
+  const delay = at - Date.now();
+  if (delay <= 0) return;
+  // setTimeout delay is 32-bit; clamp to ~24d (session is 2h so fine)
+  expiryTimerId = window.setTimeout(() => {
+    expiryTimerId = null;
+    clearSession();
+  }, Math.min(delay, 2_147_483_647));
+}
+
+/** Resolve session end time: prefer JWT exp, else stored expiresAt, else null. */
+function resolveExpiresAtMs(storedExpiresAt) {
+  const fromJwt = tokenExpiresAtMs(getStoredToken());
+  if (fromJwt != null) return fromJwt;
+  const stored = Number(storedExpiresAt);
+  if (Number.isFinite(stored) && stored > 0) return stored;
+  return null;
+}
+
+/** Persist a 2h window for legacy sessions that have no JWT and no expiresAt. */
+function ensureExpiresAtOnSessionData(data) {
+  const existing = resolveExpiresAtMs(data?.expiresAt);
+  if (existing != null) return existing;
+  const expiresAt = Date.now() + SESSION_TTL_MS;
+  try {
+    const next = { ...data, expiresAt };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  } catch {}
+  return expiresAt;
+}
+
+/** If session/token is past expiry, clear and return true. */
+function expireSessionIfNeeded(data) {
+  const expiresAt = ensureExpiresAtOnSessionData(data);
+  if (Date.now() < expiresAt) {
+    scheduleSessionExpiry(expiresAt);
+    return false;
+  }
+  clearExpiryTimer();
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {}
+  notifyAuthChanged();
+  return true;
+}
+
+/** Boot hook: enforce expiry for an existing local session (call once from app root). */
+export function initSessionExpiryWatch() {
+  if (typeof window === "undefined") return;
+  const session = getSession();
+  if (!session) return;
+  const expiresAt = resolveExpiresAtMs(session.expiresAt);
+  if (expiresAt != null) scheduleSessionExpiry(expiresAt);
+}
 
 function parseKycEmailSet() {
   try {
@@ -58,6 +174,15 @@ export function markKycComplete(email) {
   localStorage.setItem(KYC_COMPLETE_KEY, JSON.stringify([...next]));
 }
 
+/** Clear local KYC-complete flag (used by incomplete-KYC demo personas). */
+export function clearKycComplete(email) {
+  const key = normalizeEmail(email);
+  if (!key) return;
+  const next = parseKycEmailSet();
+  if (!next.delete(key)) return;
+  localStorage.setItem(KYC_COMPLETE_KEY, JSON.stringify([...next]));
+}
+
 function displayNameFromEmail(email) {
   if (!email || typeof email !== "string") return "Customer";
   const local = email.split("@")[0] || "";
@@ -72,15 +197,17 @@ export function getSession() {
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (!data || typeof data.email !== "string" || !data.email.trim()) return null;
+    if (expireSessionIfNeeded(data)) return null;
     const email = data.email.trim();
     const rawRole = typeof data.role === "string" ? data.role.trim() : ROLES.CUSTOMER;
     const role = rawRole === "super" ? ROLES.ADMIN : rawRole;
     const kycComplete =
       role === ROLES.CUSTOMER
         ? typeof data.kycComplete === "boolean"
-          ? data.kycComplete || hasCompletedKyc(email)
+          ? data.kycComplete
           : hasCompletedKyc(email)
         : true;
+    const expiresAt = resolveExpiresAtMs(data.expiresAt) ?? ensureExpiresAtOnSessionData(data);
     return {
       email,
       name: (typeof data.name === "string" && data.name.trim()) || displayNameFromEmail(data.email),
@@ -89,6 +216,7 @@ export function getSession() {
       status: typeof data.status === "string" ? data.status : ADMIN_STATUS.ACTIVE,
       company: typeof data.company === "string" ? data.company : "",
       kycComplete,
+      expiresAt,
     };
   } catch {
     return null;
@@ -99,7 +227,28 @@ export function isAuthenticated() {
   return getSession() !== null;
 }
 
-export function setSession({ email, name, phone, role, status, token, kycComplete, company }) {
+/** True when session role is operations or admin. */
+export function isStaffSession(session = getSession()) {
+  const role = session?.role;
+  return role === ROLES.ADMIN || role === ROLES.OPERATIONS || role === "super";
+}
+
+/** Subscribe to login/logout (and cross-tab storage). Returns unsubscribe. */
+export function subscribeAuth(onChange) {
+  if (typeof window === "undefined") return () => {};
+  const handler = () => onChange(getSession());
+  const onStorage = (e) => {
+    if (e.key === STORAGE_KEY || e.key === TOKEN_KEY) handler();
+  };
+  window.addEventListener(AUTH_CHANGED_EVENT, handler);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(AUTH_CHANGED_EVENT, handler);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+export function setSession({ email, name, phone, role, status, token, kycComplete, company, expiresAt }) {
   const payload = {
     email: String(email || "").trim(),
     name: String(name || "").trim() || displayNameFromEmail(email),
@@ -113,22 +262,35 @@ export function setSession({ email, name, phone, role, status, token, kycComplet
   };
   if (typeof kycComplete === "boolean") payload.kycComplete = kycComplete;
   if (!payload.email) return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+
   if (token) {
     try {
-      localStorage.setItem("vistara_token", token);
+      localStorage.setItem(TOKEN_KEY, token);
     } catch {}
   }
-  if (payload.kycComplete && payload.role === ROLES.CUSTOMER) {
-    markKycComplete(payload.email);
+
+  const jwtExp = tokenExpiresAtMs(token || getStoredToken());
+  const explicit = Number(expiresAt);
+  payload.expiresAt =
+    jwtExp ??
+    (Number.isFinite(explicit) && explicit > 0 ? explicit : Date.now() + SESSION_TTL_MS);
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  if (payload.role === ROLES.CUSTOMER && typeof kycComplete === "boolean") {
+    if (kycComplete) markKycComplete(payload.email);
+    else clearKycComplete(payload.email);
   }
+  scheduleSessionExpiry(payload.expiresAt);
+  notifyAuthChanged();
 }
 
 export function clearSession() {
+  clearExpiryTimer();
   localStorage.removeItem(STORAGE_KEY);
   try {
-    localStorage.removeItem("vistara_token");
+    localStorage.removeItem(TOKEN_KEY);
   } catch {}
+  notifyAuthChanged();
 }
 
 /** Avoid open redirects: only same-origin relative paths. */
@@ -136,6 +298,19 @@ export function safeNextPath(raw) {
   if (!raw || typeof raw !== "string") return "/dashboard";
   const decoded = decodeURIComponent(raw.trim());
   if (decoded.startsWith("/") && !decoded.startsWith("//")) return decoded;
+  return "/dashboard";
+}
+
+/**
+ * Where a customer should land after sign-in.
+ * Journey gates (billing / KYC) win; otherwise only honor workspace deep links —
+ * never bounce back to the marketing home page (confusing after OTP).
+ */
+export function customerPostLoginPath(nextRaw, gatedPath = "/dashboard") {
+  const gated = gatedPath || "/dashboard";
+  if (gated !== "/dashboard") return gated;
+  const next = safeNextPath(nextRaw);
+  if (next.startsWith("/dashboard") || next.startsWith("/admin")) return next;
   return "/dashboard";
 }
 
@@ -150,10 +325,8 @@ export function workspaceFor(role) {
 
 const SEED_REQUESTS = [
   { id: "REQ-1042", name: "Sanjay Rao", email: "sanjay.r@newindiaexport.com", phone: "+91 98100 10001", role: ROLES.ADMIN, department: "Platform governance", employeeId: "VST-001", reason: "Bootstrap platform admin", status: ADMIN_STATUS.APPROVED, emailVerified: true, createdAt: "2025-04-01T08:00:00Z" },
-  { id: "REQ-1041", name: "Aditi Khanna", email: "aditi.k@newindiaexport.com", phone: "+91 98765 11220", role: ROLES.OPERATIONS, department: "Compliance ops", employeeId: "VST-227", reason: "Joining ICEGATE desk", status: ADMIN_STATUS.PENDING, emailVerified: true, createdAt: "2025-05-10T09:14:00Z" },
-  { id: "REQ-1040", name: "Karan Shetty", email: "karan.s@newindiaexport.com", phone: "+91 99820 10044", role: ROLES.OPERATIONS, department: "Customer success", employeeId: "VST-218", reason: "Backfill for outgoing CSM", status: ADMIN_STATUS.PENDING, emailVerified: false, createdAt: "2025-05-09T17:32:00Z" },
   { id: "REQ-1039", name: "Meera Iyer", email: "meera@newindiaexport.com", phone: "+91 90000 23456", role: ROLES.ADMIN, department: "Finance leadership", employeeId: "VST-104", reason: "Quarter close + pricing controls", status: ADMIN_STATUS.PENDING, emailVerified: true, createdAt: "2025-05-08T11:02:00Z" },
-  { id: "REQ-1038", name: "Rahul Bose", email: "rahul.b@newindiaexport.com", phone: "+91 98111 33221", role: ROLES.OPERATIONS, department: "Documentation", employeeId: "VST-201", reason: "Volume spike in May", status: ADMIN_STATUS.APPROVED, emailVerified: true, createdAt: "2025-05-04T08:00:00Z" },
+  { id: "REQ-RAMA-OPS", name: "Ramakrishna", email: "ramakrishnamnit@gmail.com", phone: "", role: ROLES.OPERATIONS, department: "Operations", employeeId: "", reason: "Bootstrap operations user", status: ADMIN_STATUS.APPROVED, emailVerified: true, createdAt: "2026-03-08T08:00:00Z" },
 ];
 
 function seedIfEmpty() {
@@ -257,20 +430,103 @@ export const OTP_PURPOSE = {
   STAFF_REGISTER: "staff_register",
 };
 
-function allowAuthMock() {
+export function allowAuthMock() {
   return String(import.meta.env?.VITE_ALLOW_AUTH_MOCK || "").toLowerCase() === "true";
 }
 
-/** Start or refresh a pending email OTP via backend (mock only if VITE_ALLOW_AUTH_MOCK=true). */
-export async function startEmailOtp(email, purpose) {
+/** Prefabricated sessions for UI demos when the API is offline. */
+export const DEMO_USERS = [
+  {
+    id: "customer-plan",
+    label: "Customer · choose plan",
+    description: "New account — pick a plan & pay first",
+    email: "demo.plan@example.com",
+    name: "Neha Kapoor",
+    company: "Kapoor Exports",
+    phone: "+91 98765 01000",
+    role: ROLES.CUSTOMER,
+    kycComplete: false,
+  },
+  {
+    id: "customer-kyc",
+    label: "Customer · KYC pending",
+    description: "Plan paid — complete KYC next",
+    email: "demo.kyc@example.com",
+    name: "Arjun Desai",
+    company: "Desai Organics",
+    phone: "+91 98765 01002",
+    role: ROLES.CUSTOMER,
+    kycComplete: false,
+  },
+  {
+    id: "customer",
+    label: "Customer · active",
+    description: "Plan paid · KYC done · full workspace",
+    email: "demo.customer@example.com",
+    name: "Priya Mehta",
+    company: "Mehta Spices Pvt Ltd",
+    phone: "+91 98765 01001",
+    role: ROLES.CUSTOMER,
+    kycComplete: true,
+  },
+  {
+    id: "operations",
+    label: "Operations",
+    description: "Case & compliance desk",
+    email: "ramakrishnamnit@gmail.com",
+    name: "Ramakrishna",
+    phone: "",
+    role: ROLES.OPERATIONS,
+  },
+  {
+    id: "admin",
+    label: "Admin",
+    description: "Platform & RBAC console",
+    email: "sanjay.r@newindiaexport.com",
+    name: "Sanjay Rao",
+    phone: "+91 98100 10001",
+    role: ROLES.ADMIN,
+  },
+];
+
+/** Instant local session for a demo persona (no OTP / no API). */
+export function loginAsDemoUser(demoId) {
+  if (!allowAuthMock()) return { ok: false, message: "Demo login requires VITE_ALLOW_AUTH_MOCK=true" };
+  const user = DEMO_USERS.find((u) => u.id === demoId);
+  if (!user) return { ok: false, message: "Unknown demo user" };
+  const kycComplete = user.role === ROLES.CUSTOMER ? Boolean(user.kycComplete) : true;
+  setSession({
+    email: user.email,
+    name: user.name,
+    phone: user.phone || "",
+    company: user.company || "",
+    role: user.role,
+    status: ADMIN_STATUS.ACTIVE,
+    kycComplete,
+  });
+  // Always land on role workspace. Customer Chrome gate sends: plan → pay → KYC → home.
+  return { ok: true, path: workspaceFor(user.role), user };
+}
+
+/**
+ * Start or refresh a pending email OTP via backend (mock only if VITE_ALLOW_AUTH_MOCK=true).
+ * For customer_signup, pass profile: { name, company, phone? } — backend validates existence + stores draft + sends OTP.
+ */
+export async function startEmailOtp(email, purpose, profile = {}) {
   if (typeof window === "undefined") return { ok: false };
   const normalized = normalizeEmail(email);
   if (!normalized) return { ok: false };
   try {
+    const body = { email: normalized, purpose };
+    if (purpose === OTP_PURPOSE.CUSTOMER_SIGNUP) {
+      if (profile.name != null) body.name = String(profile.name).trim();
+      if (profile.company != null) body.company = String(profile.company).trim();
+      if (profile.phone != null) body.phone = String(profile.phone).trim();
+    }
     const res = await fetch("/api/auth/otp/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: normalized, purpose }),
+      body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok !== false) {
@@ -290,6 +546,7 @@ export async function startEmailOtp(email, purpose) {
       return {
         ok: false,
         message: data.message || data.detail || data.error || "Could not send OTP. Is the backend running?",
+        code: data.code,
       };
     }
   } catch (err) {
@@ -313,7 +570,7 @@ export async function startEmailOtp(email, purpose) {
     })
   );
   if (import.meta.env?.DEV) {
-    console.info(`[New India Export demo OTP] ${normalized}: ${code}`);
+    console.info(`[VIRASTRA INTERNATIONAL EXPORT demo OTP] ${normalized}: ${code}`);
   }
   return { ok: true, mock: true };
 }

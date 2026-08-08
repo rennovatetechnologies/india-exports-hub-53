@@ -3,6 +3,9 @@ import { ArrowUp, MessageCircle, Mail, Phone, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useLocation } from "react-router-dom";
+import { PRODUCT_CATEGORIES } from "@/lib/siteNav";
+import { PATHS } from "@/lib/routes";
+
 export default function Footer() {
   const pathname = useLocation().pathname;
   const [showTop, setShowTop] = useState(false);
@@ -11,7 +14,12 @@ export default function Footer() {
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-  const hide = pathname?.startsWith("/dashboard") || pathname?.startsWith("/admin") || ["/login", "/signup", "/verify", "/forgot-password"].some((p) => pathname?.startsWith(p));
+  // Workspace chrome owns layout; keep footer on marketing + auth pages.
+  const hide =
+    pathname?.startsWith("/dashboard") ||
+    (pathname?.startsWith("/admin") &&
+      !pathname.startsWith("/admin/login") &&
+      !pathname.startsWith("/admin/register"));
   if (hide) return null;
 
   return (
@@ -23,11 +31,14 @@ export default function Footer() {
         <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8 py-16">
           <div className="grid gap-12 lg:grid-cols-12">
             <div className="lg:col-span-5">
-              <Link to="/" className="inline-flex items-center gap-2">
+              <Link to={PATHS.home} className="inline-flex items-center gap-2">
                 <span className="text-2xl font-semibold tracking-tight">
-                  New India Export
+                  VIRASTRA INTERNATIONAL EXPORT
                 </span>
               </Link>
+              <p className="mt-2 text-xs uppercase tracking-[0.2em] text-[var(--gold)]/90">
+                where trust travels
+              </p>
               <p className="mt-4 max-w-md text-sm text-white/55 leading-relaxed">
                 Export products from anywhere to everywhere. The premium consultancy
                 & workflow platform for modern global trade.
@@ -42,25 +53,26 @@ export default function Footer() {
 
             <FooterCol title="Platform" links={[
               ["Plans", "/#plans"],
-              ["Events", "/events"],
-              ["Brochures", "/brochures"],
-              ["Contact", "/contact"],
+              ["Products", "/#products"],
+              ["Events", PATHS.events],
+              ["Brochures", PATHS.brochures],
+              ["Contact", PATHS.contact],
             ]} />
             <FooterCol title="Company" links={[
-              ["About", "/about"],
-              ["Gallery", "/gallery"],
-              ["Contact", "/contact"],
+              ["About", PATHS.about],
+              ["Gallery", PATHS.gallery],
+              ["Contact", PATHS.contact],
+              ["Log in", PATHS.login],
+              ["Sign up", PATHS.signup],
             ]} />
-            <FooterCol title="Products" links={[
-              ["Spices", "/spices"],
-              ["Cereals & Pulses", "/cerealsandpulses"],
-              ["Organic", "/organicfood"],
-              ["Fruits & Veg", "/fruitsandvegetables"],
-            ]} />
+            <FooterCol
+              title="Products"
+              links={PRODUCT_CATEGORIES.map(({ name, path, short }) => [short || name, path])}
+            />
           </div>
 
           <div className="mt-14 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/5 pt-6 text-xs text-white/40">
-            <div suppressHydrationWarning>© {new Date().getFullYear()} New India Export. All rights reserved.</div>
+            <div suppressHydrationWarning>© {new Date().getFullYear()} VIRASTRA INTERNATIONAL EXPORT. All rights reserved.</div>
             <div className="flex items-center gap-3">
               <a
                 href="https://wa.me/919028894149"

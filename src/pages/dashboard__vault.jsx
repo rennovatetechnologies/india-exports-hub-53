@@ -94,7 +94,7 @@ export default function VaultPage() {
   const [rowsByCase, setRowsByCase] = useState(() => loadVaultDocsFromStorage());
   const [vaultListQuery, setVaultListQuery] = useState("");
   const [vaultPreset, setVaultPreset] = useState(
-    /** @type {"all" | "attention" | "active" | "complete" | "pending_docs"} */ ("all")
+    /** @type {"all" | "active" | "complete" | "pending_docs"} */ ("all")
   );
   const [vaultSort, setVaultSort] = useState(/** @type {"smart" | "caseId" | "stage"} */ ("smart"));
   const [vaultListTick, setVaultListTick] = useState(0);
@@ -295,7 +295,7 @@ export default function VaultPage() {
             <input
               value={vaultListQuery}
               onChange={(e) => setVaultListQuery(e.target.value)}
-              placeholder="Smart search: case id, buyer, sla:breached, words…"
+              placeholder="Smart search: case id, buyer, company…"
               className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-white/30"
             />
           </div>
@@ -312,7 +312,6 @@ export default function VaultPage() {
         <div className="flex flex-wrap gap-1.5">
           {[
             { id: "all", label: "All" },
-            { id: "attention", label: "SLA risk" },
             { id: "active", label: "Active" },
             { id: "complete", label: "Done" },
             { id: "pending_docs", label: "Pending docs" },

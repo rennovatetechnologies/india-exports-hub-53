@@ -15,7 +15,7 @@ export default function BookingPage() {
 
   useEffect(() => {
     if (!isAuthenticated()) {
-      navigate(`/login?next=${encodeURIComponent("/booking")}`);
+      navigate(`/login?next=${encodeURIComponent("/dashboard")}`);
     }
   }, [navigate]);
 
@@ -59,7 +59,7 @@ Country: ${country}`;
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/40 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/70 via-transparent to-[var(--background)]/80" />
-        <div className="relative z-10 text-white px-6 mt-16 sm:mt-20">
+        <div className="relative z-10 text-white px-6 mt-6 sm:mt-8">
           <h1 className="text-5xl sm:text-7xl font-bold tracking-tight">Book Shipment</h1>
           <p className="max-w-2xl mx-auto text-white/80 text-lg sm:text-xl font-light tracking-wide mt-4">
             Guided booking with simple pop‑ups

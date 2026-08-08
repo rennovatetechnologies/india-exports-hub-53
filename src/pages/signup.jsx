@@ -20,15 +20,22 @@ export default function SignupPage() {
     const em = email.trim();
     if (!em) return;
     setLoading(true);
-    const { ok, message } = await startEmailOtp(em, OTP_PURPOSE.CUSTOMER_SIGNUP);
+    const profile = {
+      company: company.trim(),
+      name: name.trim(),
+    };
+    const { ok, message, code } = await startEmailOtp(em, OTP_PURPOSE.CUSTOMER_SIGNUP, profile);
     if (!ok) {
-      setError(message || "Could not send verification code. Try again.");
+      setError(
+        code === "already_registered"
+          ? "An account already exists for this email. Please sign in."
+          : message || "Could not send verification code. Try again."
+      );
       setLoading(false);
       return;
     }
     setSignupDraft({
-      company: company.trim(),
-      name: name.trim(),
+      ...profile,
       email: em,
     });
     router("/verify?mode=signup");
@@ -56,7 +63,7 @@ export default function SignupPage() {
           </div>
         </div>
         {error && <p className="text-xs text-rose-300">{error}</p>}
-        <p className="text-[11px] text-white/45">By continuing you agree to New India Export&apos;s Terms and Privacy.</p>
+        <p className="text-[11px] text-white/45">By continuing you agree to VIRASTRA INTERNATIONAL EXPORT&apos;s Terms and Privacy.</p>
         <button disabled={loading} className="btn-gold w-full inline-flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-black disabled:opacity-60">
           {loading ? "Sending code…" : (<>Continue with email code <ArrowRight size={15} /></>)}
         </button>

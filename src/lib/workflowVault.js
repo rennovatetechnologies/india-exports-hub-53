@@ -4,13 +4,13 @@
  */
 
 export const WORKFLOW_CASES = [
-  { id: "VST-2041", title: "Spices · Nagpur → Rotterdam", buyer: "EuroSpice BV", value: "$48,200", stage: 4, accountName: "Anil Sharma", accountCompany: "Sharma Spices Pvt Ltd", sla: "On track", opsOwner: "Riya M." },
-  { id: "VST-2038", title: "Pulses · Mumbai → Dubai", buyer: "Al-Madar Trading", value: "$22,900", stage: 6, accountName: "Meera Kulkarni", accountCompany: "Konkan Pulse Exports", sla: "On track", opsOwner: "Neha T." },
-  { id: "VST-2034", title: "Organic · Cochin → Hamburg", buyer: "BioNord GmbH", value: "$31,400", stage: 2, accountName: "Thomas George", accountCompany: "Kerala Organic Coop", sla: "On track", opsOwner: "Aman P." },
-  { id: "VST-2039", title: "Coastal Organics · ICEGATE filing", buyer: "Gulf Retail LLC", value: "$18,200", stage: 3, accountName: "Priya Nair", accountCompany: "Coastal Organics", sla: "Due today", opsOwner: "Karan S." },
-  { id: "VST-2036", title: "Verma Agro · IEC issuance", buyer: "FreshMart EU", value: "$9,400", stage: 2, accountName: "Mohit Verma", accountCompany: "Verma Agro Exports", sla: "Breached", opsOwner: "Riya M." },
-  { id: "VST-2033", title: "Iyer Foods · RCMC / APEDA", buyer: "Nordic Foods AB", value: "$12,100", stage: 2, accountName: "Lakshmi Iyer", accountCompany: "Iyer Foods", sla: "On track", opsOwner: "Aman P." },
-  { id: "VST-2030", title: "Saffron Trade · KYC review", buyer: "—", value: "—", stage: 1, accountName: "Rohan Gupta", accountCompany: "Saffron Trade Co.", sla: "On track", opsOwner: "Karan S." },
+  { id: "VST-2041", title: "Spices · Nagpur → Rotterdam", buyer: "EuroSpice BV", value: "$48,200", stage: 4, accountName: "Anil Sharma", accountCompany: "Sharma Spices Pvt Ltd", opsOwner: "Riya M." },
+  { id: "VST-2038", title: "Pulses · Mumbai → Dubai", buyer: "Al-Madar Trading", value: "$22,900", stage: 6, accountName: "Meera Kulkarni", accountCompany: "Konkan Pulse Exports", opsOwner: "Neha T." },
+  { id: "VST-2034", title: "Organic · Cochin → Hamburg", buyer: "BioNord GmbH", value: "$31,400", stage: 2, accountName: "Thomas George", accountCompany: "Kerala Organic Coop", opsOwner: "Aman P." },
+  { id: "VST-2039", title: "Coastal Organics · ICEGATE filing", buyer: "Gulf Retail LLC", value: "$18,200", stage: 3, accountName: "Priya Nair", accountCompany: "Coastal Organics", opsOwner: "Karan S." },
+  { id: "VST-2036", title: "Verma Agro · IEC issuance", buyer: "FreshMart EU", value: "$9,400", stage: 2, accountName: "Mohit Verma", accountCompany: "Verma Agro Exports", opsOwner: "Riya M." },
+  { id: "VST-2033", title: "Iyer Foods · RCMC / APEDA", buyer: "Nordic Foods AB", value: "$12,100", stage: 2, accountName: "Lakshmi Iyer", accountCompany: "Iyer Foods", opsOwner: "Aman P." },
+  { id: "VST-2030", title: "Saffron Trade · KYC review", buyer: "—", value: "—", stage: 1, accountName: "Rohan Gupta", accountCompany: "Saffron Trade Co.", opsOwner: "Karan S." },
 ];
 
 /** Shipment pipeline stages (index = active step in UI; `stage === length` = all completed). */
@@ -235,26 +235,16 @@ export function workflowCaseStageLabel(stageIdx) {
   return WORKFLOW_STAGE_LABELS[stageIdx] ?? "—";
 }
 
-function workflowSlaSortRank(sla) {
-  if (!sla || sla === "—" || sla === "–") return 3;
-  if (sla === "Breached") return 0;
-  if (sla === "Due today") return 1;
-  return 2;
-}
-
 /**
  * Lowercase bag of words for fuzzy / multi-token search (includes light synonyms).
  * @param {typeof WORKFLOW_CASES[number]} c
  */
 export function workflowCaseSearchHaystack(c) {
   const stageLab = workflowCaseStageLabel(c.stage);
-  const bits = [c.id, c.title, c.buyer, c.value, c.accountName, c.accountCompany, c.opsOwner, c.sla, stageLab]
+  const bits = [c.id, c.title, c.buyer, c.value, c.accountName, c.accountCompany, c.opsOwner, stageLab]
     .filter(Boolean)
     .map((x) => String(x).toLowerCase());
   const extra = [];
-  if (c.sla === "Breached") extra.push("breach", "breached", "overdue", "late", "risk", "escalation");
-  if (c.sla === "Due today") extra.push("due", "today", "urgent", "deadline");
-  if (c.sla === "On track") extra.push("healthy", "ok", "green");
   if (c.stage >= WORKFLOW_STAGE_TOTAL) extra.push("complete", "completed", "done", "finished", "closed");
   else extra.push("active", "open", "in progress", "pipeline");
   return [...bits, ...extra].join(" ");
@@ -276,7 +266,7 @@ export function parseWorkflowSmartTokens(raw) {
     if (idx > 0 && idx < p.length - 1) {
       const key = p.slice(0, idx);
       const val = p.slice(idx + 1);
-      if (["sla", "owner", "stage", "buyer", "company"].includes(key)) fieldPredicates.push({ key, val });
+      if (["owner", "stage", "buyer", "company"].includes(key)) fieldPredicates.push({ key, val });
       else freeTokens.push(p);
     } else freeTokens.push(p);
   }
@@ -284,13 +274,12 @@ export function parseWorkflowSmartTokens(raw) {
 }
 
 /**
- * Multi-token AND search plus optional `sla:`, `owner:`, `stage:`, `buyer:`, `company:` filters.
+ * Multi-token AND search plus optional `owner:`, `stage:`, `buyer:`, `company:` filters.
  * @param {typeof WORKFLOW_CASES[number]} c
  */
 export function workflowCaseMatchesSmartQuery(c, rawQuery) {
   const { freeTokens, fieldPredicates } = parseWorkflowSmartTokens(rawQuery);
   for (const { key, val } of fieldPredicates) {
-    if (key === "sla" && !(c.sla && String(c.sla).toLowerCase().includes(val))) return false;
     if (key === "owner" && !(c.opsOwner && String(c.opsOwner).toLowerCase().includes(val))) return false;
     if (key === "buyer" && !(c.buyer && String(c.buyer).toLowerCase().includes(val))) return false;
     if (key === "company" && !(c.accountCompany && String(c.accountCompany).toLowerCase().includes(val))) return false;
@@ -303,11 +292,10 @@ export function workflowCaseMatchesSmartQuery(c, rawQuery) {
 
 /**
  * @param {typeof WORKFLOW_CASES[number]} c
- * @param {"all" | "attention" | "active" | "complete"} preset
+ * @param {"all" | "active" | "complete"} preset
  */
 export function workflowCaseMatchesPreset(c, preset) {
   if (!preset || preset === "all") return true;
-  if (preset === "attention") return c.sla === "Breached" || c.sla === "Due today";
   if (preset === "active") return c.stage < WORKFLOW_STAGE_TOTAL;
   if (preset === "complete") return c.stage >= WORKFLOW_STAGE_TOTAL;
   return true;
@@ -323,9 +311,6 @@ export function sortWorkflowCases(cases, mode = "smart") {
   if (mode === "caseId" || mode === "case-id") return out.sort(idCmp);
   if (mode === "stage") return out.sort((a, b) => b.stage - a.stage || idCmp(a, b));
   return out.sort((a, b) => {
-    const ra = workflowSlaSortRank(a.sla);
-    const rb = workflowSlaSortRank(b.sla);
-    if (ra !== rb) return ra - rb;
     const doneA = a.stage >= WORKFLOW_STAGE_TOTAL;
     const doneB = b.stage >= WORKFLOW_STAGE_TOTAL;
     if (doneA !== doneB) return doneA ? 1 : -1;

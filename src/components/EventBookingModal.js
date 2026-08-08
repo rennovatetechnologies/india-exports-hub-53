@@ -5,12 +5,15 @@ import { X } from "lucide-react";
 import { FaChevronRight } from "react-icons/fa";
 import { FiCheckCircle } from "react-icons/fi";
 import { getSession, isAuthenticated } from "@/lib/authSession";
+import { issueInvoiceForPayment } from "@/lib/invoice";
+import InvoiceModal from "@/components/InvoiceModal";
 
-const WORKSHOP_REGISTER_PATH = "/events#register";
+const WORKSHOP_AMOUNT_INR = 6399;
 
 export default function EventBookingModal({ open, setOpen }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const loginHref = `/login?next=${encodeURIComponent(WORKSHOP_REGISTER_PATH)}`;
+  const [activeInvoice, setActiveInvoice] = useState(null);
+  const loginHref = `/login?next=${encodeURIComponent("/dashboard")}`;
 
   const loadRazorpayScript = () =>
     new Promise((resolve) => {
@@ -67,7 +70,7 @@ export default function EventBookingModal({ open, setOpen }) {
         key: rzKey,
         amount: order.amount,
         currency: order.currency,
-        name: "New India Export",
+        name: "VIRASTRA INTERNATIONAL EXPORT",
         description: "Virtual Shipment Workshop (5 Days)",
         order_id: order.id,
         handler: async function (response) {
@@ -94,7 +97,26 @@ export default function EventBookingModal({ open, setOpen }) {
             } catch {
               /* ignore */
             }
-            alert("Payment Successful! Your seat has been reserved.");
+            const invoice = issueInvoiceForPayment({
+              paymentId: response.razorpay_payment_id,
+              orderId: response.razorpay_order_id,
+              sku: "workshop",
+              description: "Virtual Shipment Workshop (5 Days)",
+              customer: {
+                name: session.name,
+                email: session.email,
+                phone: session.phone,
+                company: session.company,
+              },
+              totalInclusive: WORKSHOP_AMOUNT_INR,
+              lineItems: [
+                {
+                  description: "Virtual Shipment Workshop (5 Days)",
+                  quantity: 1,
+                },
+              ],
+            });
+            setActiveInvoice(invoice);
             setOpen(false);
           } else {
             alert("Payment verification failed. Please contact support.");
@@ -124,9 +146,17 @@ export default function EventBookingModal({ open, setOpen }) {
     }
   };
 
-  if (!open) return null;
+  if (!open && !activeInvoice) return null;
 
   return (
+    <>
+      <InvoiceModal
+        open={Boolean(activeInvoice)}
+        invoice={activeInvoice}
+        emailNotice
+        onClose={() => setActiveInvoice(null)}
+      />
+      {open ? (
     <AnimatePresence>
       <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[60] flex items-center justify-center p-4">
         <motion.div
@@ -149,7 +179,7 @@ export default function EventBookingModal({ open, setOpen }) {
             {!isAuthenticated() ? (
               <div className="space-y-5">
                 <p className="text-sm text-neutral-300 leading-relaxed">
-                  Sign in to your New India Export account to reserve a seat. Your work email and profile will be used for
+                  Sign in to your VIRASTRA INTERNATIONAL EXPORT account to reserve a seat. Your work email and profile will be used for
                   confirmation and payment.
                 </p>
                 <Link
@@ -194,5 +224,7 @@ export default function EventBookingModal({ open, setOpen }) {
         </motion.div>
       </div>
     </AnimatePresence>
+      ) : null}
+    </>
   );
 }

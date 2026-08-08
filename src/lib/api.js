@@ -1,4 +1,6 @@
-/** API client for New India Export backend (proxied via Vite /api). */
+/** API client for VIRASTRA INTERNATIONAL EXPORT backend (proxied via Vite /api). */
+
+import { clearSession } from "@/lib/authSession";
 
 const TOKEN_KEY = "vistara_token";
 
@@ -42,6 +44,10 @@ export async function api(path, { method = "GET", body, headers = {}, auth = tru
   const ct = res.headers.get("content-type") || "";
   const data = ct.includes("application/json") ? await res.json().catch(() => ({})) : await res.text();
   if (!res.ok) {
+    // Expired / invalid JWT — force client logout so AuthGuard redirects to login.
+    if (auth && res.status === 401) {
+      clearSession();
+    }
     let msg = "Request failed";
     if (data && typeof data === "object") {
       if (typeof data.message === "string") msg = data.message;

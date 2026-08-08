@@ -7,7 +7,7 @@ export default function WhyChooseUs() {
       <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
         <div className="max-w-2xl">
           <span className="inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white/70">
-            <Sparkles size={12} className="text-[var(--gold)]" /> Why New India Export
+            <Sparkles size={12} className="text-[var(--gold)]" /> Why VIRASTRA INTERNATIONAL EXPORT
           </span>
           <h2 className="mt-5 text-4xl sm:text-5xl font-semibold tracking-tight">
             Built like a fintech. <span className="text-gold-gradient">Run like a global desk.</span>

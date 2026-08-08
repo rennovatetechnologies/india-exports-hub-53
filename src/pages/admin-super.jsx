@@ -1,27 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ShieldCheck, Users, IndianRupee, Workflow, Activity, CheckCircle2, XCircle, Clock,
-  Search, Filter, ArrowUpRight, Crown, Settings2, BarChart3, AlertTriangle, Mail, Pencil,
+  Users, IndianRupee, Workflow, Activity, CheckCircle2, XCircle, Clock,
+  Search, Crown, Mail,
 } from "lucide-react";
-import { fetchAdminRequests, updateAdminRequest, ADMIN_STATUS, ROLES } from "@/lib/authSession";
+import {
+  fetchAdminRequests,
+  updateAdminRequest,
+  getSession,
+  ADMIN_STATUS,
+  ROLES,
+} from "@/lib/authSession";
 import { api } from "@/lib/api";
 
 const STATS = [
   { label: "MRR", value: "₹1.42 Cr", delta: "+9.4% MoM", icon: IndianRupee, tone: "text-[var(--gold)]" },
   { label: "Active customers", value: "1,284", delta: "+184 this month", icon: Users, tone: "text-cyan-300" },
-  { label: "Workflows live", value: "327", delta: "94% on SLA", icon: Workflow, tone: "text-emerald-300" },
-  { label: "Risk events", value: "6", delta: "−3 vs last week", icon: AlertTriangle, tone: "text-amber-300" },
+  { label: "Workflows live", value: "327", delta: "+12 this week", icon: Workflow, tone: "text-emerald-300" },
 ];
-
-const AUDIT = [
-  { who: "Riya M.", what: "Approved KYC for Verma Agro Exports", when: "12 min ago", tone: "emerald" },
-  { who: "Karan S.", what: "Rejected GST certificate · Coastal Organics", when: "44 min ago", tone: "rose" },
-  { who: "System", what: "Pricing template v3.2 published", when: "2 h ago", tone: "cyan" },
-  { who: "Aman P.", what: "Closed case VST-2031 (Iyer Foods)", when: "5 h ago", tone: "emerald" },
-];
-
-const PERMISSION_PRESET = ["Cases · read/write", "KYC · approve", "Pricing · view", "Audit log · read"];
 
 const statusChip = (s) => {
   if (s === ADMIN_STATUS.PENDING) return "bg-amber-400/10 text-amber-300";
@@ -32,12 +29,13 @@ const statusChip = (s) => {
 };
 
 export default function SuperAdminPage() {
+  const session = getSession();
   const [requests, setRequests] = useState([]);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(ADMIN_STATUS.PENDING);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(null);
-  /** `view` = read-only summary; `edit` = adjust preset & approve / reject / suspend. */
-  const [drawerMode, setDrawerMode] = useState("view");
+  const [busyId, setBusyId] = useState(null);
+  const [actionMsg, setActionMsg] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -68,48 +66,58 @@ export default function SuperAdminPage() {
     });
   }, [requests, filter, query]);
 
-  const closeDrawer = () => {
-    setActive(null);
-    setDrawerMode("view");
-  };
+  // Only platform admins review staff access requests.
+  if (session?.role !== ROLES.ADMIN) {
+    return <Navigate to="/admin" replace />;
+  }
+
+  const closeDrawer = () => setActive(null);
 
   const setStatus = async (id, status) => {
+    setBusyId(id);
+    setActionMsg("");
+    // Always persist locally so approve/reject works without the backend.
+    const list = updateAdminRequest(id, { status });
+    setRequests(list);
+    setActive((a) => (a && a.id === id ? { ...a, status } : a));
     try {
       await api(`/api/staff/access-requests/${id}`, { method: "PATCH", body: { status } });
-      const list = await fetchAdminRequests();
-      setRequests(list);
+      const remote = await fetchAdminRequests();
+      setRequests(remote);
+      setActive((a) => {
+        if (!a || a.id !== id) return a;
+        return remote.find((r) => r.id === id) || { ...a, status };
+      });
     } catch {
-      const list = updateAdminRequest(id, { status });
-      setRequests(list);
+      /* local store already updated */
     }
-    setActive((a) => (a && a.id === id ? { ...a, status } : a));
-    setDrawerMode("view");
+    setBusyId(null);
+    setActionMsg(status === ADMIN_STATUS.APPROVED ? "Request approved." : status === ADMIN_STATUS.REJECTED ? "Request rejected." : `Marked as ${status}.`);
+    if (status === ADMIN_STATUS.APPROVED || status === ADMIN_STATUS.REJECTED) {
+      window.setTimeout(() => setActive(null), 600);
+    }
   };
 
   const pendingCount = requests.filter((r) => r.status === ADMIN_STATUS.PENDING).length;
+  const canApprove = (r) => r.status === ADMIN_STATUS.PENDING && r.emailVerified !== false;
+  const canReject = (r) =>
+    r.status === ADMIN_STATUS.PENDING ||
+    r.status === ADMIN_STATUS.APPROVED ||
+    r.status === ADMIN_STATUS.ACTIVE;
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <span className="inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-white/70">
-            <Crown size={11} className="text-[var(--gold)]" /> Admin
-          </span>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight">Executive control center</h1>
-          <p className="mt-1 text-sm text-white/55">Revenue, RBAC and platform health at a glance.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-xs text-white/75 hover:bg-white/[0.06]">
-            <Settings2 size={13} /> Pricing templates
-          </button>
-          <button className="inline-flex items-center gap-2 rounded-xl bg-[var(--grad-gold)] px-4 py-2 text-xs font-semibold text-black hover:opacity-90">
-            <BarChart3 size={13} /> Open analytics
-          </button>
-        </div>
+      <header>
+        <span className="inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-white/70">
+          <Crown size={11} className="text-[var(--gold)]" /> Admin
+        </span>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight">Staff access requests</h1>
+        <p className="mt-1 text-sm text-white/55">
+          Review operations and admin access requests — approve or reject each one.
+        </p>
       </header>
 
-      {/* Stats */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {STATS.map(({ label, value, delta, icon: Icon, tone }) => (
           <motion.div key={label} whileHover={{ y: -2 }} className="glass-card p-5">
             <div className="flex items-center justify-between">
@@ -122,14 +130,14 @@ export default function SuperAdminPage() {
         ))}
       </section>
 
-      {/* Approval Center */}
       <section className="grid gap-6 lg:grid-cols-3">
         <div className="glass-card p-6 lg:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-white/55">Admin approval queue</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-white/55">Approval queue</h3>
               <p className="mt-1 text-xs text-white/45">
-                <span className="text-amber-300">{pendingCount}</span> requests awaiting review
+                <span className="text-amber-300">{pendingCount}</span> awaiting review
+                {actionMsg && <span className="ml-2 text-emerald-300">· {actionMsg}</span>}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -159,40 +167,77 @@ export default function SuperAdminPage() {
           <div className="mt-5 grid gap-3">
             <AnimatePresence initial={false}>
               {filtered.map((r) => (
-                <motion.button
+                <motion.div
                   key={r.id}
                   layout
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  onClick={() => {
-                    setActive(r);
-                    setDrawerMode("view");
-                  }}
-                  className="text-left rounded-2xl border border-white/10 bg-white/[0.02] p-4 hover:border-white/20 hover:bg-white/[0.04] transition"
+                  className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 hover:border-white/20 hover:bg-white/[0.04] transition"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--grad-gold)] text-black text-xs font-bold">
-                        {r.name.split(" ").map((p) => p[0]).join("").slice(0, 2)}
-                      </span>
-                      <div>
-                        <div className="text-sm font-medium text-white">{r.name}</div>
-                        <div className="text-[11px] text-white/50">{r.email} · {r.department}</div>
+                  <button
+                    type="button"
+                    onClick={() => setActive(r)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--grad-gold)] text-black text-xs font-bold">
+                          {r.name.split(" ").map((p) => p[0]).join("").slice(0, 2)}
+                        </span>
+                        <div>
+                          <div className="text-sm font-medium text-white">{r.name}</div>
+                          <div className="text-[11px] text-white/50">{r.email} · {r.department}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px]">
+                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-white/65 capitalize">
+                          {r.role === ROLES.ADMIN ? "Admin" : "Operations"}
+                        </span>
+                        {r.status === ADMIN_STATUS.PENDING && r.emailVerified === false && (
+                          <span className="rounded-full bg-amber-400/10 px-2 py-0.5 text-amber-300">Email unverified</span>
+                        )}
+                        <span className={`rounded-full px-2 py-0.5 ${statusChip(r.status)}`}>{r.status}</span>
+                        <span className="text-white/40">{r.id}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 text-[11px]">
-                      <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-white/65 capitalize">
-                        {r.role === ROLES.ADMIN ? "Admin" : "Operations"}
-                      </span>
-                      {r.status === ADMIN_STATUS.PENDING && r.emailVerified === false && (
-                        <span className="rounded-full bg-amber-400/10 px-2 py-0.5 text-amber-300">Email unverified</span>
-                      )}
-                      <span className={`rounded-full px-2 py-0.5 ${statusChip(r.status)}`}>{r.status}</span>
-                      <span className="text-white/40">{r.id}</span>
+                  </button>
+
+                  {r.status === ADMIN_STATUS.PENDING && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
+                      <button
+                        type="button"
+                        disabled={busyId === r.id || !canApprove(r)}
+                        title={!canApprove(r) ? "Applicant must verify their work email first" : "Approve access"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setStatus(r.id, ADMIN_STATUS.APPROVED);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-300 to-cyan-300 px-3 py-1.5 text-xs font-semibold text-black hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <CheckCircle2 size={13} /> Approve
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === r.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setStatus(r.id, ADMIN_STATUS.REJECTED);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300/30 bg-rose-300/5 px-3 py-1.5 text-xs text-rose-200 hover:bg-rose-300/10 disabled:opacity-40"
+                      >
+                        <XCircle size={13} /> Reject
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActive(r)}
+                        className="ml-auto text-[11px] text-white/45 hover:text-white"
+                      >
+                        View details
+                      </button>
                     </div>
-                  </div>
-                </motion.button>
+                  )}
+                </motion.div>
               ))}
             </AnimatePresence>
             {filtered.length === 0 && (
@@ -203,49 +248,22 @@ export default function SuperAdminPage() {
           </div>
         </div>
 
-        {/* Audit / activity */}
         <div className="glass-card p-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-white/55">Audit log</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-white/55">How it works</h3>
             <Activity size={14} className="text-white/40" />
           </div>
-          <ul className="mt-4 space-y-4">
-            {AUDIT.map((a, i) => (
-              <li key={i} className="flex gap-3">
-                <span className={`mt-1 h-2 w-2 shrink-0 rounded-full bg-${a.tone}-300`} />
-                <div>
-                  <div className="text-sm text-white">{a.what}</div>
-                  <div className="text-[11px] text-white/45">{a.who} · {a.when}</div>
-                </div>
-              </li>
-            ))}
+          <ul className="mt-4 space-y-4 text-sm text-white/70">
+            <li>Open a pending request to review department, role, and reason.</li>
+            <li>Approve grants workspace access for that role on next staff sign-in.</li>
+            <li>Reject blocks sign-in until they submit a new request.</li>
           </ul>
-          <button className="mt-5 inline-flex items-center gap-1.5 text-xs text-white/60 hover:text-white">
-            Open full audit trail <ArrowUpRight size={12} />
-          </button>
+          <p className="mt-5 text-[11px] text-white/40">
+            Changes save locally when the API is offline, so demo approve/reject still works.
+          </p>
         </div>
       </section>
 
-      {/* RBAC + content quick links */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { title: "Pricing", desc: "Plans, addons, seasonal offers", icon: IndianRupee },
-          { title: "Workflow templates", desc: "DGFT · ICEGATE · AD code", icon: Workflow },
-          { title: "Events & summits", desc: "Webinars, AI export forums", icon: ShieldCheck },
-          { title: "Permissions", desc: "RBAC matrix &amp; SSO", icon: Filter },
-        ].map(({ title, desc, icon: Icon }) => (
-          <div key={title} className="glass-card p-5">
-            <Icon size={18} className="text-[var(--gold)]" />
-            <div className="mt-3 text-sm font-semibold">{title}</div>
-            <div className="mt-1 text-[11px] text-white/50">{desc}</div>
-            <button className="mt-3 inline-flex items-center gap-1 text-[11px] text-white/65 hover:text-white">
-              Manage <ArrowUpRight size={11} />
-            </button>
-          </div>
-        ))}
-      </section>
-
-      {/* Approval drawer */}
       <AnimatePresence>
         {active && (
           <>
@@ -270,12 +288,6 @@ export default function SuperAdminPage() {
                 <button type="button" onClick={closeDrawer} className="rounded-md p-1 text-white/45 hover:text-white">✕</button>
               </div>
 
-              {drawerMode === "edit" && (
-                <p className="mt-3 rounded-lg border border-cyan-400/20 bg-cyan-400/5 px-3 py-2 text-[11px] text-cyan-100/90">
-                  Edit mode: adjust the permission preset mock below, then approve, reject, or suspend. This demo does not persist checkbox changes.
-                </p>
-              )}
-
               <span className={`mt-4 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${statusChip(active.status)}`}>
                 <Clock size={11} /> {active.status}
               </span>
@@ -294,7 +306,7 @@ export default function SuperAdminPage() {
               {active.status === ADMIN_STATUS.PENDING && active.emailVerified === false && (
                 <div className="mt-4 flex gap-2 rounded-xl border border-amber-400/25 bg-amber-400/5 p-3 text-xs text-amber-200">
                   <Mail size={14} className="mt-0.5 shrink-0 opacity-80" />
-                  <span>This request cannot be approved until the applicant verifies their work email (one-time code at registration).</span>
+                  <span>Approve is blocked until they verify work email. You can still reject.</span>
                 </div>
               )}
 
@@ -303,83 +315,65 @@ export default function SuperAdminPage() {
                 <p className="mt-1 text-sm text-white/80">{active.reason || "—"}</p>
               </div>
 
-              <div className="mt-5">
-                <div className="text-[11px] uppercase tracking-wider text-white/45">Permission preset</div>
-                {drawerMode === "view" ? (
-                  <ul className="mt-2 space-y-2">
-                    {PERMISSION_PRESET.map((p) => (
-                      <li
-                        key={p}
-                        className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/75"
-                      >
-                        <CheckCircle2 size={14} className="shrink-0 text-emerald-300/90" /> {p}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="mt-2 grid gap-2">
-                    {PERMISSION_PRESET.map((p) => (
-                      <label key={p} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-white/75">
-                        <input type="checkbox" defaultChecked className="h-3.5 w-3.5 rounded border-white/20 bg-white/5" />
-                        {p}
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {drawerMode === "view" ? (
-                <div className="mt-auto pt-6 flex flex-col gap-2 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={closeDrawer}
-                    className="inline-flex flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm text-white/80 hover:bg-white/[0.07]"
-                  >
-                    Close
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDrawerMode("edit")}
-                    className="btn-gold inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
-                  >
-                    <Pencil size={14} /> Edit
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="mt-auto pt-6 grid grid-cols-2 gap-2">
+              <div className="mt-auto pt-6 space-y-2">
+                {active.status === ADMIN_STATUS.PENDING && (
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
+                      disabled={busyId === active.id}
                       onClick={() => setStatus(active.id, ADMIN_STATUS.REJECTED)}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-300/30 bg-rose-300/5 px-4 py-2.5 text-sm text-rose-200 hover:bg-rose-300/10"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-300/30 bg-rose-300/5 px-4 py-2.5 text-sm text-rose-200 hover:bg-rose-300/10 disabled:opacity-40"
                     >
                       <XCircle size={14} /> Reject
                     </button>
                     <button
                       type="button"
+                      disabled={busyId === active.id || !canApprove(active)}
                       onClick={() => setStatus(active.id, ADMIN_STATUS.APPROVED)}
-                      disabled={active.status === ADMIN_STATUS.PENDING && active.emailVerified === false}
                       className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-300 to-cyan-300 px-4 py-2.5 text-sm font-semibold text-black hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <CheckCircle2 size={14} /> Approve
                     </button>
                   </div>
+                )}
+                {(active.status === ADMIN_STATUS.APPROVED || active.status === ADMIN_STATUS.ACTIVE) && (
                   <button
                     type="button"
+                    disabled={busyId === active.id}
                     onClick={() => setStatus(active.id, ADMIN_STATUS.SUSPENDED)}
-                    className="mt-2 text-xs text-white/45 hover:text-white"
+                    className="w-full rounded-xl border border-white/10 px-4 py-2.5 text-sm text-white/70 hover:bg-white/[0.04] hover:text-white disabled:opacity-40"
                   >
                     Suspend access
                   </button>
+                )}
+                {(active.status === ADMIN_STATUS.REJECTED || active.status === ADMIN_STATUS.SUSPENDED) && (
                   <button
                     type="button"
-                    onClick={() => setDrawerMode("view")}
-                    className="mt-3 w-full rounded-xl border border-white/10 px-4 py-2 text-xs text-white/60 hover:bg-white/[0.04] hover:text-white"
+                    disabled={busyId === active.id}
+                    onClick={() => setStatus(active.id, ADMIN_STATUS.APPROVED)}
+                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-300 to-cyan-300 px-4 py-2.5 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-40"
                   >
-                    Back to summary
+                    <CheckCircle2 size={14} /> Approve now
                   </button>
-                </>
-              )}
+                )}
+                {canReject(active) && active.status !== ADMIN_STATUS.PENDING && active.status !== ADMIN_STATUS.REJECTED && (
+                  <button
+                    type="button"
+                    disabled={busyId === active.id}
+                    onClick={() => setStatus(active.id, ADMIN_STATUS.REJECTED)}
+                    className="w-full text-xs text-rose-300/80 hover:text-rose-200 disabled:opacity-40"
+                  >
+                    Reject / revoke
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={closeDrawer}
+                  className="w-full rounded-xl border border-white/10 px-4 py-2 text-xs text-white/60 hover:bg-white/[0.04] hover:text-white"
+                >
+                  Close
+                </button>
+              </div>
             </motion.aside>
           </>
         )}

@@ -1,10 +1,12 @@
-# New India Export — frontend
+# VIRASTRA INTERNATIONAL EXPORT — frontend
 
-Vite + React SPA for the New India Export customer and ops dashboards.
+Vite + React SPA for the VIRASTRA INTERNATIONAL EXPORT customer and ops dashboards.
+
+Lives under **`INDIA EXPORTS/`** next to `new-india-exports` (backend) and `shared` (API contract).
 
 ## Connect to the backend
 
-This app talks to **`new-india-exports`** (FastAPI) over `/api`.
+This app talks to **`new-india-exports`** over `/api` (sibling folder).
 
 | Service | Default | Notes |
 |---------|---------|--------|
@@ -45,8 +47,18 @@ Auth is **email + OTP** against `/api/auth/otp/*`. In development, OTP codes are
 
 **Customers:** sign up at `/signup` with any email, then verify with the OTP from the backend logs.
 
-Set `VITE_ALLOW_AUTH_MOCK=true` only if you need the old offline OTP mock (no JWT / no DB).
+### Demo UI without backend
 
+Set `VITE_ALLOW_AUTH_MOCK=true` in `.env.local` (already set if you copied from this README flow). Restart Vite, then open `/login` or `/admin/login` — a **Demo mode** panel lets you jump in as:
+
+| Persona | Lands on |
+|---------|----------|
+| Customer (KYC done) | `/dashboard` |
+| Customer · KYC | `/dashboard/kyc` |
+| Operations | `/admin` |
+| Admin | `/admin/platform` |
+
+No OTP or API required. Pages that need live data fall back to local seed catalogs.
 ## Scripts
 
 ```bash

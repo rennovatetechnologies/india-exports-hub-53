@@ -1,10 +1,22 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Download } from "lucide-react";
+import { getBrochureMenu, PRODUCT_CATEGORIES, openBrochureDownload } from "@/lib/siteNav";
+import { subscribeBrochures } from "@/lib/brochuresCatalog";
+import { PATHS } from "@/lib/routes";
+import {
+  clearSession,
+  getSession,
+  isStaffSession,
+  subscribeAuth,
+  workspaceFor,
+  ROLES,
+} from "@/lib/authSession";
 
 export default function Navbar() {
+  const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -12,12 +24,36 @@ export default function Navbar() {
   const [mobileProductsOpen, setMobileProductsOpen] = useState(false);
   const [desktopBrochuresOpen, setDesktopBrochuresOpen] = useState(false);
   const [mobileBrochuresOpen, setMobileBrochuresOpen] = useState(false);
+  const [brochureMenu, setBrochureMenu] = useState(() => getBrochureMenu());
+  const [session, setSessionState] = useState(null);
   const pathname = useLocation().pathname;
+
+  const loggedIn = Boolean(session?.email);
+  const workspaceHref = loggedIn
+    ? workspaceFor(session?.role || ROLES.CUSTOMER)
+    : "/login";
+  const authLabel = !loggedIn
+    ? "Log in"
+    : isStaffSession(session)
+      ? "Workspace"
+      : "Dashboard";
+
+  const handleLogout = () => {
+    clearSession();
+    setMobileOpen(false);
+    navigate(PATHS.login, { replace: true });
+  };
 
   useEffect(() => {
     setMounted(true);
+    setSessionState(getSession());
+    return subscribeAuth((next) => setSessionState(next));
   }, []);
 
+  useEffect(() => {
+    setBrochureMenu(getBrochureMenu());
+    return subscribeBrochures(() => setBrochureMenu(getBrochureMenu()));
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60);
@@ -42,6 +78,8 @@ export default function Navbar() {
         setMobileOpen(false);
         setMobileProductsOpen(false);
         setMobileBrochuresOpen(false);
+        setDesktopProductsOpen(false);
+        setDesktopBrochuresOpen(false);
       }
     };
     window.addEventListener("resize", onResize);
@@ -60,56 +98,40 @@ export default function Navbar() {
     setDesktopBrochuresOpen(false);
   }, [pathname]);
 
-  // Dashboard and admin use their own chrome; keep the public navbar on auth pages so users can always reach the rest of the site.
-  const hideForDedicatedChrome = pathname?.startsWith("/dashboard") || pathname?.startsWith("/admin");
+  // Workspace chrome owns its chrome; keep public nav on marketing + auth pages.
+  const hideForDedicatedChrome =
+    pathname?.startsWith("/dashboard") ||
+    (pathname?.startsWith("/admin") &&
+      !pathname.startsWith("/admin/login") &&
+      !pathname.startsWith("/admin/register"));
   if (hideForDedicatedChrome) return null;
 
-  const brochures = [
-    {
-      name: "Workshop Flyer",
-      path: "/new india (4).pdf",
-      type: "download"
-    },
-    {
-      name: "Workshop Brochure",
-      path: "/BrochureFinal.pdf",
-      type: "download"
-    },
-    {
-      name: "NIE X Virtual Workshop Brochure",
-      path: "/brochure/NIE X VIRTUAL SHIPMENT WORKSHOP (5 DAYS) BROCHURE.pdf",
-      type: "download"
-    }
-  ];
-
   const navItems = [
-    { name: "Home", path: "/" },
+    { name: "Home", path: PATHS.home },
+    { name: "Plans", path: "/#plans" },
     {
       name: "Brochures",
-      sub: brochures
+      sub: brochureMenu,
     },
     {
       name: "Products",
-      sub: [
-        { name: "Spices", path: "/spices" },
-        { name: "Cereals & Pulses", path: "/cerealsandpulses" },
-        { name: "Organic Food", path: "/organicfood" },
-        { name: "Fruits & Vegetables", path: "/fruitsandvegetables" },
-        { name: "Others", path: "/others" },
-      ],
+      sub: PRODUCT_CATEGORIES.map(({ name, path }) => ({ name, path })),
     },
-    { name: "Gallery", path: "/gallery" },
-    { name: "Events", path: "/events" },
-    { name: "Contact Us", path: "/contact" },
-    { name: "About Us", path: "/about" },
+    { name: "Gallery", path: PATHS.gallery },
+    { name: "Events", path: PATHS.events },
+    { name: "Contact Us", path: PATHS.contact },
+    { name: "About Us", path: PATHS.about },
   ];
 
-  const isActive = (path) => (path === "/" ? pathname === "/" : pathname.startsWith(path));
+  const isActive = (path) => {
+    if (!path) return false;
+    if (path.startsWith("/#")) return pathname === "/";
+    return path === "/" ? pathname === "/" : pathname.startsWith(path);
+  };
 
-  const handleBrochureClick = (item) => {
+  const handleBrochureClick = async (item) => {
     if (item.type === "download") {
-      const url = item.path.split("/").map((seg) => encodeURIComponent(seg)).join("/");
-      window.open(url, "_blank", "noopener,noreferrer");
+      await openBrochureDownload(item);
     }
     setMobileOpen(false);
     setDesktopBrochuresOpen(false);
@@ -162,19 +184,23 @@ export default function Navbar() {
           <div className="flex h-16 items-center gap-3">
             {/* Logo — stays left; does not shrink */}
             <Link
-              to="/"
+              to={PATHS.home}
               className="flex shrink-0 items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md"
-              aria-label="New India Export Home"
+              aria-label="VIRASTRA INTERNATIONAL EXPORT Home"
             >
-              <span className="text-xl md:text-2xl font-semibold tracking-tight text-white">
-                <span className="text-gold-gradient">New India Export</span>
+              <span className="flex flex-col leading-tight">
+                <span className="text-sm sm:text-base md:text-lg font-semibold tracking-tight text-gold-gradient">
+                  VIRASTRA INTERNATIONAL EXPORT
+                </span>
+                <span className="hidden sm:block text-[9px] uppercase tracking-[0.18em] text-white/45">
+                  where trust travels
+                </span>
               </span>
             </Link>
 
-            {/* Desktop: nav scrolls if needed; Log in stays visible on the right */}
+            {/* Desktop: overflow must stay visible so Brochures/Products menus aren't clipped */}
             <div className="hidden md:flex flex-1 min-w-0 items-center justify-end gap-2 lg:gap-3">
-              <div className="flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                <div className="flex min-h-16 shrink-0 items-center justify-end gap-4 lg:gap-7 pr-1">
+              <div className="flex min-h-16 min-w-0 flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1 lg:gap-x-6 pr-1">
               {navItems.map((item) =>
                 item.sub ? (
                   <div
@@ -190,8 +216,19 @@ export default function Navbar() {
                     }}
                   >
                     <button
+                      type="button"
                       aria-haspopup="menu"
                       aria-expanded={item.name === "Products" ? desktopProductsOpen : desktopBrochuresOpen}
+                      onClick={() => {
+                        if (item.name === "Products") {
+                          setDesktopProductsOpen((v) => !v);
+                          setDesktopBrochuresOpen(false);
+                        }
+                        if (item.name === "Brochures") {
+                          setDesktopBrochuresOpen((v) => !v);
+                          setDesktopProductsOpen(false);
+                        }
+                      }}
                       className={`flex items-center gap-1 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md px-1 ${scrolled ? "text-zinc-300 hover:text-white" : "text-zinc-200 hover:text-white"
                         }`}
                     >
@@ -208,19 +245,23 @@ export default function Navbar() {
                       {(item.name === "Products" && desktopProductsOpen) ||
                         (item.name === "Brochures" && desktopBrochuresOpen) ? (
                         <motion.div
-                          initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                          animate={{ opacity: 1, y: 12, scale: 1 }}
-                          exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                          transition={{ duration: 0.18, ease: "easeOut" }}
-                          className="absolute left-0 top-full z-50 mt-1 min-w-[240px] rounded-xl border border-white/10 bg-zinc-950/95 p-1.5 shadow-2xl"
+                          initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                          transition={{ duration: 0.16, ease: "easeOut" }}
+                          role="menu"
+                          className="absolute left-0 top-full z-[100] pt-2 min-w-[240px]"
                         >
+                          <div className="rounded-xl border border-white/10 bg-zinc-950/95 p-1.5 shadow-2xl backdrop-blur-md">
                           {item.sub.map((sub) => (
                             item.name === "Brochures" ? (
-                              <BrochureItem key={sub.name} item={sub} />
+                              <BrochureItem key={sub.id || sub.name} item={sub} />
                             ) : (
                               <Link
                                 key={sub.name}
                                 to={sub.path}
+                                role="menuitem"
+                                onClick={() => setDesktopProductsOpen(false)}
                                 className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 hover:text-white transition-colors ${isActive(sub.path) ? "bg-white/5 text-white" : ""
                                   }`}
                               >
@@ -228,6 +269,7 @@ export default function Navbar() {
                               </Link>
                             )
                           ))}
+                          </div>
                         </motion.div>
                       ) : null}
                     </AnimatePresence>
@@ -252,15 +294,37 @@ export default function Navbar() {
                   </Link>
                 )
               )}
-                </div>
               </div>
-              <div className="shrink-0 border-l border-white/10 pl-4 lg:pl-6 ml-1">
+              <div className="shrink-0 border-l border-white/10 pl-4 lg:pl-6 ml-1 flex items-center gap-2">
+                {!loggedIn && (
+                  <Link
+                    to={PATHS.signup}
+                    className={`hidden lg:inline-flex text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md px-2 py-1.5 ${scrolled ? "text-zinc-400 hover:text-white" : "text-zinc-300 hover:text-white"}`}
+                  >
+                    Sign up
+                  </Link>
+                )}
                 <Link
-                  to="/login"
-                  className={`inline-flex text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md px-2 py-1.5 ${scrolled ? "text-zinc-300 hover:text-white" : "text-zinc-200 hover:text-white"}`}
+                  to={workspaceHref}
+                  className={`inline-flex text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md px-2.5 py-1.5 ${
+                    loggedIn
+                      ? scrolled
+                        ? "text-zinc-300 hover:text-white"
+                        : "text-zinc-200 hover:text-white"
+                      : "bg-white/10 text-white hover:bg-white/15 border border-white/15"
+                  }`}
                 >
-                  Log in
+                  {authLabel}
                 </Link>
+                {loggedIn && (
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className={`inline-flex text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md px-2 py-1.5 ${scrolled ? "text-zinc-400 hover:text-white" : "text-zinc-300 hover:text-white"}`}
+                  >
+                    Log out
+                  </button>
+                )}
               </div>
             </div>
 
@@ -363,7 +427,7 @@ export default function Navbar() {
                             <div className="mt-1 space-y-1 rounded-lg pl-2">
                               {item.sub.map((sub) => (
                                 item.name === "Brochures" ? (
-                                  <BrochureItem key={sub.name} item={sub} isMobile={true} />
+                                  <BrochureItem key={sub.id || sub.name} item={sub} isMobile={true} />
                                 ) : (
                                   <Link
                                     key={sub.name}
@@ -395,19 +459,30 @@ export default function Navbar() {
                 )}
                 <div className="mx-2 mt-4 border-t border-white/10 pt-4 space-y-1 px-2">
                   <Link
-                    to="/login"
+                    to={workspaceHref}
                     onClick={() => setMobileOpen(false)}
                     className="block rounded-lg px-3.5 py-3 text-base font-medium text-zinc-200 hover:bg-white/5 hover:text-white"
                   >
-                    Log in
+                    {authLabel}
                   </Link>
-                  <Link
-                    to="/signup"
-                    onClick={() => setMobileOpen(false)}
-                    className="block rounded-lg px-3.5 py-3 text-base font-medium text-zinc-200 hover:bg-white/5 hover:text-white"
-                  >
-                    Sign up
-                  </Link>
+                  {!loggedIn && (
+                    <Link
+                      to={PATHS.signup}
+                      onClick={() => setMobileOpen(false)}
+                      className="block rounded-lg px-3.5 py-3 text-base font-medium text-zinc-200 hover:bg-white/5 hover:text-white"
+                    >
+                      Sign up
+                    </Link>
+                  )}
+                  {loggedIn && (
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="block w-full rounded-lg px-3.5 py-3 text-left text-base font-medium text-zinc-200 hover:bg-white/5 hover:text-white"
+                    >
+                      Log out
+                    </button>
+                  )}
                 </div>
               </nav>
             </motion.aside>

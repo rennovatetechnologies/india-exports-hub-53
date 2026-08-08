@@ -1,11 +1,27 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { PATHS } from "@/lib/routes";
+
 export default function OrganicFoodsPage() {
+  const { pathname } = useLocation();
+  const inDashboard = pathname.startsWith("/dashboard");
   const categories = [
-    { name: "VEGETABLES", img: "/veg1.jpg", link: "/fruitsandvegetables" },
-    { name: "FRUITS", img: "/veg.jpg", link: "/fruitsandvegetables" },
-    { name: "SPICES", img: "/Spices.jpg", link: "/spices" },
+    {
+      name: "VEGETABLES",
+      img: "/Veg1.jpg",
+      link: inDashboard ? PATHS.dashboardProductsFruits : PATHS.fruits,
+    },
+    {
+      name: "FRUITS",
+      img: "/Veg.jpg",
+      link: inDashboard ? PATHS.dashboardProductsFruits : PATHS.fruits,
+    },
+    {
+      name: "SPICES",
+      img: "/Spices.jpg",
+      link: inDashboard ? PATHS.dashboardProductsSpices : PATHS.spices,
+    },
   ];
 
   const [selectedImg, setSelectedImg] = useState(null);
@@ -23,7 +39,7 @@ export default function OrganicFoodsPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/30 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/70 via-transparent to-[var(--background)]/80" />
-        <div className="relative z-10 text-white px-6 mt-16 sm:mt-20">
+        <div className="relative z-10 text-white px-6 mt-6 sm:mt-8">
           <div className="inline-block mb-6">
             <div className="w-20 h-1 bg-[var(--gold)] mx-auto mb-4" />
             <h1 className="text-5xl sm:text-7xl font-bold mb-4 tracking-tight text-white">

@@ -16,14 +16,14 @@ const CHANNELS = [
 ];
 
 const FAQS = [
-  { q: "How long does IEC issuance take?", a: "Typically 3–5 working days after we receive complete KYC. New India Export handles the DGFT submission end-to-end." },
+  { q: "How long does IEC issuance take?", a: "Typically 3–5 working days after we receive complete KYC. VIRASTRA INTERNATIONAL EXPORT handles the DGFT submission end-to-end." },
   { q: "Can I upgrade my plan mid-cycle?", a: "Yes. We pro-rate the difference and apply it to your next invoice. Upgrades activate instantly." },
   { q: "Do you support shipments outside India?", a: "Yes. We coordinate with partner CHAs in Dubai, Rotterdam and Singapore for transshipment workflows." },
   { q: "How do I add a teammate?", a: "Go to Settings → Team and invite by email. Each role (Admin, Ops, Viewer) has scoped permissions." },
 ];
 
 const ARTICLES = [
-  "Getting started with New India Export in 10 minutes",
+  "Getting started with VIRASTRA INTERNATIONAL EXPORT in 10 minutes",
   "Uploading PAN, GST and Bank documents securely",
   "Understanding DGFT, AD code and ICEGATE",
   "Reading your shipment workflow timeline",

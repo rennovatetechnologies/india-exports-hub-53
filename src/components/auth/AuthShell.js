@@ -62,7 +62,7 @@ export default function AuthShell({ title, subtitle, footer, children }) {
               <div className="glass-card relative p-7 sm:p-8">
                 <div className="text-center">
                   <span className="inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-white/70">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--gold)]" /> New India Export Account
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--gold)]" /> VIRASTRA INTERNATIONAL EXPORT Account
                   </span>
                   <h1 className="mt-4 text-2xl sm:text-3xl font-semibold tracking-tight">{title}</h1>
                   {subtitle && <p className="mt-2 text-sm text-white/55">{subtitle}</p>}

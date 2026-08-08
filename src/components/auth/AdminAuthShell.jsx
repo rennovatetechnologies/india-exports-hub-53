@@ -19,7 +19,7 @@ export default function AdminAuthShell({ title, subtitle, badge = "Internal port
             <ShieldCheck size={12} className="text-emerald-300" /> {badge}
           </div>
           <h2 className="mt-6 text-5xl font-semibold leading-[1.05] tracking-tight">
-            Operations console for the <span className="text-aurora">New India Export desk.</span>
+            Operations console for the <span className="text-aurora">VIRASTRA INTERNATIONAL EXPORT desk.</span>
           </h2>
           <p className="mt-5 max-w-md text-white/55 leading-relaxed">
             Secure, role-based workspace for the operations and leadership teams that
@@ -38,7 +38,7 @@ export default function AdminAuthShell({ title, subtitle, badge = "Internal port
               <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-cyan-300"><Activity size={15} /></span>
               <div>
                 <div className="font-medium text-white">Real-time queues</div>
-                <div className="text-white/50">SLA-tracked cases and escalations in one place.</div>
+                <div className="text-white/50">Case queues and escalations in one place.</div>
               </div>
             </li>
           </ul>

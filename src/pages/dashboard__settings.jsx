@@ -140,7 +140,7 @@ export default function SettingsPage() {
             <>
               <h2 className="text-lg font-semibold">Security</h2>
               <p className="text-sm text-white/60">
-                New India Export does not use passwords. You always sign in with your email and a one-time code. To use a different email, sign out and sign in again from the home page.
+                VIRASTRA INTERNATIONAL EXPORT does not use passwords. You always sign in with your email and a one-time code. To use a different email, sign out and sign in again from the home page.
               </p>
               <div className="rounded-xl bg-white/[0.03] p-4">
                 <div className="flex items-center justify-between gap-4">

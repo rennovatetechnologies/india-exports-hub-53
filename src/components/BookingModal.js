@@ -3,10 +3,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ArrowRight, Ship, Plane, Box, PackageSearch, Weight } from "lucide-react";
 import { getSession, isAuthenticated } from "@/lib/authSession";
+import { issueInvoiceForPayment } from "@/lib/invoice";
+import InvoiceModal from "@/components/InvoiceModal";
 
 export default function BookingModal({ open, setOpen }) {
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeInvoice, setActiveInvoice] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -61,7 +64,7 @@ export default function BookingModal({ open, setOpen }) {
   const send = async () => {
     if (!isAuthenticated()) {
       const next = `${location.pathname}${location.search || ""}`;
-      navigate(`/login?next=${encodeURIComponent(next || "/")}`);
+      navigate(`/login?next=${encodeURIComponent(next || "/dashboard")}`);
       return;
     }
     const session = getSession();
@@ -112,7 +115,7 @@ export default function BookingModal({ open, setOpen }) {
         key: rzKey,
         amount: order.amount,
         currency: order.currency,
-        name: "New India Export",
+        name: "VIRASTRA INTERNATIONAL EXPORT",
         description: `Booking for ${form.category}`,
         order_id: order.id,
         handler: async function (response) {
@@ -152,7 +155,27 @@ export default function BookingModal({ open, setOpen }) {
 
             const bookData = await bookRes.json();
             if (bookRes.ok || bookData.id) {
-              alert("Payment Successful & Request Sent!");
+              const invoice = issueInvoiceForPayment({
+                paymentId: response.razorpay_payment_id,
+                orderId: response.razorpay_order_id,
+                sku: "booking",
+                description: `Shipment enquiry booking — ${form.category}`,
+                customer: {
+                  name: session.name,
+                  email: session.email,
+                  phone: session.phone,
+                  company: session.company,
+                  address: [form.address, form.country].filter(Boolean).join(", "),
+                },
+                totalInclusive: 1,
+                lineItems: [
+                  {
+                    description: `Booking token — ${form.category}`,
+                    quantity: 1,
+                  },
+                ],
+              });
+              setActiveInvoice(invoice);
               setOpen(false);
               setStep(0);
               setForm({
@@ -195,9 +218,17 @@ export default function BookingModal({ open, setOpen }) {
     }
   };
 
-  if (!open) return null;
+  if (!open && !activeInvoice) return null;
 
   return (
+    <>
+      <InvoiceModal
+        open={Boolean(activeInvoice)}
+        invoice={activeInvoice}
+        emailNotice
+        onClose={() => setActiveInvoice(null)}
+      />
+      {open ? (
     <AnimatePresence>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <motion.div
@@ -338,7 +369,7 @@ export default function BookingModal({ open, setOpen }) {
                     onClick={() => {
                       if (!isAuthenticated()) {
                         const next = `${location.pathname}${location.search || ""}`;
-                        navigate(`/login?next=${encodeURIComponent(next || "/")}`);
+                        navigate(`/login?next=${encodeURIComponent(next || "/dashboard")}`);
                         setOpen(false);
                         return;
                       }
@@ -431,5 +462,7 @@ export default function BookingModal({ open, setOpen }) {
         </motion.div>
       </div>
     </AnimatePresence>
+      ) : null}
+    </>
   );
 }

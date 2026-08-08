@@ -4,7 +4,7 @@ import { Quote } from "lucide-react";
 const items = [
   {
     quote:
-      "New India Export turned a year of paperwork into a 4-week timeline. Our first FCL of turmeric shipped to Rotterdam without a single chase email.",
+      "VIRASTRA INTERNATIONAL EXPORT turned a year of paperwork into a 4-week timeline. Our first FCL of turmeric shipped to Rotterdam without a single chase email.",
     name: "Aarav Mehta",
     role: "Founder · Saffron Roots Exports",
   },

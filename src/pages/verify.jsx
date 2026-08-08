@@ -8,7 +8,7 @@ import {
   getPendingOtpInfo,
   OTP_PURPOSE,
   setSession,
-  safeNextPath,
+  customerPostLoginPath,
   hasCompletedKyc,
   clearSignupDraft,
   getSignupDraft,
@@ -16,8 +16,11 @@ import {
   resolveAdminLoginForEmail,
   ADMIN_STATUS,
   markKycComplete,
+  allowAuthMock,
+  ROLES,
 } from "@/lib/authSession";
 import { api } from "@/lib/api";
+import { getCustomerCase, gatePathForCase, fetchMyCase } from "@/lib/customerCase";
 
 export default function VerifyPage() {
   const router = useNavigate();
@@ -92,14 +95,22 @@ export default function VerifyPage() {
           setError("No account for this email. Please sign up first.");
           setLoading(false);
           return;
+        } else if (allowAuthMock()) {
+          // Offline demo: mint a local customer session (no JWT).
+          applySession({
+            email,
+            role: ROLES.CUSTOMER,
+            status: ADMIN_STATUS.ACTIVE,
+            kycComplete: hasCompletedKyc(email),
+          });
         } else {
           setError("Sign-in failed. Ensure the backend issued a session for this email.");
           setLoading(false);
           return;
         }
-        const next = safeNextPath(nextParam);
-        const kycOk = result.session?.kycComplete ?? hasCompletedKyc(email);
-        router(kycOk ? next : "/dashboard/kyc");
+        const caseState = (await fetchMyCase({ force: true })) || getCustomerCase(email);
+        const gated = gatePathForCase(caseState);
+        router(customerPostLoginPath(nextParam, gated));
         return;
       }
 
@@ -123,9 +134,23 @@ export default function VerifyPage() {
           });
           applySession(data.session || { ...data.user, token: data.token }, { token: data.token });
           clearSignupDraft();
-          const kycOk = data.session?.kycComplete ?? data.kycComplete ?? hasCompletedKyc(email);
-          router(kycOk ? "/dashboard" : "/dashboard/kyc");
+          const caseState = (await fetchMyCase({ force: true })) || getCustomerCase(email);
+          router(gatePathForCase(caseState));
         } catch (err) {
+          if (allowAuthMock()) {
+            applySession({
+              email,
+              name: draft.name || "",
+              company: draft.company || "",
+              phone: draft.phone || "",
+              role: ROLES.CUSTOMER,
+              status: ADMIN_STATUS.ACTIVE,
+              kycComplete: false,
+            });
+            clearSignupDraft();
+            router(gatePathForCase(getCustomerCase(email)));
+            return;
+          }
           setError(err.message || "Could not create account. Is the backend running?");
           setLoading(false);
         }
@@ -158,7 +183,12 @@ export default function VerifyPage() {
           setLoading(false);
           return;
         }
-        // Fallback local resolve
+        // Offline demo only — never mint a staff session without a backend JWT.
+        if (!allowAuthMock()) {
+          setError("Staff sign-in failed. Is the API running on :5001?");
+          setLoading(false);
+          return;
+        }
         const resolved = resolveAdminLoginForEmail(email);
         if (resolved.kind !== "ok") {
           const msg =

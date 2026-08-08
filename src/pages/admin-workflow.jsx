@@ -1,616 +1,935 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { motion } from "framer-motion";
 import {
   ArrowLeft,
   CheckCircle2,
-  Loader2,
-  FileCheck2,
-  Building2,
-  Banknote,
-  Globe2,
-  Truck,
-  PackageCheck,
-  ClipboardList,
-  MessageSquare,
-  Paperclip,
-  Search,
-  XCircle,
+  Circle,
   Download,
   Eye,
+  Loader2,
+  Upload,
+  MessageSquare,
+  UserPlus,
+  X,
+  XCircle,
 } from "lucide-react";
-import { getSession } from "@/lib/authSession";
+import { getSession, ROLES } from "@/lib/authSession";
 import {
-  WORKFLOW_STAGE_LABELS,
-  WORKFLOW_STAGE_TOTAL,
-  appendWorkflowCaseActivity,
-  getCaseById,
-  loadWorkflowCaseActivity,
-  loadVaultDocsFromStorage,
-  persistWorkflowStage,
-  saveVaultDocsToStorage,
-} from "@/lib/workflowVault";
-import {
-  downloadBlobAsFile,
-  openBlobInNewTab,
-  resolveVaultDocumentBlob,
-  vaultDocIsDownloadable,
-} from "@/lib/vaultDownloads";
+  findCaseByRef,
+  approveKyc,
+  requestKycMore,
+  reviewKycDocument,
+  downloadCaseFile,
+  fetchCaseFileBlob,
+  setCaseStage,
+  addOpsDocument,
+  requestDocument,
+  reassignOps,
+  loadOpsRoster,
+  getCaseWorkflowStages,
+  journeyStatus,
+  CASE_STATUS,
+  KYC_STATUS,
+  fetchCasesQueue,
+} from "@/lib/customerCase";
+import { getPlanById } from "@/lib/planCatalog";
+import { fetchMessagesForCase, getMessagesForCase, sendMessage } from "@/lib/caseMessages";
+import { PATHS } from "@/lib/routes";
 
-const STAGE_ICONS = [
-  Building2,
-  FileCheck2,
-  ClipboardList,
-  Banknote,
-  Globe2,
-  Truck,
-  PackageCheck,
-  CheckCircle2,
-];
-
-const STAGES = WORKFLOW_STAGE_LABELS.map((label, i) => ({ label, icon: STAGE_ICONS[i] }));
-
-const DOC_STATUS_BADGE = {
-  verified: "bg-emerald-400/10 text-emerald-300",
-  review: "bg-amber-400/10 text-amber-300",
-  missing: "bg-rose-400/10 text-rose-300",
-  rejected: "bg-rose-500/15 text-rose-200",
-};
-
-const DOC_STATUS_LABEL = {
-  verified: "Verified",
-  review: "In review",
-  missing: "Missing",
-  rejected: "Rejected",
-};
-
-/** Lower = earlier in list: actionable / pending docs before verified. */
-const VAULT_DOC_SORT_RANK = {
-  review: 0,
-  rejected: 1,
-  missing: 2,
-  verified: 3,
-};
-
-function docSmartHaystack(doc) {
-  const statusLabel = DOC_STATUS_LABEL[doc.status] ?? doc.status ?? "";
-  const bits = [doc.name, statusLabel, doc.status, doc.updated, doc.size, doc.opsComment]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  const aliases = [];
-  if (doc.status === "verified") aliases.push("done", "ok", "cleared");
-  if (doc.status === "review") aliases.push("pending", "queue", "ops");
-  if (doc.status === "missing") aliases.push("gap", "need", "todo");
-  if (doc.status === "rejected") aliases.push("rework", "failed");
-  return `${bits} ${aliases.join(" ")}`;
-}
-
-function parseDocSmartTokens(raw) {
-  const parts = String(raw || "")
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
-  const free = [];
-  let statusFilter = null;
-  for (const p of parts) {
-    if (p.startsWith("status:") && p.length > 7) {
-      statusFilter = p.slice(7);
-      continue;
-    }
-    free.push(p);
-  }
-  return { free, statusFilter };
-}
-
-function docMatchesSmartFilter(doc, raw) {
-  const { free, statusFilter } = parseDocSmartTokens(raw);
-  if (statusFilter && !String(doc.status).toLowerCase().includes(statusFilter)) return false;
-  if (!free.length) return true;
-  const hay = docSmartHaystack(doc);
-  return free.every((t) => hay.includes(t));
-}
-
-function activityTone(kind) {
-  if (kind === "approve") return "text-emerald-300/90";
-  if (kind === "reject") return "text-rose-300/90";
-  return "text-white/85";
+function reviewBadge(status) {
+  if (status === "approved") return "bg-emerald-400/15 text-emerald-300";
+  if (status === "rejected") return "bg-rose-400/15 text-rose-300";
+  if (status === "pending") return "bg-amber-400/15 text-amber-200";
+  return "bg-white/10 text-white/45";
 }
 
 export default function AdminWorkflowPage() {
   const { caseId } = useParams();
   const navigate = useNavigate();
   const session = getSession();
-  const who = session?.name ? `${session.name} · Operations` : "Operations";
-
   const [tick, setTick] = useState(0);
-  const refresh = useCallback(() => setTick((t) => t + 1), []);
+  const [queueReady, setQueueReady] = useState(false);
+  const [tab, setTab] = useState("overview");
+  const [note, setNote] = useState("");
+  const [reqLabel, setReqLabel] = useState("");
+  const [reqReason, setReqReason] = useState("");
+  const [chatBody, setChatBody] = useState("");
+  const [docFile, setDocFile] = useState(null);
+  const [docLabel, setDocLabel] = useState("");
+  const [docNote, setDocNote] = useState("");
+  const [docUploading, setDocUploading] = useState(false);
+  const [docError, setDocError] = useState("");
+  const [reqBusy, setReqBusy] = useState(false);
+  const [reqError, setReqError] = useState("");
+  const docFileInputRef = useRef(null);
+  const [chatSending, setChatSending] = useState(false);
+  const [kycBusy, setKycBusy] = useState(null);
+  const [showRequestMore, setShowRequestMore] = useState(false);
+  const [requestReason, setRequestReason] = useState("");
+  const [selectedMissing, setSelectedMissing] = useState({});
+  const [docNotes, setDocNotes] = useState({});
+  const [rejectDrafts, setRejectDrafts] = useState({});
+  const [fileBusy, setFileBusy] = useState(null);
+  const [kycError, setKycError] = useState("");
+  const [filePreview, setFilePreview] = useState(null); // { url, name, type }
+  const [stageBusy, setStageBusy] = useState(false);
+  const [stageError, setStageError] = useState("");
 
   useEffect(() => {
-    const h = () => refresh();
-    window.addEventListener("iehub-workflow-updated", h);
-    return () => window.removeEventListener("iehub-workflow-updated", h);
-  }, [refresh]);
-
-  const active = useMemo(() => (caseId ? getCaseById(caseId) : null), [caseId, tick]);
-
-  const [rejectReason, setRejectReason] = useState("");
-  const [commentDraft, setCommentDraft] = useState("");
-  const [docRejectDraft, setDocRejectDraft] = useState({});
-  const [docCommentDraft, setDocCommentDraft] = useState({});
-  const [feedback, setFeedback] = useState(null);
-  const [vaultDocsByCase, setVaultDocsByCase] = useState(loadVaultDocsFromStorage);
-  const [vaultDocQuery, setVaultDocQuery] = useState("");
-
-  useEffect(() => {
-    const syncVault = () => setVaultDocsByCase(loadVaultDocsFromStorage());
-    window.addEventListener("iehub-vault-docs-updated", syncVault);
-    return () => window.removeEventListener("iehub-vault-docs-updated", syncVault);
+    let cancelled = false;
+    fetchCasesQueue({ force: true })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setQueueReady(true);
+      });
+    const h = () => setTick((t) => t + 1);
+    window.addEventListener("iehub-case-updated", h);
+    window.addEventListener("iehub-messages-updated", h);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("iehub-case-updated", h);
+      window.removeEventListener("iehub-messages-updated", h);
+    };
   }, []);
 
+  // tick forces re-read after cache updates
+  void tick;
+  const c = caseId ? findCaseByRef(caseId) : null;
+  const customerEmail = c?.customerEmail || "";
+
   useEffect(() => {
-    setDocRejectDraft({});
-    setDocCommentDraft({});
-    setVaultDocQuery("");
-  }, [caseId]);
+    if (!c?.id || !queueReady) return;
+    fetchMessagesForCase(c, { force: true }).catch(() => {});
+  }, [c?.id, queueReady, tab]);
 
-  const activity = useMemo(
-    () => (active ? loadWorkflowCaseActivity(active.id) : []),
-    [active, tick]
-  );
+  useEffect(() => {
+    return () => {
+      if (filePreview?.url) URL.revokeObjectURL(filePreview.url);
+    };
+  }, [filePreview?.url]);
 
-  const caseVaultDocs = active ? vaultDocsByCase[active.id] ?? [] : [];
-
-  const filteredVaultDocEntries = useMemo(() => {
-    return caseVaultDocs
-      .map((doc, index) => ({ doc, index }))
-      .filter(({ doc }) => docMatchesSmartFilter(doc, vaultDocQuery))
-      .sort((a, b) => {
-        const ra = VAULT_DOC_SORT_RANK[a.doc.status] ?? 99;
-        const rb = VAULT_DOC_SORT_RANK[b.doc.status] ?? 99;
-        if (ra !== rb) return ra - rb;
-        return a.index - b.index;
-      });
-  }, [caseVaultDocs, vaultDocQuery]);
-
-  const showFeedback = (message) => {
-    setFeedback(message);
-    window.setTimeout(() => setFeedback(null), 3400);
+  const closeFilePreview = () => {
+    setFilePreview((prev) => {
+      if (prev?.url) URL.revokeObjectURL(prev.url);
+      return null;
+    });
   };
 
-  if (!caseId || !active) {
+  if (!queueReady && !c) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-white/55">
+        <Loader2 size={16} className="animate-spin" /> Loading case…
+      </div>
+    );
+  }
+
+  if (!c) {
     return (
       <div className="space-y-4">
-        <p className="text-sm text-white/55">Case not found or invalid link.</p>
-        <Link to="/admin" className="text-[var(--gold)] hover:underline text-sm">
-          ← Back to Operations
+        <p className="text-sm text-white/55">Case not found.</p>
+        <Link to={PATHS.admin} className="text-[var(--gold)]">
+          ← Back to queue
         </Link>
       </div>
     );
   }
 
-  const stageIdx = active.stage;
-  const allDone = stageIdx >= WORKFLOW_STAGE_TOTAL;
-  const currentStageLabel = allDone ? "Completed" : WORKFLOW_STAGE_LABELS[stageIdx];
+  const plan = getPlanById(c.paidPlanId || c.planId);
+  const stages = getCaseWorkflowStages(c);
+  const status = journeyStatus(c);
+  const kycDocs = plan?.kycDocs || [];
+  const msgs = getMessagesForCase(c || customerEmail);
+  const roster = loadOpsRoster();
+  const canReviewKyc = c.kycStatus === KYC_STATUS.SUBMITTED;
 
-  const approveStage = () => {
-    if (allDone) return;
-    const next = stageIdx + 1;
-    persistWorkflowStage(active.id, next);
-    appendWorkflowCaseActivity(active.id, {
-      who,
-      kind: "approve",
-      text: `Approved “${WORKFLOW_STAGE_LABELS[stageIdx]}”.${next >= WORKFLOW_STAGE_TOTAL ? " All shipment stages complete." : ""}`,
-    });
-    showFeedback(next >= WORKFLOW_STAGE_TOTAL ? "Workflow complete for this case." : "Stage approved. Customer workspace updated.");
-    refresh();
+  let kycApproved = 0;
+  let kycRejected = 0;
+  let kycPending = 0;
+  let kycMissing = 0;
+  for (const d of kycDocs) {
+    const up = c.kycUploads?.[d.id];
+    if (!up) {
+      kycMissing += 1;
+      continue;
+    }
+    const st = up.reviewStatus || "pending";
+    if (st === "approved") kycApproved += 1;
+    else if (st === "rejected") kycRejected += 1;
+    else kycPending += 1;
+  }
+  const kycReviewStats = { approved: kycApproved, rejected: kycRejected, pending: kycPending, missing: kycMissing };
+
+  const openRequestMorePanel = () => {
+    const next = {};
+    const notes = {};
+    for (const d of kycDocs) {
+      const up = c.kycUploads?.[d.id];
+      const rejected = up?.reviewStatus === "rejected" || !up;
+      next[d.id] = rejected;
+      if (up?.reviewNote) notes[d.id] = up.reviewNote;
+    }
+    setSelectedMissing(next);
+    setDocNotes(notes);
+    setRequestReason(c.kycRejectReason || "Please re-upload clearer scans of the documents listed below.");
+    setShowRequestMore(true);
+    setKycError("");
   };
 
-  const rejectStage = () => {
-    const reason = rejectReason.trim();
-    if (!reason) {
-      showFeedback("Add a short reason before rejecting this stage.");
-      return;
+  const runApproveKyc = async () => {
+    setKycBusy("approve");
+    setKycError("");
+    try {
+      const ok = await approveKyc(customerEmail);
+      if (!ok) setKycError("Could not approve KYC. Try again.");
+      setShowRequestMore(false);
+    } finally {
+      setKycBusy(null);
     }
-    if (stageIdx <= 0) {
-      showFeedback("Already at the first stage.");
-      return;
-    }
-    const next = stageIdx - 1;
-    persistWorkflowStage(active.id, next);
-    appendWorkflowCaseActivity(active.id, {
-      who,
-      kind: "reject",
-      text: `Rejected “${WORKFLOW_STAGE_LABELS[stageIdx]}”. Rolled back to “${WORKFLOW_STAGE_LABELS[next]}”. Reason: ${reason}`,
-    });
-    setRejectReason("");
-    showFeedback("Stage rejected and rolled back. Customer notified.");
-    refresh();
   };
 
-  const postComment = () => {
-    const text = commentDraft.trim();
-    if (!text) {
-      showFeedback("Write a comment before posting.");
+  const runRequestMore = async () => {
+    const missingDocIds = Object.entries(selectedMissing)
+      .filter(([, on]) => on)
+      .map(([id]) => id);
+    if (!missingDocIds.length) {
+      setKycError("Select at least one document the customer must update.");
       return;
     }
-    appendWorkflowCaseActivity(active.id, { who, kind: "comment", text });
-    setCommentDraft("");
-    showFeedback("Comment posted on this case.");
-    refresh();
-  };
-
-  const approveVaultDoc = (id, index) => {
-    setVaultDocsByCase((prev) => {
-      const doc = prev[id]?.[index];
-      if (!doc || (doc.status !== "review" && doc.status !== "rejected")) {
-        requestAnimationFrame(() =>
-          showFeedback(
-            !doc
-              ? "Document not found."
-              : doc.status === "verified"
-                ? "Already verified."
-                : "Approve when a file is in review or rejected for rework."
-          )
-        );
-        return prev;
+    setKycBusy("request");
+    setKycError("");
+    try {
+      const notesPayload = {};
+      for (const id of missingDocIds) {
+        if (docNotes[id]?.trim()) notesPayload[id] = docNotes[id].trim();
       }
-      const list = [...prev[id]];
-      list[index] = { ...doc, status: "verified", updated: "Just now" };
-      const next = { ...prev, [id]: list };
-      saveVaultDocsToStorage(next);
-      requestAnimationFrame(() => showFeedback(`Verified “${doc.name}”.`));
-      return next;
-    });
+      const ok = await requestKycMore(customerEmail, requestReason.trim() || "Additional documents required", {
+        missingDocIds,
+        docNotes: notesPayload,
+      });
+      if (!ok) setKycError("Could not notify the customer. Try again.");
+      else setShowRequestMore(false);
+    } finally {
+      setKycBusy(null);
+    }
   };
 
-  const rejectVaultDoc = (id, index) => {
-    const reason = (docRejectDraft[index] ?? "").trim();
-    if (!reason) {
-      showFeedback("Add a rejection reason for the customer.");
+  const runDocReview = async (docId, reviewStatus) => {
+    const note = (rejectDrafts[docId] || "").trim();
+    if (reviewStatus === "rejected" && note.length < 3) {
+      setKycError("Add a short note so the customer knows what to fix.");
       return;
     }
-    setVaultDocsByCase((prev) => {
-      const doc = prev[id]?.[index];
-      if (!doc || doc.status === "verified") return prev;
-      const list = [...prev[id]];
-      list[index] = { ...doc, status: "rejected", updated: "Just now", opsComment: reason };
-      const next = { ...prev, [id]: list };
-      saveVaultDocsToStorage(next);
-      requestAnimationFrame(() => showFeedback(`Rejected “${doc.name}”.`));
-      return next;
-    });
-    setDocRejectDraft((d) => {
-      const copy = { ...d };
-      delete copy[index];
-      return copy;
-    });
+    setKycBusy(`review:${docId}:${reviewStatus}`);
+    setKycError("");
+    try {
+      await reviewKycDocument(customerEmail, docId, reviewStatus, note);
+      if (reviewStatus === "rejected") {
+        setSelectedMissing((s) => ({ ...s, [docId]: true }));
+        setDocNotes((n) => ({ ...n, [docId]: note }));
+      }
+    } catch (e) {
+      setKycError(e?.message || "Review update failed");
+    } finally {
+      setKycBusy(null);
+    }
   };
 
-  const commentVaultDoc = (id, index) => {
-    const text = (docCommentDraft[index] ?? "").trim();
-    if (!text) {
-      showFeedback("Write a comment before posting.");
+  const viewFile = async (up, { errorKey = "kyc" } = {}) => {
+    const fileId = up?.fileId || up?.driveFileId;
+    if (!fileId) {
+      const msg = "No file id on this upload — ask the customer to re-upload.";
+      if (errorKey === "doc") setDocError(msg);
+      else setKycError(msg);
       return;
     }
-    setVaultDocsByCase((prev) => {
-      const doc = prev[id]?.[index];
-      if (!doc) return prev;
-      const list = [...prev[id]];
-      list[index] = { ...doc, updated: "Just now", opsComment: text };
-      const next = { ...prev, [id]: list };
-      saveVaultDocsToStorage(next);
-      requestAnimationFrame(() => showFeedback(`Comment saved on “${doc.name}”.`));
-      return next;
-    });
-    setDocCommentDraft((d) => {
-      const copy = { ...d };
-      delete copy[index];
-      return copy;
-    });
+    setFileBusy(fileId);
+    if (errorKey === "doc") setDocError("");
+    else setKycError("");
+    try {
+      const blob = await fetchCaseFileBlob(fileId);
+      const mime =
+        blob.type ||
+        up?.mimeType ||
+        (/\.pdf$/i.test(up?.name || "") ? "application/pdf" : "") ||
+        "application/octet-stream";
+      const typed = blob.type ? blob : new Blob([blob], { type: mime });
+      const url = URL.createObjectURL(typed);
+      setFilePreview((prev) => {
+        if (prev?.url) URL.revokeObjectURL(prev.url);
+        return {
+          url,
+          name: up?.name || "Document",
+          type: typed.type || mime,
+        };
+      });
+    } catch (e) {
+      const msg = e?.message || "Could not open file. Try download instead.";
+      if (errorKey === "doc") setDocError(msg);
+      else setKycError(msg);
+    } finally {
+      setFileBusy(null);
+    }
   };
+
+  const downloadFile = async (up, { errorKey = "kyc" } = {}) => {
+    const fileId = up?.fileId || up?.driveFileId;
+    if (!fileId) return;
+    setFileBusy(`dl:${fileId}`);
+    try {
+      await downloadCaseFile(fileId, up.name || "kyc-document");
+    } catch {
+      const msg = "Could not download file.";
+      if (errorKey === "doc") setDocError(msg);
+      else setKycError(msg);
+    } finally {
+      setFileBusy(null);
+    }
+  };
+
+  const tabs = [
+    { id: "overview", label: "Overview" },
+    { id: "kyc", label: "KYC" },
+    { id: "workflow", label: "Workflow" },
+    { id: "documents", label: "Documents" },
+    { id: "chat", label: "Chat" },
+  ];
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-start gap-3">
-        <button
-          type="button"
-          onClick={() => navigate("/admin")}
-          title="Back to workflows"
-          aria-label="Back to workflows"
-          className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
-        >
-          <ArrowLeft size={18} />
-        </button>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs uppercase tracking-[0.25em] text-white/40">Workflow</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">{active.id}</h1>
-          <p className="mt-1 text-sm text-white/55">{active.title}</p>
-          <p className="mt-0.5 text-xs text-white/45">
-            {active.accountName} · {active.accountCompany} · Owner {active.opsOwner}
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <button
+            type="button"
+            onClick={() => navigate(PATHS.admin)}
+            className="mb-2 inline-flex items-center gap-1 text-xs text-white/45 hover:text-white"
+          >
+            <ArrowLeft size={14} /> Queue
+          </button>
+          <h1 className="text-2xl font-semibold">{customerEmail}</h1>
+          <p className="mt-1 text-sm text-white/55">
+            {plan?.name || "No plan"} · {status.replace(/_/g, " ")} · Case {c.id}
           </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-xs text-white/50">
+            <UserPlus size={14} />
+            <select
+              className="rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-sm text-white"
+              value={c.opsEmail || ""}
+              onChange={(e) => {
+                const o = roster.find((r) => r.email === e.target.value);
+                if (o) reassignOps(customerEmail, o.email, o.name);
+              }}
+            >
+              <option value="">Unassigned</option>
+              {roster.map((o) => (
+                <option key={o.email} value={o.email}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 
-      {feedback && (
-        <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100" role="status">
-          {feedback}
+      <div className="flex flex-wrap gap-2">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={`rounded-xl px-4 py-2 text-sm ${tab === t.id ? "bg-white/10 text-white" : "text-white/50 hover:bg-white/5"}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "overview" && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="glass-card p-5 space-y-2 text-sm">
+            <div>
+              <span className="text-white/40">KYC</span> · {c.kycStatus}
+            </div>
+            <div>
+              <span className="text-white/40">Ops</span> · {c.opsName || "—"}
+            </div>
+            <div>
+              <span className="text-white/40">Stage</span> · {stages[c.stageIndex]?.label || "—"}
+            </div>
+            <div>
+              <span className="text-white/40">Docs ready</span> · {(c.documents || []).filter((d) => d.from === "ops").length}
+            </div>
+          </div>
+          <div className="glass-card p-5">
+            <p className="text-xs text-white/45 mb-2">Quick actions</p>
+            <div className="flex flex-wrap gap-2">
+              {canReviewKyc && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setTab("kyc")}
+                    className="btn-gold rounded-xl px-3 py-2 text-xs font-semibold"
+                  >
+                    Review KYC files
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTab("kyc");
+                      openRequestMorePanel();
+                    }}
+                    className="btn-ghost rounded-xl px-3 py-2 text-xs"
+                  >
+                    Request more KYC
+                  </button>
+                </>
+              )}
+              <button type="button" onClick={() => setTab("chat")} className="btn-ghost inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs">
+                <MessageSquare size={14} /> Open chat
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      <div className={caseVaultDocs.length > 0 ? "grid gap-6 lg:grid-cols-[1fr_320px]" : "grid gap-6"}>
-        <div className="space-y-6">
-          <div className="glass-card p-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <div className="text-xs text-white/45">Current gate</div>
-                <h2 className="mt-1 text-lg font-semibold text-sky-100">{currentStageLabel}</h2>
-                <p className="mt-1 text-xs text-white/50">
-                  Buyer {active.buyer} · Value {active.value} · SLA{" "}
-                  <span className="text-white/70">{active.sla}</span>
-                </p>
+      {tab === "kyc" && (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[
+              ["Legal name", c.kycProfile?.legalName],
+              ["Entity type", c.kycProfile?.entityType],
+              ["Incorporation", c.kycProfile?.incorporationDate],
+              ["Turnover", c.kycProfile?.turnover],
+              ["City", c.kycProfile?.operatingCity],
+              ["Address", c.kycProfile?.registeredAddress],
+              ["Signatory", c.kycProfile?.signatoryName],
+              ["Designation", c.kycProfile?.designation],
+              ["PAN", c.kycProfile?.panNumber],
+              ["Aadhaar (last 4)", c.kycProfile?.aadhaarLast4],
+            ].map(([k, v]) => (
+              <div key={k} className="rounded-xl bg-white/[0.03] p-3 text-sm">
+                <div className="text-[11px] uppercase tracking-wider text-white/40">{k}</div>
+                <div className="mt-1 text-white/85">{v || "—"}</div>
               </div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-medium">Submitted files</h3>
+              <p className="text-xs text-white/45">
+                {kycReviewStats.approved} approved · {kycReviewStats.pending} pending ·{" "}
+                {kycReviewStats.rejected} rejected · {kycReviewStats.missing} missing
+              </p>
+            </div>
+            {canReviewKyc && (
               <div className="flex flex-wrap gap-2">
-                <Link
-                  to={`/dashboard/vault/${active.id}`}
-                  className="inline-flex items-center gap-2 rounded-xl glass px-3 py-2 text-xs text-white/90 hover:bg-white/10"
-                >
-                  <Paperclip size={13} /> Vault
-                </Link>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-2 border-t border-white/10 pt-6">
-              <button
-                type="button"
-                onClick={approveStage}
-                disabled={allDone}
-                className="inline-flex flex-1 min-w-[140px] items-center justify-center gap-2 rounded-xl bg-emerald-500/90 px-4 py-2.5 text-xs font-semibold text-black hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <CheckCircle2 size={15} /> Approve stage
-              </button>
-              <button
-                type="button"
-                onClick={rejectStage}
-                disabled={stageIdx <= 0 || allDone}
-                className="inline-flex flex-1 min-w-[140px] items-center justify-center gap-2 rounded-xl border border-rose-400/35 bg-rose-500/10 px-4 py-2.5 text-xs font-semibold text-rose-100 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <XCircle size={15} /> Reject stage
-              </button>
-            </div>
-            <div className="mt-3">
-              <label className="text-[10px] uppercase tracking-wider text-white/35">Rejection reason (required to reject)</label>
-              <textarea
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                rows={2}
-                placeholder="Explain what failed so the customer can fix it…"
-                className="mt-1 w-full resize-none rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white placeholder:text-white/25 outline-none focus:border-rose-400/35"
-              />
-            </div>
-          </div>
-
-          <div className="glass-card p-6">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-white/55">Shipment stages</h3>
-            <ol className="relative mt-6 max-w-xl">
-              {STAGES.map((s, i) => {
-                const done = i < stageIdx;
-                const cur = i === stageIdx && !allDone;
-                const isLast = i === STAGES.length - 1;
-                const nextIdx = i + 1;
-                const lineClass =
-                  nextIdx < stageIdx
-                    ? "bg-emerald-400/45"
-                    : nextIdx === stageIdx && !allDone
-                      ? "bg-gradient-to-b from-emerald-400/45 via-sky-400/35 to-white/12"
-                      : "bg-white/[0.08]";
-                return (
-                  <motion.li
-                    key={s.label}
-                    initial={{ opacity: 0, x: -6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.03 }}
-                    className="relative flex gap-4"
-                  >
-                    <div className="flex w-11 shrink-0 flex-col items-center self-stretch">
-                      <span
-                        className={`relative z-[1] flex h-10 w-10 shrink-0 items-center justify-center rounded-full border shadow-lg ${
-                          done
-                            ? "border-emerald-400/35 bg-emerald-400/15 text-emerald-300"
-                            : cur
-                              ? "border-sky-400/45 bg-sky-500/15 text-sky-100 ring-1 ring-[var(--gold)]/35"
-                              : "border-white/10 bg-white/[0.06] text-white/40"
-                        }`}
-                      >
-                        {done ? <CheckCircle2 size={18} /> : cur ? <Loader2 size={18} className="animate-spin text-sky-100" /> : <s.icon size={18} />}
-                      </span>
-                      {!isLast && (
-                        <div className={`mt-2 w-px flex-1 min-h-[20px] rounded-full ${lineClass}`} aria-hidden />
-                      )}
-                    </div>
-                    <div
-                      className={`min-w-0 flex-1 rounded-xl border p-4 ${
-                        cur
-                          ? "border-sky-400/25 bg-sky-500/[0.06]"
-                          : done
-                            ? "border-emerald-400/20 bg-emerald-400/[0.04]"
-                            : "border-white/5 bg-white/[0.02]"
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <div className="text-sm font-medium">{s.label}</div>
-                        <span
-                          className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                            done ? "text-emerald-300/90" : cur ? "text-sky-200/95" : "text-white/35"
-                          }`}
-                        >
-                          {done ? "Completed" : cur ? "In progress" : "Pending"}
-                        </span>
-                      </div>
-                    </div>
-                  </motion.li>
-                );
-              })}
-            </ol>
-          </div>
-
-          <div id="workflow-activity" className="glass-card scroll-mt-24 p-6">
-            <h3 className="text-sm font-semibold">Activity & comments</h3>
-            <p className="mt-1 text-xs text-white/45">Visible to the customer on their workflow thread.</p>
-            <ul className="mt-4 space-y-4">
-              {activity.length === 0 && <li className="text-xs text-white/40">No activity yet — approve, reject, or comment below.</li>}
-              {activity.map((n, i) => (
-                <li key={`${n.when}-${i}`} className="flex gap-3">
-                  <span
-                    className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
-                      n.kind === "approve" ? "bg-emerald-400" : n.kind === "reject" ? "bg-rose-400" : "bg-sky-400/90"
-                    }`}
-                  />
-                  <div>
-                    <div className="text-xs text-white/45">
-                      {n.who} · {n.when}
-                    </div>
-                    <div className={`mt-0.5 text-sm ${activityTone(n.kind)}`}>{n.text}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-5 space-y-2">
-              <label className="text-[10px] uppercase tracking-wider text-white/35">Comment (ops ↔ customer)</label>
-              <div className="flex items-end gap-2 rounded-xl bg-white/5 p-2">
-                <MessageSquare size={14} className="ml-2 shrink-0 text-white/30" />
-                <textarea
-                  value={commentDraft}
-                  onChange={(e) => setCommentDraft(e.target.value)}
-                  rows={2}
-                  placeholder="Add a note or clarification…"
-                  className="min-h-[44px] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-white/30"
-                />
                 <button
                   type="button"
-                  onClick={postComment}
-                  className="btn-gold shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-black"
+                  disabled={Boolean(kycBusy)}
+                  onClick={runApproveKyc}
+                  className="btn-gold rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
                 >
-                  Post
+                  {kycBusy === "approve" ? "Approving…" : "Approve all KYC"}
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(kycBusy)}
+                  onClick={openRequestMorePanel}
+                  className="btn-ghost rounded-xl px-4 py-2 text-sm"
+                >
+                  Request more…
+                </button>
+              </div>
+            )}
+          </div>
+
+          {kycError && <p className="text-sm text-rose-300">{kycError}</p>}
+
+          <ul className="space-y-3">
+            {kycDocs.map((d) => {
+              const up = c.kycUploads?.[d.id];
+              const reviewStatus = up?.reviewStatus || (up ? "pending" : "missing");
+              const fileId = up?.fileId || up?.driveFileId;
+              const reviewing = kycBusy === `review:${d.id}:approved` || kycBusy === `review:${d.id}:rejected`;
+              return (
+                <li key={d.id} className="glass-card space-y-3 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {d.label} {d.required !== false && <span className="text-white/40">*</span>}
+                        </span>
+                        <span className={`rounded-md px-2 py-0.5 text-[10px] uppercase tracking-wider ${reviewBadge(reviewStatus)}`}>
+                          {reviewStatus}
+                        </span>
+                      </div>
+                      <p className={`mt-1 truncate text-xs ${up ? "text-white/55" : "text-white/35"}`}>
+                        {up ? up.name : "Not uploaded"}
+                        {up?.size ? ` · ${Math.round(up.size / 1024)} KB` : ""}
+                      </p>
+                      {up?.reviewNote && (
+                        <p className="mt-1 text-xs text-rose-200/90">Note: {up.reviewNote}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {fileId && (
+                        <>
+                          <button
+                            type="button"
+                            className="btn-ghost inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs"
+                            disabled={fileBusy === fileId}
+                            onClick={() => viewFile(up)}
+                          >
+                            <Eye size={13} /> {fileBusy === fileId ? "Opening…" : "View"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-ghost inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs"
+                            disabled={fileBusy === `dl:${fileId}`}
+                            onClick={() => downloadFile(up)}
+                          >
+                            <Download size={13} /> Download
+                          </button>
+                        </>
+                      )}
+                      {canReviewKyc && up && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={Boolean(kycBusy) || reviewStatus === "approved"}
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-400/15 px-2.5 py-1.5 text-xs text-emerald-300 disabled:opacity-40"
+                            onClick={() => runDocReview(d.id, "approved")}
+                          >
+                            <CheckCircle2 size={13} />
+                            {kycBusy === `review:${d.id}:approved` ? "…" : "Approve"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={Boolean(kycBusy)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-rose-400/15 px-2.5 py-1.5 text-xs text-rose-300 disabled:opacity-40"
+                            onClick={() => runDocReview(d.id, "rejected")}
+                          >
+                            <XCircle size={13} />
+                            {kycBusy === `review:${d.id}:rejected` ? "…" : "Reject"}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {canReviewKyc && up && reviewStatus !== "approved" && (
+                    <input
+                      value={rejectDrafts[d.id] || ""}
+                      onChange={(e) => setRejectDrafts((prev) => ({ ...prev, [d.id]: e.target.value }))}
+                      placeholder="Reject note (required) — e.g. Blurry scan, please upload a clearer PDF"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs"
+                      disabled={reviewing}
+                    />
+                  )}
+                </li>
+              );
+            })}
+            {!kycDocs.length && (
+              <li className="text-sm text-white/45">No KYC documents configured for this plan.</li>
+            )}
+          </ul>
+
+          {showRequestMore && canReviewKyc && (
+            <div className="glass-card space-y-4 border border-amber-400/20 p-5">
+              <div>
+                <h3 className="text-sm font-semibold text-amber-100">Request more from customer</h3>
+                <p className="mt-1 text-xs text-white/50">
+                  Select the documents they must fix. They get an email listing these files and your notes.
+                </p>
+              </div>
+              <textarea
+                value={requestReason}
+                onChange={(e) => setRequestReason(e.target.value)}
+                rows={2}
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+                placeholder="Overall message to the customer"
+              />
+              <ul className="space-y-2">
+                {kycDocs.map((d) => (
+                  <li key={d.id} className="rounded-xl bg-white/[0.03] p-3">
+                    <label className="flex items-start gap-3 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={Boolean(selectedMissing[d.id])}
+                        onChange={(e) =>
+                          setSelectedMissing((s) => ({ ...s, [d.id]: e.target.checked }))
+                        }
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="font-medium">{d.label}</span>
+                        {selectedMissing[d.id] && (
+                          <input
+                            value={docNotes[d.id] || ""}
+                            onChange={(e) => setDocNotes((n) => ({ ...n, [d.id]: e.target.value }))}
+                            placeholder="What should they fix for this file?"
+                            className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-2.5 py-1.5 text-xs"
+                          />
+                        )}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={Boolean(kycBusy)}
+                  onClick={runRequestMore}
+                  className="btn-gold rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                >
+                  {kycBusy === "request" ? "Sending…" : "Notify customer"}
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(kycBusy)}
+                  onClick={() => setShowRequestMore(false)}
+                  className="btn-ghost rounded-xl px-4 py-2 text-sm"
+                >
+                  Cancel
                 </button>
               </div>
             </div>
-          </div>
-        </div>
+          )}
 
-        {caseVaultDocs.length > 0 ? (
-          <aside className="space-y-4">
-            <div className="glass-card p-5">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-white/55">Vault documents</h3>
-              <p className="mt-1 text-[11px] text-white/45">Approve, reject, or comment on uploads.</p>
-              <div className="mt-2 flex items-center gap-2 rounded-lg bg-white/5 px-2 py-1.5 text-[11px] text-white/55">
-                <Search size={12} className="shrink-0 text-white/35" />
+          {status === CASE_STATUS.ACTIVE && <p className="text-sm text-emerald-300">KYC approved</p>}
+          {c.kycStatus === KYC_STATUS.NEEDS_MORE && (
+            <p className="text-sm text-amber-200">
+              Waiting on customer — requested: {(c.kycMissingDocIds || []).join(", ") || "documents"}
+            </p>
+          )}
+        </div>
+      )}
+
+      {tab === "workflow" && (
+        <div className="space-y-4">
+          {stageError && (
+            <p className="rounded-xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-200">
+              {stageError}
+            </p>
+          )}
+          <ol className="space-y-3">
+            {stages.map((s, i) => {
+              const idx = Number(c.stageIndex) || 0;
+              const done = i < idx;
+              const active = i === idx;
+              return (
+                <li key={s.id} className="glass-card flex flex-wrap items-center justify-between gap-3 p-4">
+                  <div className="flex items-center gap-3">
+                    {done ? (
+                      <CheckCircle2 className="text-emerald-400" size={18} />
+                    ) : active ? (
+                      <Loader2 className="animate-spin text-[var(--gold)]" size={18} />
+                    ) : (
+                      <Circle className="text-white/25" size={18} />
+                    )}
+                    <div>
+                      <div className="text-sm font-medium">{s.label}</div>
+                      <div className="text-xs text-white/40">{s.description}</div>
+                    </div>
+                  </div>
+                  {active && status === CASE_STATUS.ACTIVE && (
+                    <button
+                      type="button"
+                      disabled={stageBusy}
+                      className="btn-gold rounded-xl px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                      onClick={async () => {
+                        setStageError("");
+                        setStageBusy(true);
+                        try {
+                          await setCaseStage(customerEmail, i + 1, note || undefined);
+                          setNote("");
+                        } catch (e) {
+                          setStageError(e?.message || "Could not advance stage. Try again.");
+                        } finally {
+                          setStageBusy(false);
+                        }
+                      }}
+                    >
+                      {stageBusy ? "Saving…" : "Mark complete"}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Optional note when advancing stage"
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+          />
+        </div>
+      )}
+
+      {tab === "documents" && (
+        <div className="space-y-6">
+          <div>
+            <h3 className="mb-2 text-sm font-medium">Upload for customer</h3>
+            <p className="mb-3 text-xs text-white/45">
+              Name the document clearly so the customer knows what it is. PDF or image (JPG, PNG, WebP). Max 5 MB.
+            </p>
+            <div className="space-y-2">
+              <input
+                value={docLabel}
+                onChange={(e) => {
+                  setDocError("");
+                  setDocLabel(e.target.value);
+                }}
+                placeholder="What is this file? e.g. IEC certificate, Shipping bill draft"
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+              />
+              <input
+                value={docNote}
+                onChange={(e) => setDocNote(e.target.value)}
+                placeholder="Optional note for the customer (e.g. Please review and confirm)"
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+              />
+              <div className="flex flex-wrap items-center gap-2">
                 <input
-                  value={vaultDocQuery}
-                  onChange={(e) => setVaultDocQuery(e.target.value)}
-                  placeholder="Smart search: name, status:review, missing…"
-                  className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-white/25"
+                  ref={docFileInputRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+                  className="min-w-[200px] flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1 file:text-xs file:text-white"
+                  onChange={(e) => {
+                    setDocError("");
+                    const f = e.target.files?.[0] || null;
+                    setDocFile(f);
+                    if (f && !docLabel.trim()) {
+                      const base = String(f.name || "")
+                        .replace(/\.[^.]+$/, "")
+                        .replace(/[_-]+/g, " ")
+                        .trim();
+                      if (base) setDocLabel(base);
+                    }
+                  }}
                 />
+                <button
+                  type="button"
+                  disabled={!docFile || !docLabel.trim() || docUploading}
+                  className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                  onClick={async () => {
+                    if (!docFile || !docLabel.trim() || docUploading) return;
+                    setDocUploading(true);
+                    setDocError("");
+                    try {
+                      await addOpsDocument(customerEmail, {
+                        file: docFile,
+                        label: docLabel.trim(),
+                        note: docNote.trim() || undefined,
+                        stageId: stages[c.stageIndex]?.id,
+                      });
+                      setDocFile(null);
+                      setDocLabel("");
+                      setDocNote("");
+                      if (docFileInputRef.current) docFileInputRef.current.value = "";
+                    } catch (e) {
+                      setDocError(e?.message || "Upload failed");
+                    } finally {
+                      setDocUploading(false);
+                    }
+                  }}
+                >
+                  {docUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {docUploading ? "Uploading…" : "Upload"}
+                </button>
               </div>
-              <ul className="mt-3 max-h-[min(52vh,28rem)] space-y-3 overflow-y-auto pr-1">
-                {filteredVaultDocEntries.map(({ doc, index }) => {
-                  const canApprove = doc.status === "review" || doc.status === "rejected";
-                  const statusCls = DOC_STATUS_BADGE[doc.status] ?? "bg-white/10 text-white/50";
-                  return (
-                    <li key={`${active.id}-${index}-${doc.name}`} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium text-white" title={doc.name}>
-                            {doc.name}
-                          </p>
-                          <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] capitalize ${statusCls}`}>{doc.status}</span>
-                          {doc.opsComment ? (
-                            <p className="mt-2 text-[11px] leading-snug text-white/50">
-                              <span className="text-white/35">Last note · </span>
-                              {doc.opsComment}
-                            </p>
-                          ) : null}
-                        </div>
-                        <div className="flex shrink-0 flex-wrap gap-1">
-                          {vaultDocIsDownloadable(doc) ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  void resolveVaultDocumentBlob(active.id, index, doc).then((blob) =>
-                                    downloadBlobAsFile(blob, doc.name)
-                                  )
-                                }
-                                className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-semibold text-white/85 hover:bg-white/10"
-                              >
-                                <Download size={11} /> Download
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  void resolveVaultDocumentBlob(active.id, index, doc).then((blob) =>
-                                    openBlobInNewTab(blob)
-                                  )
-                                }
-                                className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-semibold text-white/85 hover:bg-white/10"
-                              >
-                                <Eye size={11} /> View
-                              </button>
-                            </>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() => approveVaultDoc(active.id, index)}
-                            disabled={!canApprove}
-                            className="rounded-lg bg-emerald-500/85 px-2 py-1 text-[10px] font-semibold text-black hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-35"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => rejectVaultDoc(active.id, index)}
-                            disabled={doc.status === "verified"}
-                            className="rounded-lg border border-rose-400/35 bg-rose-500/10 px-2 py-1 text-[10px] font-semibold text-rose-100 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-35"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </div>
-                      <label className="mt-2 block text-[10px] uppercase tracking-wider text-white/35">Rejection reason</label>
-                      <textarea
-                        value={docRejectDraft[index] ?? ""}
-                        onChange={(e) => setDocRejectDraft((d) => ({ ...d, [index]: e.target.value }))}
-                        rows={2}
-                        placeholder="Required to reject…"
-                        className="mt-1 w-full resize-none rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[11px] text-white placeholder:text-white/25 outline-none focus:border-rose-400/35"
-                      />
-                      <label className="mt-2 block text-[10px] uppercase tracking-wider text-white/35">Comment to customer</label>
-                      <textarea
-                        value={docCommentDraft[index] ?? ""}
-                        onChange={(e) => setDocCommentDraft((d) => ({ ...d, [index]: e.target.value }))}
-                        rows={2}
-                        placeholder="Optional…"
-                        className="mt-1 w-full resize-none rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[11px] text-white placeholder:text-white/25 outline-none focus:border-cyan-400/35"
-                      />
+            </div>
+            {docFile && !docError && (
+              <p className="mt-2 text-xs text-white/50">Selected file: {docFile.name}</p>
+            )}
+            {docError && <p className="mt-2 text-sm text-rose-300">{docError}</p>}
+          </div>
+          <ul className="space-y-2">
+            {(c.documents || []).map((d) => {
+              const fileId = d.fileId || d.driveFileId;
+              const title = d.label || d.name;
+              return (
+                <li key={d.id} className="glass-card flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+                  <div className="min-w-0">
+                    <span className="block truncate font-medium">{title}</span>
+                    <span className="text-xs text-white/40">
+                      {d.from}
+                      {d.label && d.name && d.label !== d.name ? ` · ${d.name}` : ""}
+                      {d.note ? ` · ${d.note}` : ""}
+                    </span>
+                  </div>
+                  {fileId && (
+                    <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => commentVaultDoc(active.id, index)}
-                        className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-400/25 bg-cyan-400/10 py-1.5 text-[10px] font-semibold text-cyan-100 hover:bg-cyan-400/15"
+                        className="btn-ghost inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs"
+                        disabled={fileBusy === fileId}
+                        onClick={() => viewFile(d, { errorKey: "doc" })}
                       >
-                        <MessageSquare size={12} /> Post comment
+                        <Eye size={13} /> {fileBusy === fileId ? "Opening…" : "View"}
                       </button>
+                      <button
+                        type="button"
+                        className="btn-ghost inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs"
+                        disabled={fileBusy === `dl:${fileId}`}
+                        onClick={() => downloadFile({ ...d, name: d.name || "document" }, { errorKey: "doc" })}
+                      >
+                        <Download size={13} /> Download
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+            {!(c.documents || []).length && (
+              <li className="text-sm text-white/45">No documents uploaded yet.</li>
+            )}
+          </ul>
+          <div className="border-t border-white/10 pt-4">
+            <h3 className="mb-2 text-sm font-medium">Request missing document (rare)</h3>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                value={reqLabel}
+                onChange={(e) => setReqLabel(e.target.value)}
+                placeholder="Document name"
+                className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+              />
+              <input
+                value={reqReason}
+                onChange={(e) => setReqReason(e.target.value)}
+                placeholder="Reason"
+                className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                disabled={!reqLabel.trim() || reqBusy}
+                className="btn-ghost rounded-xl px-4 py-2 text-sm disabled:opacity-50"
+                onClick={async () => {
+                  if (!reqLabel.trim() || reqBusy) return;
+                  setReqBusy(true);
+                  setReqError("");
+                  try {
+                    await requestDocument(customerEmail, { label: reqLabel, reason: reqReason });
+                    setReqLabel("");
+                    setReqReason("");
+                  } catch (e) {
+                    setReqError(e?.message || "Request failed");
+                  } finally {
+                    setReqBusy(false);
+                  }
+                }}
+              >
+                {reqBusy ? "Sending…" : "Request"}
+              </button>
+            </div>
+            {reqError && <p className="mt-2 text-sm text-rose-300">{reqError}</p>}
+            {(c.docRequests || []).filter((r) => r.status === "open").length > 0 && (
+              <ul className="mt-3 space-y-1">
+                {(c.docRequests || [])
+                  .filter((r) => r.status === "open")
+                  .map((r) => (
+                    <li key={r.id} className="text-xs text-amber-200/80">
+                      Open request: {r.label}
+                      {r.reason ? ` — ${r.reason}` : ""}
                     </li>
-                  );
-                })}
+                  ))}
               </ul>
-              {vaultDocQuery.trim() && filteredVaultDocEntries.length === 0 && (
-                <p className="mt-2 text-center text-[11px] text-white/40">No documents match.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === "chat" && (
+        <div className="glass-card flex h-[420px] flex-col overflow-hidden">
+          <div className="flex-1 space-y-2 overflow-y-auto p-4">
+            {msgs.map((m) => (
+              <div key={m.id} className={`text-sm ${m.fromRole === "customer" ? "text-white/70" : "text-[var(--gold)]/90"}`}>
+                <span className="text-[10px] text-white/35">{m.fromName}: </span>
+                {m.body}
+              </div>
+            ))}
+            {!msgs.length && <p className="text-sm text-white/40">No messages yet.</p>}
+          </div>
+          <form
+            className="flex gap-2 border-t border-white/10 p-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!chatBody.trim() || chatSending) return;
+              setChatSending(true);
+              try {
+                await sendMessage({
+                  customerEmail,
+                  caseId: c.id,
+                  fromRole: session?.role === ROLES.ADMIN ? "admin" : "operations",
+                  fromName: session?.name,
+                  fromEmail: session?.email,
+                  body: chatBody,
+                });
+                setChatBody("");
+              } catch {
+                /* keep body for retry */
+              } finally {
+                setChatSending(false);
+              }
+            }}
+          >
+            <input
+              value={chatBody}
+              onChange={(e) => setChatBody(e.target.value)}
+              className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+              placeholder="Reply to customer…"
+              disabled={chatSending}
+            />
+            <button type="submit" disabled={chatSending} className="btn-gold rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50">
+              Send
+            </button>
+          </form>
+        </div>
+      )}
+
+      {filePreview && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={filePreview.name}
+          onClick={closeFilePreview}
+        >
+          <div
+            className="relative flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0a0d14] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+              <p className="truncate text-sm font-medium text-white/90">{filePreview.name}</p>
+              <button
+                type="button"
+                className="rounded-lg p-2 text-white/60 hover:bg-white/10 hover:text-white"
+                onClick={closeFilePreview}
+                aria-label="Close preview"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="min-h-[50vh] flex-1 bg-black/40">
+              {String(filePreview.type).startsWith("image/") ? (
+                <img
+                  src={filePreview.url}
+                  alt={filePreview.name}
+                  className="mx-auto max-h-[80vh] w-auto object-contain p-4"
+                />
+              ) : (
+                <iframe
+                  title={filePreview.name}
+                  src={filePreview.url}
+                  className="h-[80vh] w-full border-0 bg-white"
+                />
               )}
             </div>
-          </aside>
-        ) : null}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

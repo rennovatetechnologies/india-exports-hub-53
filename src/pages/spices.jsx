@@ -58,7 +58,7 @@ export default function SpicesPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/30 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/70 via-transparent to-[var(--background)]/80" />
 
-        <div className="relative z-10 text-white px-4 mt-16 sm:mt-20">
+        <div className="relative z-10 text-white px-4 mt-6 sm:mt-8">
           <div className="inline-block mb-4">
             <div className="w-20 h-1 bg-[var(--gold)] mx-auto mb-3" />
             <h1 className="text-4xl sm:text-6xl font-bold mb-3 tracking-tight text-white">

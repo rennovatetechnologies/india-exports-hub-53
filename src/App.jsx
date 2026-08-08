@@ -1,8 +1,13 @@
-import { Routes, Route, Outlet, useLocation, Navigate } from "react-router-dom";
+import { Routes, Route, Outlet, useLocation, Navigate, useParams } from "react-router-dom";
 import { useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import DashboardChrome from "@/components/dashboard/DashboardChrome";
+import AuthGuard from "@/components/AuthGuard";
+import RedirectIfAuthenticated from "@/components/RedirectIfAuthenticated";
+import { startAppDataBootstrap } from "@/lib/appBootstrap";
+import { initSessionExpiryWatch } from "@/lib/authSession";
+import { PATHS, adminWorkflowPath } from "@/lib/routes";
 
 import Home from "@/pages/index.jsx";
 import About from "@/pages/about.jsx";
@@ -24,10 +29,13 @@ import Verify from "@/pages/verify.jsx";
 import Dashboard from "@/pages/dashboard.jsx";
 import DashBilling from "@/pages/dashboard__billing.jsx";
 import DashEvents from "@/pages/dashboard__events.jsx";
+import DashBrochures from "@/pages/dashboard__brochures.jsx";
+import DashProducts from "@/pages/dashboard__products.jsx";
 import DashKyc from "@/pages/dashboard__kyc.jsx";
 import DashSettings from "@/pages/dashboard__settings.jsx";
 import DashSupport from "@/pages/dashboard__support.jsx";
-import DashVault from "@/pages/dashboard__vault.jsx";
+import DashDocuments from "@/pages/dashboard__documents.jsx";
+import DashMessages from "@/pages/dashboard__messages.jsx";
 import DashWorkflow from "@/pages/dashboard__workflow.jsx";
 
 import Admin from "@/pages/admin.jsx";
@@ -35,6 +43,12 @@ import AdminWorkflow from "@/pages/admin-workflow.jsx";
 import AdminLogin from "@/pages/admin-login.jsx";
 import AdminRegister from "@/pages/admin-register.jsx";
 import AdminSuper from "@/pages/admin-super.jsx";
+
+/** Email/legacy `/ops/cases/:id` → canonical admin workflow. */
+function OpsCaseRedirect() {
+  const { caseId } = useParams();
+  return <Navigate to={adminWorkflowPath(caseId)} replace />;
+}
 
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
@@ -53,7 +67,7 @@ function ScrollToTop() {
 
 function PublicLayout() {
   return (
-    <>
+    <RedirectIfAuthenticated>
       <Navbar />
       <main className="relative isolate min-h-screen bg-[var(--background)] text-[var(--foreground)]">
         <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
@@ -68,7 +82,7 @@ function PublicLayout() {
         </div>
       </main>
       <Footer />
-    </>
+    </RedirectIfAuthenticated>
   );
 }
 
@@ -81,47 +95,96 @@ function ChromeLayout() {
 }
 
 export default function App() {
+  useEffect(() => {
+    initSessionExpiryWatch();
+    return startAppDataBootstrap();
+  }, []);
+
   return (
     <>
       <ScrollToTop />
       <Routes>
         <Route element={<PublicLayout />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/booking" element={<Booking />} />
-          <Route path="/brochures" element={<Brochures />} />
-          <Route path="/cerealsandpulses" element={<Cereals />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/events" element={<Events />} />
-          <Route path="/forgot-password" element={<Forgot />} />
-          <Route path="/fruitsandvegetables" element={<Fruits />} />
-          <Route path="/gallery" element={<Gallery />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/organicfood" element={<Organic />} />
-          <Route path="/others" element={<Others />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/spices" element={<Spices />} />
-          <Route path="/verify" element={<Verify />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin/register" element={<AdminRegister />} />
+          <Route path={PATHS.home} element={<Home />} />
+          <Route path={PATHS.about} element={<About />} />
+          <Route path={PATHS.booking} element={<Booking />} />
+          <Route path={PATHS.brochures} element={<Brochures />} />
+          <Route path={PATHS.cereals} element={<Cereals />} />
+          <Route path={PATHS.contact} element={<Contact />} />
+          <Route path={PATHS.events} element={<Events />} />
+          <Route path={PATHS.forgotPassword} element={<Forgot />} />
+          <Route path={PATHS.fruits} element={<Fruits />} />
+          <Route path={PATHS.gallery} element={<Gallery />} />
+          <Route path={PATHS.login} element={<Login />} />
+          <Route path={PATHS.organic} element={<Organic />} />
+          <Route path={PATHS.others} element={<Others />} />
+          <Route path={PATHS.signup} element={<Signup />} />
+          <Route path={PATHS.spices} element={<Spices />} />
+          <Route path={PATHS.verify} element={<Verify />} />
+          <Route path={PATHS.adminLogin} element={<AdminLogin />} />
+          <Route path={PATHS.adminRegister} element={<AdminRegister />} />
         </Route>
 
-        <Route path="/dashboard" element={<ChromeLayout />}>
+        <Route
+          path={PATHS.dashboard}
+          element={
+            <AuthGuard area="customer">
+              <ChromeLayout />
+            </AuthGuard>
+          }
+        >
           <Route index element={<Dashboard />} />
           <Route path="billing" element={<DashBilling />} />
           <Route path="events" element={<DashEvents />} />
+          <Route path="brochures" element={<DashBrochures />} />
+          <Route path="gallery" element={<Gallery />} />
+          <Route path="about" element={<About />} />
+          <Route path="contact" element={<Contact />} />
+          <Route path="booking" element={<Booking />} />
+          <Route path="products" element={<DashProducts />} />
+          <Route path="products/spices" element={<Spices />} />
+          <Route path="products/cerealsandpulses" element={<Cereals />} />
+          <Route path="products/organicfood" element={<Organic />} />
+          <Route path="products/fruitsandvegetables" element={<Fruits />} />
+          <Route path="products/others" element={<Others />} />
           <Route path="kyc" element={<DashKyc />} />
           <Route path="settings" element={<DashSettings />} />
           <Route path="support" element={<DashSupport />} />
-          <Route path="vault/:caseId?" element={<DashVault />} />
+          <Route path="documents" element={<DashDocuments />} />
+          <Route path="messages" element={<DashMessages />} />
+          <Route path="vault/:caseId?" element={<Navigate to={PATHS.dashboardDocuments} replace />} />
           <Route path="workflow" element={<DashWorkflow />} />
         </Route>
 
-        <Route path="/admin" element={<ChromeLayout />}>
+        <Route
+          path="/admin"
+          element={
+            <AuthGuard area="staff">
+              <ChromeLayout />
+            </AuthGuard>
+          }
+        >
           <Route index element={<Admin />} />
           <Route path="workflow/:caseId" element={<AdminWorkflow />} />
           <Route path="platform" element={<AdminSuper />} />
-          <Route path="super" element={<Navigate to="/admin/platform" replace />} />
+          <Route path="super" element={<Navigate to={PATHS.adminPlatform} replace />} />
+          <Route path="staff" element={<Navigate to={PATHS.adminPlatform} replace />} />
+          <Route path="support" element={<Navigate to={PATHS.dashboardSupport} replace />} />
+        </Route>
+
+        {/* Legacy / email deep-link aliases → canonical staff paths */}
+        <Route
+          path="/ops"
+          element={
+            <AuthGuard area="staff">
+              <Outlet />
+            </AuthGuard>
+          }
+        >
+          <Route index element={<Navigate to={PATHS.admin} replace />} />
+          <Route path="kyc" element={<Navigate to={PATHS.adminKycQueue} replace />} />
+          <Route path="cases/:caseId" element={<OpsCaseRedirect />} />
+          <Route path="bookings" element={<Navigate to={PATHS.dashboardEvents} replace />} />
         </Route>
       </Routes>
     </>

@@ -1,14 +1,32 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, ArrowRight } from "lucide-react";
 import AdminAuthShell from "@/components/auth/AdminAuthShell";
-import { startEmailOtp, OTP_PURPOSE } from "@/lib/authSession";
+import DemoLoginPanel, { staffDemoFilter } from "@/components/auth/DemoLoginPanel";
+import {
+  getSession,
+  isStaffSession,
+  startEmailOtp,
+  OTP_PURPOSE,
+  safeNextPath,
+  workspaceFor,
+} from "@/lib/authSession";
 
 export default function AdminLoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const session = getSession();
+    // Only bounce already-signed-in staff. A leftover customer demo session
+    // must not hijack /admin/login → /dashboard (or /dashboard/kyc).
+    if (!session || !isStaffSession(session)) return;
+    const next = safeNextPath(searchParams.get("next"));
+    navigate(next.startsWith("/admin") ? next : workspaceFor(session.role), { replace: true });
+  }, [navigate, searchParams]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -22,7 +40,8 @@ export default function AdminLoginPage() {
       setLoading(false);
       return;
     }
-    navigate("/verify?mode=staff");
+    const next = safeNextPath(searchParams.get("next"));
+    navigate(`/verify?mode=staff&next=${encodeURIComponent(next.startsWith("/admin") ? next : "/admin")}`);
   };
 
   return (
@@ -49,6 +68,7 @@ export default function AdminLoginPage() {
           Your role (operations or admin) comes from your <span className="text-white/70">approved</span> access request — same as production once the API is wired.
         </p>
       </form>
+      <DemoLoginPanel filter={staffDemoFilter} />
     </AdminAuthShell>
   );
 }

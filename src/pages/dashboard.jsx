@@ -1,143 +1,177 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  TrendingUp, FileCheck2, Workflow, Clock, ArrowUpRight,
-  CheckCircle2, Circle, Loader2, Upload, AlertCircle
+  ArrowUpRight,
+  CheckCircle2,
+  Circle,
+  Loader2,
+  FileText,
+  MessageSquare,
+  Workflow,
+  CalendarDays,
 } from "lucide-react";
 import { getSession } from "@/lib/authSession";
-
-const STAGES = [
-  { label: "IEC Issued", desc: "DGFT · 12 Apr", status: "done" },
-  { label: "AD Code Registration", desc: "ICEGATE · in review", status: "active" },
-  { label: "RCMC Application", desc: "APEDA · pending docs", status: "pending" },
-  { label: "First Shipment", desc: "Nagpur → Rotterdam", status: "pending" },
-];
-
-const ACTIONS = [
-  { title: "Upload GST certificate", meta: "KYC · required", icon: Upload, tone: "gold" },
-  { title: "Sign AD code authorization", meta: "Bank · awaiting e-sign", icon: AlertCircle, tone: "amber" },
-  { title: "Confirm HS code mapping", meta: "Spices · 0904.11", icon: FileCheck2, tone: "emerald" },
-];
-
-const ACTIVITY = [
-  { who: "Operations · Priya", what: "submitted IEC application to DGFT", when: "2h ago" },
-  { who: "You", what: "uploaded PAN card", when: "5h ago" },
-  { who: "System", what: "verified bank account ICICI ••4421", when: "Yesterday" },
-  { who: "Success · Karan", what: "scheduled shipment kickoff call", when: "2d ago" },
-];
+import {
+  ensureCaseForSession,
+  getCaseWorkflowStages,
+  journeyStatus,
+  CASE_STATUS,
+} from "@/lib/customerCase";
+import { getPlanById } from "@/lib/planCatalog";
+import { getMessagesForCase } from "@/lib/caseMessages";
 
 export default function DashboardOverview() {
   const session = getSession();
-  const kycDone = Boolean(session?.kycComplete);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const h = () => setTick((t) => t + 1);
+    window.addEventListener("iehub-case-updated", h);
+    window.addEventListener("iehub-messages-updated", h);
+    return () => {
+      window.removeEventListener("iehub-case-updated", h);
+      window.removeEventListener("iehub-messages-updated", h);
+    };
+  }, []);
+
+  const c = ensureCaseForSession();
+  const status = c ? journeyStatus(c) : CASE_STATUS.NO_PLAN;
+  const plan = getPlanById(c?.paidPlanId || c?.planId);
+  const stages = c ? getCaseWorkflowStages(c) : [];
+  const stageIdx = c?.stageIndex || 0;
+  const currentStage = stages[Math.min(stageIdx, Math.max(stages.length - 1, 0))];
+  const readyDocs = (c?.documents || []).filter((d) => d.from === "ops").slice(0, 3);
+  const openReqs = (c?.docRequests || []).filter((r) => r.status === "open");
+  const msgs = session?.email ? getMessagesForCase(session.email) : [];
+  const lastMsg = msgs[msgs.length - 1];
+
+  const hour = new Date().getHours();
+  const hello = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
+  let primary = { to: "/dashboard/workflow", label: "View workflow", hint: "See where your documentation stands" };
+  if (openReqs.length) {
+    primary = { to: "/dashboard/documents", label: "Upload requested document", hint: openReqs[0].label };
+  } else if (readyDocs.length) {
+    primary = { to: "/dashboard/documents", label: "Download ready documents", hint: `${readyDocs.length} from your ops team` };
+  } else if (lastMsg && lastMsg.fromRole !== "customer") {
+    primary = { to: "/dashboard/messages", label: "Reply to operations", hint: lastMsg.body.slice(0, 80) };
+  }
 
   return (
     <div className="space-y-8">
-      {/* Greeting */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-white/40">Workspace · Aurora Exports Pvt Ltd</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Good evening, Rohit</h1>
-          <p className="mt-1 text-sm text-white/55">Here's where your export operation stands today.</p>
+          <p className="text-xs uppercase tracking-[0.25em] text-white/40">
+            {session?.company || "Your workspace"}
+            {plan ? ` · ${plan.name}` : ""}
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+            {hello}, {(session?.name || "there").split(" ")[0]}
+          </h1>
+          <p className="mt-1 text-sm text-white/55">
+            {status === CASE_STATUS.ACTIVE
+              ? currentStage
+                ? `Current stage: ${currentStage.label}`
+                : "Your documentation workspace is ready."
+              : "Complete onboarding to unlock your workspace."}
+          </p>
         </div>
-        {kycDone ? (
-          <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-2.5 text-sm font-medium text-emerald-200">
-            <CheckCircle2 size={16} /> KYC verified
+        {c?.opsName && (
+          <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white/70">
+            Ops · {c.opsName}
           </span>
-        ) : (
-          <Link to="/dashboard/kyc" className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-black">
-            Continue KYC <ArrowUpRight size={15} />
-          </Link>
         )}
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: "Active plan", value: "Standard · one-time", sub: "Paid in full · 12 Apr 2026", icon: TrendingUp, accent: "text-[var(--gold)]" },
-          { label: "Onboarding", value: "62%", sub: "5 of 8 steps complete", icon: Workflow, accent: "text-emerald-300" },
-          { label: "Documents", value: "14 / 22", sub: "8 pending review", icon: FileCheck2, accent: "text-cyan-300" },
-          { label: "Avg response", value: "3h 12m", sub: "Success desk SLA", icon: Clock, accent: "text-fuchsia-300" },
-        ].map((c, i) => (
-          <motion.div
-            key={c.label}
-            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className="glass-card relative overflow-hidden p-5"
-          >
-            <div className="flex items-start justify-between">
-              <span className="text-[11px] uppercase tracking-[0.2em] text-white/45">{c.label}</span>
-              <c.icon size={16} className={c.accent} />
-            </div>
-            <div className="mt-3 text-2xl font-semibold">{c.value}</div>
-            <div className="mt-1 text-xs text-white/45">{c.sub}</div>
-            <div className="pointer-events-none absolute -bottom-12 -right-12 h-32 w-32 rounded-full bg-white/5 blur-2xl" />
-          </motion.div>
-        ))}
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-3xl border border-[var(--gold)]/20 bg-gradient-to-br from-[var(--gold)]/15 via-white/[0.04] to-transparent p-6 sm:p-8"
+      >
+        <p className="text-xs uppercase tracking-[0.2em] text-[var(--gold)]/90">Next step</p>
+        <h2 className="mt-2 text-xl font-semibold sm:text-2xl">{primary.label}</h2>
+        <p className="mt-1 max-w-xl text-sm text-white/55">{primary.hint}</p>
+        <Link
+          to={primary.to}
+          className="btn-gold mt-5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-black"
+        >
+          Continue <ArrowUpRight size={16} />
+        </Link>
+      </motion.div>
 
-      {/* Workflow + side widgets */}
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="glass-card p-6 lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold">Shipment workflow</h2>
-              <p className="text-xs text-white/45">Case #VST-2041 · Spices to Rotterdam</p>
+              <h2 className="text-lg font-semibold">Documentation workflow</h2>
+              <p className="text-xs text-white/45">Company formation &amp; registrations</p>
             </div>
-            <Link to="/dashboard/workflow" className="text-xs text-[var(--gold)] hover:underline">View timeline →</Link>
+            <Link to="/dashboard/workflow" className="text-xs text-[var(--gold)] hover:underline">
+              Full timeline →
+            </Link>
           </div>
-
-          <ol className="mt-6 space-y-5">
-            {STAGES.map((s, i) => (
-              <li key={s.label} className="flex gap-4">
-                <div className="flex flex-col items-center">
-                  {s.status === "done" ? (
-                    <CheckCircle2 size={20} className="text-emerald-400" />
-                  ) : s.status === "active" ? (
-                    <Loader2 size={20} className="animate-spin text-[var(--gold)]" />
-                  ) : (
-                    <Circle size={20} className="text-white/20" />
-                  )}
-                  {i < STAGES.length - 1 && <span className="mt-1 h-12 w-px bg-white/10" />}
-                </div>
-                <div className="pb-2">
-                  <div className="text-sm font-medium">{s.label}</div>
-                  <div className="text-xs text-white/45">{s.desc}</div>
-                </div>
-              </li>
-            ))}
+          <ol className="mt-6 space-y-4">
+            {stages.slice(0, 5).map((s, i) => {
+              const done = i < stageIdx;
+              const active = i === stageIdx;
+              return (
+                <li key={s.id} className="flex gap-4">
+                  <div className="flex flex-col items-center">
+                    {done ? (
+                      <CheckCircle2 size={20} className="text-emerald-400" />
+                    ) : active ? (
+                      <Loader2 size={20} className="animate-spin text-[var(--gold)]" />
+                    ) : (
+                      <Circle size={20} className="text-white/20" />
+                    )}
+                    {i < Math.min(stages.length, 5) - 1 && <span className="mt-1 h-8 w-px bg-white/10" />}
+                  </div>
+                  <div>
+                    <div className={`text-sm font-medium ${active ? "text-white" : "text-white/70"}`}>{s.label}</div>
+                    <div className="text-xs text-white/40">{s.description}</div>
+                  </div>
+                </li>
+              );
+            })}
+            {!stages.length && (
+              <p className="text-sm text-white/45">Workflow appears after your plan is active.</p>
+            )}
           </ol>
         </div>
 
         <div className="space-y-4">
-          <div className="glass-card p-5">
-            <h3 className="text-sm font-semibold">Next actions</h3>
-            <ul className="mt-4 space-y-3">
-              {ACTIONS.map((a) => (
-                <li key={a.title} className="flex items-start gap-3 rounded-xl bg-white/5 p-3">
-                  <a.icon size={16} className={a.tone === "gold" ? "text-[var(--gold)]" : a.tone === "amber" ? "text-amber-300" : "text-emerald-300"} />
-                  <div className="flex-1">
-                    <div className="text-sm">{a.title}</div>
-                    <div className="text-[11px] text-white/45">{a.meta}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="glass-card p-5">
-            <h3 className="text-sm font-semibold">Recent activity</h3>
-            <ul className="mt-4 space-y-3 text-sm">
-              {ACTIVITY.map((a, i) => (
-                <li key={i} className="flex justify-between gap-3 border-b border-white/5 pb-3 last:border-none last:pb-0">
-                  <div>
-                    <span className="text-white/80">{a.who}</span>{" "}
-                    <span className="text-white/50">{a.what}</span>
-                  </div>
-                  <span className="shrink-0 text-[11px] text-white/35">{a.when}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <Link to="/dashboard/documents" className="glass-card block p-5 transition hover:bg-white/[0.04]">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <FileText size={16} className="text-cyan-300" /> Documents
+            </div>
+            <p className="mt-2 text-xs text-white/45">
+              {readyDocs.length
+                ? `${readyDocs.length} ready to download`
+                : openReqs.length
+                  ? `${openReqs.length} requested from you`
+                  : "Uploads and deliveries live here"}
+            </p>
+          </Link>
+          <Link to="/dashboard/messages" className="glass-card block p-5 transition hover:bg-white/[0.04]">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <MessageSquare size={16} className="text-[var(--gold)]" /> Messages
+            </div>
+            <p className="mt-2 line-clamp-2 text-xs text-white/45">
+              {lastMsg ? lastMsg.body : "Chat with your operations owner"}
+            </p>
+          </Link>
+          <Link to="/dashboard/events" className="glass-card block p-5 transition hover:bg-white/[0.04]">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <CalendarDays size={16} className="text-emerald-300" /> Events
+            </div>
+            <p className="mt-2 text-xs text-white/45">Browse upcoming meets &amp; summits (fees apply to all plans)</p>
+          </Link>
+          <Link to="/dashboard/workflow" className="glass-card block p-5 transition hover:bg-white/[0.04]">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Workflow size={16} className="text-fuchsia-300" /> Workflow
+            </div>
+            <p className="mt-2 text-xs text-white/45">Stage-by-stage progress for your case</p>
+          </Link>
         </div>
       </div>
     </div>

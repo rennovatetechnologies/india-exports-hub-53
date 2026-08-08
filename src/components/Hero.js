@@ -23,7 +23,7 @@ export default function Hero() {
 
   const openBooking = () => {
     if (!isAuthenticated()) {
-      navigate(`/login?next=${encodeURIComponent("/")}`);
+      navigate(`/login?next=${encodeURIComponent("/dashboard")}`);
       return;
     }
     setOpen(true);
@@ -31,7 +31,7 @@ export default function Hero() {
 
   const openEventBooking = () => {
     if (!isAuthenticated()) {
-      navigate(`/login?next=${encodeURIComponent("/events#register")}`);
+      navigate(`/login?next=${encodeURIComponent("/dashboard")}`);
       return;
     }
     setEventOpen(true);
@@ -39,7 +39,7 @@ export default function Hero() {
 
   return (
     <>
-      <section className="relative isolate min-h-[100svh] overflow-hidden pt-28 pb-20 md:pt-32 md:pb-28">
+      <section className="relative isolate min-h-[100svh] overflow-hidden pt-20 pb-20 md:pt-24 md:pb-28">
         {/* Full-bleed hero photo + overlays (headline sits on the image) */}
         <div className="pointer-events-none absolute inset-0 z-0">
           <img
@@ -67,7 +67,7 @@ export default function Hero() {
                 className="inline-flex items-center gap-2 rounded-full glass px-3.5 py-1.5 text-xs uppercase tracking-[0.18em] text-white/80"
               >
                 <Sparkles size={14} className="text-[var(--gold)]" />
-                <span>New India Export · Global Trade OS</span>
+                <span>VIRASTRA INTERNATIONAL EXPORT · where trust travels</span>
               </motion.div>
 
               <motion.h1
