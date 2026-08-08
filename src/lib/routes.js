@@ -39,7 +39,6 @@ export const PATHS = {
   dashboardProductsOthers: "/dashboard/products/others",
   dashboardBooking: "/dashboard/booking",
   dashboardKyc: "/dashboard/kyc",
-  dashboardSettings: "/dashboard/settings",
   dashboardSupport: "/dashboard/support",
   dashboardDocuments: "/dashboard/documents",
   dashboardMessages: "/dashboard/messages",
@@ -51,6 +50,9 @@ export const PATHS = {
   adminPlatform: "/admin/platform",
   /** Staff access requests live on the control center */
   adminStaff: "/admin/platform",
+  /** Admin payment ledger (week / month filters) */
+  adminAudit: "/admin/audit",
+  adminPayments: "/admin/audit",
   /** Shared support surface (staff + customer) */
   adminSupport: "/dashboard/support",
   adminKycQueue: "/admin?filter=pending_kyc",

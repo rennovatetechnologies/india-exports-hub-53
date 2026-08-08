@@ -2,12 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Send } from "lucide-react";
 import { getSession, ROLES } from "@/lib/authSession";
 import {
-  fetchCasesQueue,
   listAllCases,
   listCasesForOps,
   getCustomerCase,
-  ensureCaseForSession,
-  fetchMyCase,
 } from "@/lib/customerCase";
 import { fetchMessagesForCase, getMessagesForCase, sendMessage } from "@/lib/caseMessages";
 
@@ -33,24 +30,8 @@ export default function MessagesPage() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        if (session?.role === ROLES.CUSTOMER) {
-          await fetchMyCase({ force: true });
-          ensureCaseForSession();
-        } else {
-          await fetchCasesQueue({ force: true });
-        }
-      } catch {
-        /* ignore */
-      } finally {
-        if (!cancelled) setQueueReady(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    // Use bootstrap/cache; staff can hit header Refresh for a force reload.
+    setQueueReady(true);
   }, [session?.role, session?.email]);
 
   const isCustomer = session?.role === ROLES.CUSTOMER;

@@ -1,35 +1,13 @@
 import { api } from "@/lib/api";
-import { allowAuthMock, normalizeEmail } from "@/lib/authSession";
+import { normalizeEmail } from "@/lib/authSession";
 import { getCustomerCase } from "@/lib/customerCase";
 
-const LEGACY_KEY = "vistara_case_messages_v1";
-
-/** @type {Record<string, object[]>} keyed by caseId */
+/** @type {Record<string, object[]>} last API snapshot by caseId */
 const cacheByCaseId = {};
 
 function emit() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent("iehub-messages-updated"));
-}
-
-function loadLegacy() {
-  try {
-    const raw = localStorage.getItem(LEGACY_KEY);
-    if (!raw) return {};
-    const p = JSON.parse(raw);
-    return p && typeof p === "object" ? p : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveLegacy(map) {
-  try {
-    localStorage.setItem(LEGACY_KEY, JSON.stringify(map));
-  } catch {
-    /* ignore */
-  }
-  emit();
 }
 
 function normalizeMsg(m) {
@@ -55,125 +33,51 @@ export function resolveCaseId(customerEmailOrCase) {
   return getCustomerCase(email)?.id || null;
 }
 
-/** Sync read from in-memory cache (and legacy localStorage for mock). */
+/** Sync read from last API snapshot only. */
 export function getMessagesForCase(customerEmailOrCase) {
   const caseId = resolveCaseId(customerEmailOrCase);
   if (caseId && Array.isArray(cacheByCaseId[caseId])) {
     return cacheByCaseId[caseId].map((m) => ({ ...m }));
   }
-  const email =
-    customerEmailOrCase && typeof customerEmailOrCase === "object"
-      ? normalizeEmail(customerEmailOrCase.customerEmail)
-      : normalizeEmail(customerEmailOrCase);
-  if (!email) return [];
-  const legacy = loadLegacy()[email];
-  return Array.isArray(legacy) ? legacy.map((m) => ({ ...m })) : [];
+  return [];
 }
 
-export async function fetchMessagesForCase(customerEmailOrCase, { force = false } = {}) {
+/** Always load messages from Mongo. */
+export async function fetchMessagesForCase(customerEmailOrCase) {
   const caseId = resolveCaseId(customerEmailOrCase);
-  if (!caseId) return getMessagesForCase(customerEmailOrCase);
+  if (!caseId) return [];
 
-  if (!force && Array.isArray(cacheByCaseId[caseId]) && cacheByCaseId[caseId].length) {
-    return cacheByCaseId[caseId].map((m) => ({ ...m }));
-  }
-
-  try {
-    const data = await api(`/api/cases/${encodeURIComponent(caseId)}/messages`);
-    const list = Array.isArray(data) ? data : data?.items || data?.data || [];
-    let msgs = list.map(normalizeMsg).filter(Boolean);
-
-    // One-time migrate browser-local demo messages into the shared case thread.
-    if (!msgs.length) {
-      const email =
-        customerEmailOrCase && typeof customerEmailOrCase === "object"
-          ? normalizeEmail(customerEmailOrCase.customerEmail)
-          : normalizeEmail(customerEmailOrCase);
-      const legacy = email ? loadLegacy()[email] : null;
-      if (Array.isArray(legacy) && legacy.length) {
-        for (const m of legacy) {
-          const text = String(m?.body || "").trim();
-          if (!text) continue;
-          try {
-            const posted = await api(`/api/cases/${encodeURIComponent(caseId)}/messages`, {
-              method: "POST",
-              body: { body: text },
-            });
-            const nm = normalizeMsg(posted?.data || posted);
-            if (nm) msgs.push(nm);
-          } catch {
-            break;
-          }
-        }
-        if (msgs.length) {
-          const all = loadLegacy();
-          delete all[email];
-          saveLegacy(all);
-        }
-      }
-    }
-
-    cacheByCaseId[caseId] = msgs;
-    emit();
-    return msgs.map((m) => ({ ...m }));
-  } catch (e) {
-    console.warn("[messages] fetch failed", e.message);
-    return getMessagesForCase(customerEmailOrCase);
-  }
+  const data = await api(`/api/cases/${encodeURIComponent(caseId)}/messages`);
+  const list = Array.isArray(data) ? data : data?.items || data?.data || [];
+  const msgs = list.map(normalizeMsg).filter(Boolean);
+  cacheByCaseId[caseId] = msgs;
+  emit();
+  return msgs.map((m) => ({ ...m }));
 }
 
-export async function sendMessage({ customerEmail, caseId: caseIdArg, fromRole, fromName, fromEmail, body }) {
+export async function sendMessage({ customerEmail, caseId: caseIdArg, body }) {
   const text = String(body || "").trim();
   const email = normalizeEmail(customerEmail);
   const caseId = caseIdArg || resolveCaseId(email) || resolveCaseId(customerEmail);
   if (!text) return null;
+  if (!caseId) throw new Error("Case not loaded — cannot send message");
 
-  if (caseId) {
-    try {
-      const data = await api(`/api/cases/${encodeURIComponent(caseId)}/messages`, {
-        method: "POST",
-        body: { body: text },
-      });
-      const msg = normalizeMsg(data?.data || data);
-      if (msg) {
-        const prev = Array.isArray(cacheByCaseId[caseId]) ? cacheByCaseId[caseId] : [];
-        cacheByCaseId[caseId] = [...prev, msg];
-        emit();
-        return msg;
-      }
-    } catch (e) {
-      console.warn("[messages] send failed", e.message);
-      if (!allowAuthMock()) throw e;
-    }
+  const data = await api(`/api/cases/${encodeURIComponent(caseId)}/messages`, {
+    method: "POST",
+    body: { body: text },
+  });
+  const msg = normalizeMsg(data?.data || data);
+  if (msg) {
+    await fetchMessagesForCase({ id: caseId, customerEmail: email });
+    return msg;
   }
-
-  // Demo / offline fallback — browser-local only (not shared across users).
-  if (!email) return null;
-  const all = loadLegacy();
-  const list = Array.isArray(all[email]) ? all[email] : [];
-  const msg = {
-    id: `msg-${Date.now()}`,
-    caseId: caseId || null,
-    fromRole: fromRole || "customer",
-    fromName: fromName || fromEmail || "User",
-    fromEmail: normalizeEmail(fromEmail),
-    body: text,
-    createdAt: new Date().toISOString(),
-  };
-  all[email] = [...list, msg];
-  if (caseId) {
-    const prev = Array.isArray(cacheByCaseId[caseId]) ? cacheByCaseId[caseId] : [];
-    cacheByCaseId[caseId] = [...prev, msg];
-  }
-  saveLegacy(all);
-  return msg;
+  return null;
 }
 
-export function unreadCount(customerEmail, readerRole) {
-  const msgs = getMessagesForCase(customerEmail);
-  if (!msgs.length) return 0;
-  if (readerRole === "customer") {
-    return msgs.filter((m) => m.fromRole !== "customer").length > 0 ? 0 : 0;
+export function unreadCountForCase(customerEmailOrCase, viewerRole) {
+  const msgs = getMessagesForCase(customerEmailOrCase);
+  if (viewerRole === "customer") {
+    return msgs.filter((m) => m.fromRole !== "customer" && !m.readAt).length;
   }
-  return 0;
+  return msgs.filter((m) => m.fromRole === "customer" && !m.readAt).length;
 }

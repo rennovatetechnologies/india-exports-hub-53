@@ -32,7 +32,6 @@ import DashEvents from "@/pages/dashboard__events.jsx";
 import DashBrochures from "@/pages/dashboard__brochures.jsx";
 import DashProducts from "@/pages/dashboard__products.jsx";
 import DashKyc from "@/pages/dashboard__kyc.jsx";
-import DashSettings from "@/pages/dashboard__settings.jsx";
 import DashSupport from "@/pages/dashboard__support.jsx";
 import DashDocuments from "@/pages/dashboard__documents.jsx";
 import DashMessages from "@/pages/dashboard__messages.jsx";
@@ -43,6 +42,7 @@ import AdminWorkflow from "@/pages/admin-workflow.jsx";
 import AdminLogin from "@/pages/admin-login.jsx";
 import AdminRegister from "@/pages/admin-register.jsx";
 import AdminSuper from "@/pages/admin-super.jsx";
+import AdminAudit from "@/pages/admin-audit.jsx";
 
 /** Email/legacy `/ops/cases/:id` → canonical admin workflow. */
 function OpsCaseRedirect() {
@@ -148,7 +148,6 @@ export default function App() {
           <Route path="products/fruitsandvegetables" element={<Fruits />} />
           <Route path="products/others" element={<Others />} />
           <Route path="kyc" element={<DashKyc />} />
-          <Route path="settings" element={<DashSettings />} />
           <Route path="support" element={<DashSupport />} />
           <Route path="documents" element={<DashDocuments />} />
           <Route path="messages" element={<DashMessages />} />
@@ -167,6 +166,7 @@ export default function App() {
           <Route index element={<Admin />} />
           <Route path="workflow/:caseId" element={<AdminWorkflow />} />
           <Route path="platform" element={<AdminSuper />} />
+          <Route path="audit" element={<AdminAudit />} />
           <Route path="super" element={<Navigate to={PATHS.adminPlatform} replace />} />
           <Route path="staff" element={<Navigate to={PATHS.adminPlatform} replace />} />
           <Route path="support" element={<Navigate to={PATHS.dashboardSupport} replace />} />

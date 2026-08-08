@@ -22,7 +22,6 @@ import {
   Workflow,
   CalendarDays,
   CreditCard,
-  Settings,
   LifeBuoy,
   Bell,
   Search,
@@ -36,6 +35,7 @@ import {
   Users,
   Compass,
   BookOpen,
+  RefreshCw,
 } from "lucide-react";
 
 const CUSTOMER_NAV_FULL = [
@@ -58,6 +58,7 @@ const CUSTOMER_NAV_GATED = [
 const OPS_NAV = [
   { href: PATHS.admin, label: "My cases", icon: Briefcase },
   { href: PATHS.dashboardMessages, label: "Messages", icon: MessageSquare },
+  { href: PATHS.dashboardEvents, label: "Events", icon: CalendarDays },
   { href: PATHS.dashboardBrochures, label: "Brochures", icon: BookOpen },
 ];
 
@@ -67,11 +68,11 @@ const ADMIN_NAV = [
   { href: PATHS.dashboardMessages, label: "Messages", icon: MessageSquare },
   { href: PATHS.dashboardBilling, label: "Plans", icon: CreditCard },
   { href: PATHS.dashboardEvents, label: "Events", icon: CalendarDays },
+  { href: PATHS.adminAudit, label: "Payments", icon: CreditCard },
   { href: PATHS.dashboardBrochures, label: "Brochures", icon: BookOpen },
 ];
 
 const FOOTER_NAV = [
-  { href: PATHS.dashboardSettings, label: "Settings", icon: Settings },
   { href: PATHS.dashboardSupport, label: "Support", icon: LifeBuoy },
 ];
 
@@ -87,6 +88,7 @@ export default function DashboardChrome({ children }) {
   const [open, setOpen] = useState(false);
   const [workspaceQ, setWorkspaceQ] = useState("");
   const [caseTick, setCaseTick] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const [session, setSessionState] = useState(() =>
     typeof window !== "undefined" ? getSession() : null
   );
@@ -95,20 +97,16 @@ export default function DashboardChrome({ children }) {
 
   useEffect(() => {
     fetchPlanCatalog().catch(() => {});
-    const session = getSession();
-    if (session?.role === ROLES.CUSTOMER) fetchMyCase({ force: true }).catch(() => {});
-    if (session?.role === ROLES.ADMIN || session?.role === ROLES.OPERATIONS) {
-      fetchCasesQueue({ force: true }).catch(() => {});
-    }
   }, []);
 
   useEffect(() => {
     setSessionState(getSession());
     return subscribeAuth((next) => {
       setSessionState(next);
-      if (next?.role === ROLES.CUSTOMER) fetchMyCase({ force: true }).catch(() => {});
+      // Cold load after login only — no background polling for everyone.
+      if (next?.role === ROLES.CUSTOMER) fetchMyCase().catch(() => {});
       if (next?.role === ROLES.ADMIN || next?.role === ROLES.OPERATIONS) {
-        fetchCasesQueue({ force: true }).catch(() => {});
+        fetchCasesQueue().catch(() => {});
       }
     });
   }, []);
@@ -173,13 +171,16 @@ export default function DashboardChrome({ children }) {
   }, []);
 
   const isAdminShell = pathname.startsWith("/admin");
+  // Gate using cached case. Only hit the network if we have no snapshot yet —
+  // never re-fetch on caseTick (that used to loop: fetch → emit → tick → fetch).
   useEffect(() => {
     if (isAdminShell) return;
     if (!session?.email) return;
     if ((session.role || ROLES.CUSTOMER) !== ROLES.CUSTOMER) return;
     let cancelled = false;
     (async () => {
-      const c = (await fetchMyCase()) || ensureCaseForSession();
+      let c = ensureCaseForSession();
+      if (!c) c = await fetchMyCase();
       if (cancelled || !c) return;
       if (isPathAllowedDuringGate(pathname, c)) return;
       navigate(gatePathForCase(c), { replace: true });
@@ -199,6 +200,21 @@ export default function DashboardChrome({ children }) {
   const signOut = () => {
     clearSession();
     navigate(PATHS.login, { replace: true });
+  };
+
+  const refreshWorkspace = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      if (role === ROLES.CUSTOMER) await fetchMyCase({ force: true });
+      else if (role === ROLES.ADMIN || role === ROLES.OPERATIONS) {
+        await fetchCasesQueue({ force: true });
+      }
+    } catch {
+      /* ignore — UI keeps last good snapshot */
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const statusLabel =
@@ -381,10 +397,21 @@ export default function DashboardChrome({ children }) {
             </div>
             <div className="flex flex-1 sm:hidden" />
 
+            <button
+              type="button"
+              onClick={refreshWorkspace}
+              disabled={refreshing}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg glass px-2.5 text-sm text-white/70 hover:text-white disabled:opacity-50"
+              aria-label="Refresh"
+              title="Refresh"
+            >
+              <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
+              <span className="hidden sm:inline">{refreshing ? "Refreshing…" : "Refresh"}</span>
+            </button>
             <button type="button" className="relative flex h-9 w-9 items-center justify-center rounded-lg glass">
               <Bell size={16} />
             </button>
-            <Link to={PATHS.dashboardSettings} className="flex h-9 items-center gap-2 rounded-lg glass px-2 pr-3">
+            <div className="flex h-9 items-center gap-2 rounded-lg glass px-2 pr-3">
               <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--grad-gold)] text-xs font-bold text-black">
                 {initials}
               </span>
@@ -392,7 +419,7 @@ export default function DashboardChrome({ children }) {
               <span className={`hidden md:inline rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider ${meta.chip}`}>
                 {meta.label}
               </span>
-            </Link>
+            </div>
             <button
               type="button"
               onClick={signOut}

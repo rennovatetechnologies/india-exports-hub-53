@@ -9,7 +9,6 @@ import {
   journeyStatus,
   CASE_STATUS,
   getCaseWorkflowStages,
-  fetchCasesQueue,
 } from "@/lib/customerCase";
 import { getPlanById, fetchPlanCatalog } from "@/lib/planCatalog";
 import { adminWorkflowPath } from "@/lib/routes";
@@ -27,7 +26,6 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetchPlanCatalog().catch(() => {});
-    fetchCasesQueue({ force: true }).catch(() => {});
     const h = () => setTick((t) => t + 1);
     window.addEventListener("iehub-case-updated", h);
     return () => window.removeEventListener("iehub-case-updated", h);

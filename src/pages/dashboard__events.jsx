@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Calendar, MapPin, Users, Check, Save, Plus, Trash2, Pencil, ArrowLeft, AlertCircle,
+  Mail, Send,
 } from "lucide-react";
 import { getSession, ROLES } from "@/lib/authSession";
 import {
@@ -22,8 +23,14 @@ import {
   unregisterFromEvent,
   isEmailRegistered,
   seedEventRegistrationsIfNeeded,
+  fetchEventRegistrationCounts,
+  fetchEventRegistrations,
+  fetchMyEventRegistrations,
+  notifyEventRegistrants,
+  fetchEventCommunications,
 } from "@/lib/eventsCatalog";
 import { getCustomerCase } from "@/lib/customerCase";
+import { PATHS } from "@/lib/routes";
 
 const emptyDraft = () => ({
   id: `e${Date.now()}`,
@@ -35,6 +42,12 @@ const emptyDraft = () => ({
   desc: "",
 });
 
+const NOTIFY_KINDS = [
+  { value: "reschedule", label: "Reschedule" },
+  { value: "followup", label: "Follow-up" },
+  { value: "update", label: "General update" },
+];
+
 function AdminEventsEditor() {
   const [events, setEvents] = useState(() => loadEventsCatalog());
   const [regTick, setRegTick] = useState(0);
@@ -42,9 +55,26 @@ function AdminEventsEditor() {
   const [editKey, setEditKey] = useState(null);
   const [draft, setDraft] = useState(null);
   const [detailId, setDetailId] = useState(null);
+  const [loadingRegs, setLoadingRegs] = useState(false);
+  const [comms, setComms] = useState([]);
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [notifyKind, setNotifyKind] = useState("followup");
+  const [notifyMessage, setNotifyMessage] = useState("");
+  const [notifySubject, setNotifySubject] = useState("");
+  const [notifyDate, setNotifyDate] = useState("");
+  const [notifyCity, setNotifyCity] = useState("");
+  const [notifyBusy, setNotifyBusy] = useState(false);
+  const [notifyMsg, setNotifyMsg] = useState("");
+  const [notifyAllUsers, setNotifyAllUsers] = useState(false);
 
   useEffect(() => {
-    fetchEventsCatalog().then(setEvents).catch(() => {});
+    fetchEventsCatalog()
+      .then(async (list) => {
+        setEvents(list);
+        await fetchEventRegistrationCounts();
+        setRegTick((t) => t + 1);
+      })
+      .catch(() => {});
     seedEventRegistrationsIfNeeded();
     const h = () => setEvents(loadEventsCatalog());
     const hr = () => setRegTick((t) => t + 1);
@@ -55,6 +85,29 @@ function AdminEventsEditor() {
       window.removeEventListener("iehub-event-regs-updated", hr);
     };
   }, []);
+
+  useEffect(() => {
+    if (!detailId) {
+      setComms([]);
+      setNotifyOpen(false);
+      setNotifyMsg("");
+      return;
+    }
+    let cancelled = false;
+    setLoadingRegs(true);
+    (async () => {
+      await fetchEventRegistrations(detailId);
+      const history = await fetchEventCommunications(detailId);
+      if (!cancelled) {
+        setComms(history);
+        setRegTick((t) => t + 1);
+        setLoadingRegs(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [detailId]);
 
   const openEditExisting = useCallback((id) => {
     const ev = events.find((e) => e.id === id);
@@ -98,10 +151,11 @@ function AdminEventsEditor() {
     let next;
     if (editKey === "new") {
       next = [...events, payload];
+      void saveEventsCatalog(next, { onlyIds: [payload.id] });
     } else {
       next = events.map((e) => (e.id === editKey ? { ...payload, id: editKey } : e));
+      void saveEventsCatalog(next, { onlyIds: [editKey] });
     }
-    void saveEventsCatalog(next);
     setEvents(next);
     setSavedAt(new Date());
     leaveEdit();
@@ -116,6 +170,39 @@ function AdminEventsEditor() {
     leaveEdit();
   };
 
+  const sendNotify = async () => {
+    if (!detailId || !notifyMessage.trim()) return;
+    setNotifyBusy(true);
+    setNotifyMsg("");
+    try {
+      const result = await notifyEventRegistrants(detailId, {
+        kind: notifyKind,
+        message: notifyMessage.trim(),
+        subject: notifySubject.trim() || undefined,
+        newDate: notifyKind === "reschedule" ? notifyDate || undefined : undefined,
+        newCity: notifyKind === "reschedule" ? notifyCity || undefined : undefined,
+        notifyAllUsers,
+      });
+      setNotifyMsg(
+        notifyAllUsers
+          ? `Sent to ${result?.recipientCount || 0} user(s) (registrants + all customers).`
+          : `Sent to ${result?.recipientCount || 0} registrant(s).`
+      );
+      setNotifyMessage("");
+      setNotifySubject("");
+      const history = await fetchEventCommunications(detailId);
+      setComms(history);
+      if (notifyKind === "reschedule") {
+        const refreshed = await fetchEventsCatalog({ force: true });
+        setEvents(refreshed);
+      }
+    } catch (e) {
+      setNotifyMsg(e?.message || "Could not send.");
+    } finally {
+      setNotifyBusy(false);
+    }
+  };
+
   const isEditing = editKey !== null && draft;
   const detailEvent = detailId ? events.find((e) => e.id === detailId) : null;
   const detailRegs = detailEvent ? getEventRegistrations(detailEvent.id) : [];
@@ -128,13 +215,21 @@ function AdminEventsEditor() {
           <p className="mt-1 text-sm text-white/55">
             {isEditing
               ? "Set date, image, and seat capacity. Registrations update the fill count automatically."
-              : "See how many people registered and whether seats are full. Edit an event to change details."}
+              : "See who registered, email them for reschedules or follow-ups, and track seat fill."}
           </p>
         </div>
         {!isEditing ? (
-          <button type="button" onClick={openNew} className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold">
-            <Plus size={16} /> Add event
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to={PATHS.adminPayments}
+              className="btn-ghost inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+            >
+              Payments
+            </Link>
+            <button type="button" onClick={openNew} className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold">
+              <Plus size={16} /> Add event
+            </button>
+          </div>
         ) : (
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={leaveEdit} className="btn-ghost inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold">
@@ -246,7 +341,6 @@ function AdminEventsEditor() {
             const left = seatsRemaining(ev);
             const full = isEventFull(ev);
             const pct = ev.capacity ? Math.min(100, Math.round((used / ev.capacity) * 100)) : 0;
-            // regTick forces re-read when registrations change
             void regTick;
             return (
               <motion.article key={ev.id} layout className="glass-card flex flex-col overflow-hidden">
@@ -320,11 +414,12 @@ function AdminEventsEditor() {
 
       {!isEditing && (
         <p className="text-xs text-white/40">
-          Tip: open{" "}
-          <Link to="/dashboard/billing" className="text-[var(--gold)] hover:underline">
-            Plans
+          Event fees apply to every plan. Saving an event emails all registrants
+          automatically. Open{" "}
+          <Link to={PATHS.adminPayments} className="text-[var(--gold)] hover:underline">
+            Payments
           </Link>{" "}
-          to mark which plans include free event seats.
+          for the payment ledger.
         </p>
       )}
 
@@ -365,11 +460,110 @@ function AdminEventsEditor() {
                 </div>
               )}
 
+              <div className="mt-5 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setNotifyOpen((o) => !o)}
+                  className="btn-gold inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold"
+                >
+                  <Mail size={15} /> {notifyOpen ? "Hide compose" : "Email attendees"}
+                </button>
+              </div>
+
+              {notifyOpen && (
+                <div className="mt-4 space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                  <label className="block text-[11px] uppercase tracking-wider text-white/45">
+                    Type
+                    <select
+                      value={notifyKind}
+                      onChange={(e) => setNotifyKind(e.target.value)}
+                      className="mt-1.5 w-full rounded-lg border border-white/10 bg-white/[0.03] px-2 py-2 text-sm text-white outline-none"
+                    >
+                      {NOTIFY_KINDS.map((k) => (
+                        <option key={k.value} value={k.value}>{k.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {notifyKind === "reschedule" && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block text-[11px] uppercase tracking-wider text-white/45">
+                        New date
+                        <input
+                          type="date"
+                          value={notifyDate}
+                          onChange={(e) => setNotifyDate(e.target.value)}
+                          className="mt-1.5 w-full rounded-lg border border-white/10 bg-white/[0.03] px-2 py-2 text-sm text-white outline-none [color-scheme:dark]"
+                        />
+                      </label>
+                      <label className="block text-[11px] uppercase tracking-wider text-white/45">
+                        New city
+                        <input
+                          value={notifyCity}
+                          onChange={(e) => setNotifyCity(e.target.value)}
+                          className="mt-1.5 w-full rounded-lg border border-white/10 bg-white/[0.03] px-2 py-2 text-sm text-white outline-none"
+                        />
+                      </label>
+                    </div>
+                  )}
+                  <label className="block text-[11px] uppercase tracking-wider text-white/45">
+                    Subject (optional)
+                    <input
+                      value={notifySubject}
+                      onChange={(e) => setNotifySubject(e.target.value)}
+                      placeholder="Leave blank for default"
+                      className="mt-1.5 w-full rounded-lg border border-white/10 bg-white/[0.03] px-2 py-2 text-sm text-white outline-none"
+                    />
+                  </label>
+                  <label className="block text-[11px] uppercase tracking-wider text-white/45">
+                    Message
+                    <textarea
+                      value={notifyMessage}
+                      onChange={(e) => setNotifyMessage(e.target.value)}
+                      rows={4}
+                      placeholder="Share reschedule details, agenda notes, or a follow-up ask…"
+                      className="mt-1.5 w-full resize-y rounded-lg border border-white/10 bg-white/[0.03] px-2 py-2 text-sm text-white outline-none"
+                    />
+                  </label>
+                  <label className="flex items-start gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5 text-xs text-white/70">
+                    <input
+                      type="checkbox"
+                      checked={notifyAllUsers}
+                      onChange={(e) => setNotifyAllUsers(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      Also notify all platform users
+                      <span className="mt-0.5 block text-[11px] text-white/40">
+                        Emails every customer account, not only this event&apos;s registrants.
+                      </span>
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={
+                      notifyBusy ||
+                      !notifyMessage.trim() ||
+                      (!notifyAllUsers && detailRegs.length === 0)
+                    }
+                    onClick={sendNotify}
+                    className="btn-gold inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold disabled:opacity-50"
+                  >
+                    <Send size={14} />{" "}
+                    {notifyBusy
+                      ? "Sending…"
+                      : notifyAllUsers
+                        ? "Send to all users"
+                        : `Send to ${detailRegs.length} registrant(s)`}
+                  </button>
+                  {notifyMsg && <p className="text-xs text-emerald-300/90">{notifyMsg}</p>}
+                </div>
+              )}
+
               <div className="mt-5 text-[11px] uppercase tracking-wider text-white/45">
-                Registered attendees ({detailRegs.length})
+                Registered attendees ({loadingRegs ? "…" : detailRegs.length})
               </div>
               <ul className="mt-2 space-y-2">
-                {detailRegs.length === 0 && (
+                {!loadingRegs && detailRegs.length === 0 && (
                   <li className="rounded-xl border border-dashed border-white/10 p-4 text-center text-xs text-white/45">
                     No registrations yet.
                   </li>
@@ -380,10 +574,33 @@ function AdminEventsEditor() {
                     <div className="text-[11px] text-white/45">{r.email}{r.company ? ` · ${r.company}` : ""}</div>
                     <div className="mt-1 text-[10px] text-white/35">
                       {r.at ? new Date(r.at).toLocaleString("en-IN") : ""}
+                      {r.paymentId ? ` · paid` : ""}
                     </div>
                   </li>
                 ))}
               </ul>
+
+              {comms.length > 0 && (
+                <>
+                  <div className="mt-6 text-[11px] uppercase tracking-wider text-white/45">
+                    Recent communications ({comms.length})
+                  </div>
+                  <ul className="mt-2 space-y-2">
+                    {comms.slice(0, 8).map((c) => (
+                      <li key={c.id} className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5">
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-white/45">
+                          <span className="uppercase tracking-wider text-[var(--gold)]">{c.kind}</span>
+                          <span>{c.createdAt ? new Date(c.createdAt).toLocaleString("en-IN") : ""}</span>
+                        </div>
+                        <p className="mt-1 line-clamp-3 text-xs text-white/70">{c.message}</p>
+                        <div className="mt-1 text-[10px] text-white/35">
+                          {c.recipientCount || 0} recipients · {c.sentBy?.email || ""}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </motion.aside>
           </>
         )}
@@ -401,6 +618,7 @@ function CustomerEvents() {
 
   useEffect(() => {
     fetchEventsCatalog().then(setEvents).catch(() => {});
+    fetchMyEventRegistrations().then(() => setRegTick((t) => t + 1)).catch(() => {});
     seedEventRegistrationsIfNeeded();
     const h = () => setEvents(loadEventsCatalog());
     const hr = () => setRegTick((t) => t + 1);
@@ -537,8 +755,6 @@ function CustomerEvents() {
 export default function EventsPage() {
   const session = getSession();
   if (session?.role === ROLES.ADMIN || session?.role === ROLES.OPERATIONS) {
-    // Ops can view fill; only Admin gets the editor UI today (same component — ops still useful for counts).
-    // Keep admin editor for both staff roles so ops can see registrations too.
     return <AdminEventsEditor />;
   }
   return <CustomerEvents />;

@@ -117,7 +117,7 @@ function sortCatalog(list) {
 function setMemory(items) {
   memoryCatalog = sortCatalog(items);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(memoryCatalog));
+    if (typeof localStorage !== "undefined") localStorage.removeItem(STORAGE_KEY);
   } catch {
     /* ignore */
   }
@@ -129,21 +129,6 @@ function setMemory(items) {
 
 export function loadBrochuresCatalog() {
   if (memoryCatalog?.length) return memoryCatalog.map((x) => ({ ...x }));
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        const cleaned = sortCatalog(parsed.map(normalizeBrochure).filter(Boolean));
-        if (cleaned.length) {
-          memoryCatalog = cleaned;
-          return cleaned.map((x) => ({ ...x }));
-        }
-      }
-    }
-  } catch {
-    /* ignore */
-  }
   return DEFAULT_BROCHURES.map((x) => ({ ...x }));
 }
 

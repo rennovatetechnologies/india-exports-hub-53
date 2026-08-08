@@ -56,6 +56,8 @@ const STORAGE_KEY = "vistara_events_catalog";
 let memoryEvents = null;
 /** @type {Record<string, object[]>} */
 let memoryRegs = {};
+/** @type {Record<string, number>} */
+let memoryCounts = {};
 
 export function toDateInputValue(raw) {
   const s = String(raw || "").trim();
@@ -110,10 +112,26 @@ function normalizeEvent(e) {
   };
 }
 
+function normalizeRegistration(r, eventId) {
+  if (!r || typeof r !== "object") return null;
+  const email = String(r.email || "").trim().toLowerCase();
+  if (!email) return null;
+  return {
+    id: r.id || `${eventId || r.eventId}:${email}`,
+    eventId: r.eventId || eventId || "",
+    email,
+    name: String(r.name || "").trim() || email.split("@")[0],
+    company: String(r.company || "").trim(),
+    status: r.status || "registered",
+    paymentId: r.paymentId || null,
+    at: r.at || r.createdAt || r.updatedAt || null,
+  };
+}
+
 function setMemory(events) {
   memoryEvents = events;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    if (typeof localStorage !== "undefined") localStorage.removeItem(STORAGE_KEY);
   } catch {
     /* ignore */
   }
@@ -122,23 +140,14 @@ function setMemory(events) {
   }
 }
 
+function emitRegs() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("iehub-event-regs-updated"));
+  }
+}
+
 export function loadEventsCatalog() {
   if (memoryEvents?.length) return memoryEvents.map((x) => ({ ...x }));
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        const cleaned = parsed.map(normalizeEvent).filter(Boolean);
-        if (cleaned.length) {
-          memoryEvents = cleaned;
-          return cleaned.map((x) => ({ ...x }));
-        }
-      }
-    }
-  } catch {
-    /* ignore */
-  }
   return DEFAULT_EVENTS.map((x) => ({ ...x }));
 }
 
@@ -158,10 +167,13 @@ export async function fetchEventsCatalog({ force = false } = {}) {
   return loadEventsCatalog();
 }
 
-export async function saveEventsCatalog(events) {
+export async function saveEventsCatalog(events, { onlyIds } = {}) {
   const next = (Array.isArray(events) ? events : []).map(normalizeEvent).filter(Boolean);
   setMemory(next);
-  for (const e of next) {
+  const toSave = onlyIds?.length
+    ? next.filter((e) => onlyIds.includes(e.id))
+    : next;
+  for (const e of toSave) {
     try {
       await api(`/api/events/${encodeURIComponent(e.id)}`, { method: "PUT", body: e });
     } catch {
@@ -173,12 +185,6 @@ export async function saveEventsCatalog(events) {
     }
   }
   return next;
-}
-
-function emitRegs() {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("iehub-event-regs-updated"));
-  }
 }
 
 export function seedEventRegistrationsIfNeeded() {
@@ -195,6 +201,7 @@ export function getAllEventRegistrations() {
 }
 
 export function countEventRegistrations(eventId) {
+  if (memoryCounts[eventId] != null) return Number(memoryCounts[eventId]) || 0;
   return getEventRegistrations(eventId).length;
 }
 
@@ -220,7 +227,87 @@ function rememberRegistration(eventId, registration) {
   const list = Array.isArray(memoryRegs[eventId]) ? [...memoryRegs[eventId]] : [];
   if (!list.some((r) => String(r.email).toLowerCase() === key)) list.push(registration);
   memoryRegs[eventId] = list;
+  memoryCounts[eventId] = list.length;
   emitRegs();
+}
+
+function setEventRegistrations(eventId, list) {
+  const cleaned = (Array.isArray(list) ? list : [])
+    .map((r) => normalizeRegistration(r, eventId))
+    .filter(Boolean);
+  memoryRegs[eventId] = cleaned;
+  memoryCounts[eventId] = cleaned.length;
+  emitRegs();
+  return cleaned;
+}
+
+/** Staff: load fill counts for all events */
+export async function fetchEventRegistrationCounts() {
+  try {
+    const data = await api("/api/events/registration-counts");
+    const counts = data?.counts || data?.data || {};
+    memoryCounts = { ...memoryCounts, ...counts };
+    emitRegs();
+    return { ...memoryCounts };
+  } catch (e) {
+    console.warn("[events] registration counts failed", e.message);
+    return { ...memoryCounts };
+  }
+}
+
+/** Staff: load registrants for one event from Mongo */
+export async function fetchEventRegistrations(eventId) {
+  if (!eventId) return [];
+  try {
+    const data = await api(`/api/events/${encodeURIComponent(eventId)}/registrations`);
+    const list = data?.items || data?.data || [];
+    return setEventRegistrations(eventId, list);
+  } catch (e) {
+    console.warn("[events] registrations fetch failed", e.message);
+    return getEventRegistrations(eventId);
+  }
+}
+
+/** Customer: hydrate my seats into memoryRegs */
+export async function fetchMyEventRegistrations() {
+  try {
+    const data = await api("/api/me/event-registrations");
+    const list = data?.items || data?.data || (Array.isArray(data) ? data : []);
+    const byEvent = {};
+    for (const raw of list) {
+      const r = normalizeRegistration(raw, raw.eventId);
+      if (!r?.eventId) continue;
+      if (!byEvent[r.eventId]) byEvent[r.eventId] = [];
+      byEvent[r.eventId].push(r);
+    }
+    for (const [eventId, regs] of Object.entries(byEvent)) {
+      memoryRegs[eventId] = regs;
+      memoryCounts[eventId] = regs.length;
+    }
+    emitRegs();
+    return byEvent;
+  } catch (e) {
+    console.warn("[events] my registrations failed", e.message);
+    return {};
+  }
+}
+
+/** Staff: email registrants (reschedule / follow-up / update) */
+export async function notifyEventRegistrants(eventId, payload) {
+  const data = await api(`/api/events/${encodeURIComponent(eventId)}/notify`, {
+    method: "POST",
+    body: payload,
+  });
+  return data?.data || data;
+}
+
+export async function fetchEventCommunications(eventId) {
+  try {
+    const data = await api(`/api/events/${encodeURIComponent(eventId)}/communications`);
+    return data?.items || data?.data || [];
+  } catch {
+    return [];
+  }
 }
 
 async function payAndRegisterForEvent(eventId, { email, name, company, priceInr, title } = {}) {
@@ -317,6 +404,7 @@ export async function unregisterFromEvent(eventId, email) {
   }
   const list = Array.isArray(memoryRegs[eventId]) ? memoryRegs[eventId] : [];
   memoryRegs[eventId] = list.filter((r) => String(r.email || "").toLowerCase() !== key);
+  memoryCounts[eventId] = memoryRegs[eventId].length;
   emitRegs();
   return true;
 }

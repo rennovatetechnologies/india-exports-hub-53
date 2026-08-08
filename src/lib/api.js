@@ -50,7 +50,14 @@ export async function api(path, { method = "GET", body, headers = {}, auth = tru
     }
     let msg = "Request failed";
     if (data && typeof data === "object") {
-      if (typeof data.message === "string") msg = data.message;
+      const fieldErrors = data.details?.fieldErrors;
+      if (fieldErrors && typeof fieldErrors === "object") {
+        const parts = Object.entries(fieldErrors).flatMap(([field, errs]) =>
+          (Array.isArray(errs) ? errs : [errs]).map((e) => `${field}: ${e}`)
+        );
+        if (parts.length) msg = parts.join("; ");
+        else if (typeof data.error === "string") msg = data.error;
+      } else if (typeof data.message === "string") msg = data.message;
       else if (typeof data.detail === "string") msg = data.detail;
       else if (Array.isArray(data.detail)) msg = data.detail.map((d) => d.msg || JSON.stringify(d)).join("; ");
       else if (typeof data.error === "string") msg = data.error;

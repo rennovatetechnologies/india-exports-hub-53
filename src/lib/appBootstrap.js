@@ -11,27 +11,28 @@ import { getSession, ROLES, subscribeAuth } from "@/lib/authSession";
 
 let started = false;
 
+/** Soft load once — uses in-tab cache; no forced refresh for every user. */
 async function loadSessionData() {
   const session = getSession();
   if (!session) return;
   if (session.role === ROLES.CUSTOMER) {
-    await fetchMyCase({ force: true });
+    await fetchMyCase();
   } else if (session.role === ROLES.ADMIN || session.role === ROLES.OPERATIONS) {
-    await fetchCasesQueue({ force: true });
+    await fetchCasesQueue();
   }
 }
 
 export async function bootstrapAppData() {
   await Promise.all([
-    fetchPublicConfig({ force: true }),
-    fetchPlanCatalog({ force: true }),
-    fetchEventsCatalog({ force: true }),
-    fetchBrochuresCatalog({ force: true }),
+    fetchPublicConfig(),
+    fetchPlanCatalog(),
+    fetchEventsCatalog(),
+    fetchBrochuresCatalog(),
   ]);
   await loadSessionData();
 }
 
-/** Idempotent: start bootstrap + re-fetch case on auth changes. */
+/** Idempotent: start bootstrap + soft-load case when auth changes. Manual refresh is in the dashboard header. */
 export function startAppDataBootstrap() {
   if (typeof window === "undefined") return () => {};
   if (!started) {

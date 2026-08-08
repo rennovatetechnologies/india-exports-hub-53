@@ -21,22 +21,13 @@ import {
   clearKycUpload,
   setKycProfile,
   submitKyc,
-  fetchMyCase,
   journeyStatus,
   CASE_STATUS,
   KYC_STATUS,
   getKycActionDocs,
 } from "@/lib/customerCase";
 import { getPlanById } from "@/lib/planCatalog";
-import { api } from "@/lib/api";
-import {
-  KYC_FILE_ACCEPT,
-  validateKycFile,
-  putKycBlob,
-  getKycBlob,
-  deleteKycBlob,
-  formatFileSize,
-} from "@/lib/kycUploads";
+import { KYC_FILE_ACCEPT, validateKycFile, formatFileSize } from "@/lib/kycUploads";
 
 const STEPS = [
   { id: "business", label: "Business", icon: Building2 },
@@ -54,8 +45,24 @@ const EMPTY_PROFILE = {
   signatoryName: "",
   designation: "",
   panNumber: "",
-  aadhaarLast4: "",
+  aadhaarNumber: "",
 };
+
+const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+const AADHAAR_RE = /^\d{12}$/;
+
+function normalizePan(value) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 10);
+}
+
+function normalizeAadhaar(value) {
+  return String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 12);
+}
 
 function Field({ label, hint, children }) {
   return (
@@ -162,6 +169,7 @@ export default function KycWizardPage() {
   const [submitError, setSubmitError] = useState("");
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [fileErrors, setFileErrors] = useState({});
+  const [uploadBusy, setUploadBusy] = useState(null);
 
   useEffect(() => {
     const h = () => setTick((t) => t + 1);
@@ -182,6 +190,8 @@ export default function KycWizardPage() {
       ...saved,
       legalName: saved.legalName || session?.company || "",
       signatoryName: saved.signatoryName || session?.name || "",
+      panNumber: normalizePan(saved.panNumber || ""),
+      aadhaarNumber: normalizeAadhaar(saved.aadhaarNumber || saved.aadhaar || ""),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.email]);
@@ -213,16 +223,55 @@ export default function KycWizardPage() {
     profile.legalName.trim() &&
     profile.registeredAddress.trim() &&
     profile.operatingCity.trim();
+  const panNormalized = normalizePan(profile.panNumber);
+  const aadhaarNormalized = normalizeAadhaar(profile.aadhaarNumber);
+  const panValid = PAN_RE.test(panNormalized);
+  const aadhaarValid = AADHAAR_RE.test(aadhaarNormalized);
   const identityOk =
     profile.signatoryName.trim() &&
     profile.designation.trim() &&
-    profile.panNumber.trim().length >= 10 &&
-    String(profile.aadhaarLast4).replace(/\D/g, "").length === 4;
+    panValid &&
+    aadhaarValid;
 
   const goto = (i) => setStep(Math.max(0, Math.min(STEPS.length - 1, i)));
 
-  const persistProfile = () => {
-    if (session?.email) setKycProfile(session.email, profile);
+  /** Draft-safe payload: invalid PAN/Aadhaar become '' so tab clicks don't 400. */
+  const buildProfilePayload = ({ requireIdentity = false } = {}) => {
+    const panNumber = panValid ? panNormalized : "";
+    const aadhaarNumber = aadhaarValid ? aadhaarNormalized : "";
+    if (requireIdentity && (!panNumber || !aadhaarNumber)) {
+      throw new Error(
+        !panValid
+          ? "Enter a valid PAN (e.g. AAACR1234F)"
+          : "Enter a valid 12-digit Aadhaar number"
+      );
+    }
+    return {
+      legalName: String(profile.legalName || ""),
+      entityType: String(profile.entityType || "Private Limited"),
+      incorporationDate: String(profile.incorporationDate || ""),
+      turnover: String(profile.turnover || ""),
+      registeredAddress: String(profile.registeredAddress || ""),
+      operatingCity: String(profile.operatingCity || ""),
+      signatoryName: String(profile.signatoryName || ""),
+      designation: String(profile.designation || ""),
+      panNumber,
+      aadhaarNumber,
+      aadhaarLast4: aadhaarNumber ? aadhaarNumber.slice(-4) : "",
+    };
+  };
+
+  const persistProfile = async ({ requireIdentity = false } = {}) => {
+    if (!session?.email) return false;
+    try {
+      const payload = buildProfilePayload({ requireIdentity });
+      await setKycProfile(session.email, payload);
+      setSubmitError("");
+      return true;
+    } catch (e) {
+      setSubmitError(e?.message || "Could not save profile");
+      return false;
+    }
   };
 
   const onPickFile = async (docId, file) => {
@@ -237,22 +286,26 @@ export default function KycWizardPage() {
       delete next[docId];
       return next;
     });
+    setUploadBusy(docId);
     try {
-      await putKycBlob(session.email, docId, file);
-      setKycUpload(session.email, docId, {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      });
-    } catch {
-      setFileErrors((e) => ({ ...e, [docId]: "Could not save file. Try again." }));
+      await setKycUpload(session.email, docId, file);
+    } catch (err) {
+      setFileErrors((e) => ({ ...e, [docId]: err?.message || "Could not upload file. Try again." }));
+    } finally {
+      setUploadBusy(null);
     }
   };
 
   const onClearFile = async (docId) => {
     if (!session?.email) return;
-    await deleteKycBlob(session.email, docId).catch(() => null);
-    clearKycUpload(session.email, docId);
+    setUploadBusy(docId);
+    try {
+      await clearKycUpload(session.email, docId);
+    } catch (err) {
+      setFileErrors((e) => ({ ...e, [docId]: err?.message || "Could not remove file." }));
+    } finally {
+      setUploadBusy(null);
+    }
     setFileErrors((e) => {
       const next = { ...e };
       delete next[docId];
@@ -260,10 +313,11 @@ export default function KycWizardPage() {
     });
   };
 
-  const onNext = () => {
-    persistProfile();
+  const onNext = async () => {
     if (step === 0 && !businessOk) return;
     if (step === 1 && (!identityOk || !canSubmitDocs)) return;
+    const saved = await persistProfile({ requireIdentity: step >= 1 });
+    if (!saved) return;
     goto(step + 1);
   };
 
@@ -271,28 +325,10 @@ export default function KycWizardPage() {
     if (!session?.email || !businessOk || !identityOk || !canSubmitDocs) return;
     setSubmitting(true);
     setSubmitError("");
-    persistProfile();
     try {
-      await api("/api/kyc/me/profile", { method: "POST", body: profile });
-      for (const doc of required) {
-        const up = c?.kycUploads?.[doc.id];
-        if (!up) continue;
-        if (up.reviewStatus === "rejected") {
-          throw new Error(`Please replace ${doc.label || doc.id} before submitting.`);
-        }
-        const stored = await getKycBlob(session.email, doc.id);
-        // Keep already-approved server files when the customer did not re-pick them
-        if (!stored) {
-          if (up.fileId || up.driveFileId) continue;
-          throw new Error(`Missing file for ${doc.label || doc.id}. Re-upload and try again.`);
-        }
-        const fd = new FormData();
-        fd.append("file", stored, up.name || `${doc.id}.pdf`);
-        await api(`/api/kyc/me/documents/${doc.id}`, { method: "POST", formData: fd });
-      }
-      await api("/api/kyc/me/submit", { method: "POST", body: {} });
-      submitKyc(session.email);
-      await fetchMyCase({ force: true });
+      const saved = await persistProfile({ requireIdentity: true });
+      if (!saved) return;
+      await submitKyc();
     } catch (e) {
       setSubmitError(e?.message || "KYC submit failed. Please try again.");
     } finally {
@@ -341,7 +377,12 @@ export default function KycWizardPage() {
     );
   }
 
-  const setField = (key) => (e) => setProfile((p) => ({ ...p, [key]: e.target.value }));
+  const setField = (key) => (e) => {
+    let value = e.target.value;
+    if (key === "panNumber") value = normalizePan(value);
+    if (key === "aadhaarNumber") value = normalizeAadhaar(value);
+    setProfile((p) => ({ ...p, [key]: value }));
+  };
 
   return (
     <div className="space-y-8">
@@ -407,7 +448,7 @@ export default function KycWizardPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    persistProfile();
+                    void persistProfile({ requireIdentity: false });
                     goto(i);
                   }}
                   className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
@@ -531,21 +572,40 @@ export default function KycWizardPage() {
                       onChange={setField("designation")}
                     />
                   </Field>
-                  <Field label="PAN">
+                  <Field
+                    label="PAN"
+                    hint={
+                      profile.panNumber && !panValid
+                        ? "Must be 5 letters + 4 digits + 1 letter (e.g. AAACR1234F)"
+                        : "Format: 5 letters + 4 digits + 1 letter (e.g. AAACR1234F)"
+                    }
+                  >
                     <input
-                      className={inputCls}
+                      className={`${inputCls}${profile.panNumber && !panValid ? " border-rose-400/50" : ""}`}
                       placeholder="AAACR1234F"
+                      maxLength={10}
+                      autoComplete="off"
+                      spellCheck={false}
                       value={profile.panNumber}
                       onChange={setField("panNumber")}
                     />
                   </Field>
-                  <Field label="Aadhaar (last 4)">
+                  <Field
+                    label="Aadhaar number"
+                    hint={
+                      profile.aadhaarNumber && !aadhaarValid
+                        ? "Must be exactly 12 digits"
+                        : "12-digit Aadhaar as on your card"
+                    }
+                  >
                     <input
-                      className={inputCls}
-                      placeholder="1234"
-                      maxLength={4}
-                      value={profile.aadhaarLast4}
-                      onChange={setField("aadhaarLast4")}
+                      className={`${inputCls}${profile.aadhaarNumber && !aadhaarValid ? " border-rose-400/50" : ""}`}
+                      placeholder="1234 5678 9012"
+                      inputMode="numeric"
+                      maxLength={12}
+                      autoComplete="off"
+                      value={profile.aadhaarNumber}
+                      onChange={setField("aadhaarNumber")}
                     />
                   </Field>
                 </div>
@@ -568,7 +628,7 @@ export default function KycWizardPage() {
                         fileMeta={up}
                         needsAction={needsAction}
                         reviewNote={up?.reviewNote || (needsAction ? actionDocs.find((a) => a.id === doc.id)?.note : "")}
-                        error={fileErrors[doc.id]}
+                        error={uploadBusy === doc.id ? "Uploading to server…" : fileErrors[doc.id]}
                         onPick={(file) => onPickFile(doc.id, file)}
                         onClear={() => onClearFile(doc.id)}
                       />
@@ -593,6 +653,12 @@ export default function KycWizardPage() {
                     ["Type / city", `${profile.entityType} · ${profile.operatingCity || "—"}`],
                     ["Signatory", `${profile.signatoryName || "—"} · ${profile.designation || "—"}`],
                     ["PAN", profile.panNumber || "—"],
+                    [
+                      "Aadhaar",
+                      profile.aadhaarNumber
+                        ? profile.aadhaarNumber.replace(/(\d{4})(?=\d)/g, "$1 ")
+                        : "—",
+                    ],
                     [
                       "Documents",
                       `${requiredOnly.filter((d) => c?.kycUploads?.[d.id]).length} of ${requiredOnly.length} required uploaded`,

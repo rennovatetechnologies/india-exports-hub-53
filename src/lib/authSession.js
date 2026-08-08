@@ -321,23 +321,31 @@ export function workspaceFor(role) {
   return "/dashboard";
 }
 
-/* ---------- Admin registration requests (mock store) ---------- */
+/* ---------- Admin registration requests (local cache; live data from API) ---------- */
 
-const SEED_REQUESTS = [
-  { id: "REQ-1042", name: "Sanjay Rao", email: "sanjay.r@newindiaexport.com", phone: "+91 98100 10001", role: ROLES.ADMIN, department: "Platform governance", employeeId: "VST-001", reason: "Bootstrap platform admin", status: ADMIN_STATUS.APPROVED, emailVerified: true, createdAt: "2025-04-01T08:00:00Z" },
-  { id: "REQ-1039", name: "Meera Iyer", email: "meera@newindiaexport.com", phone: "+91 90000 23456", role: ROLES.ADMIN, department: "Finance leadership", employeeId: "VST-104", reason: "Quarter close + pricing controls", status: ADMIN_STATUS.PENDING, emailVerified: true, createdAt: "2025-05-08T11:02:00Z" },
-  { id: "REQ-RAMA-OPS", name: "Ramakrishna", email: "ramakrishnamnit@gmail.com", phone: "", role: ROLES.OPERATIONS, department: "Operations", employeeId: "", reason: "Bootstrap operations user", status: ADMIN_STATUS.APPROVED, emailVerified: true, createdAt: "2026-03-08T08:00:00Z" },
-];
+const LEGACY_SEED_REQUEST_IDS = new Set(["REQ-1042", "REQ-1039", "REQ-RAMA-OPS"]);
 
 function seedIfEmpty() {
   try {
     const raw = localStorage.getItem(ADMIN_REQUESTS_KEY);
-    if (!raw) localStorage.setItem(ADMIN_REQUESTS_KEY, JSON.stringify(SEED_REQUESTS));
+    if (!raw) {
+      localStorage.setItem(ADMIN_REQUESTS_KEY, JSON.stringify([]));
+      return;
+    }
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) {
+      localStorage.setItem(ADMIN_REQUESTS_KEY, JSON.stringify([]));
+      return;
+    }
+    const cleaned = list.filter((r) => !LEGACY_SEED_REQUEST_IDS.has(r?.id));
+    if (cleaned.length !== list.length) {
+      localStorage.setItem(ADMIN_REQUESTS_KEY, JSON.stringify(cleaned));
+    }
   } catch {}
 }
 
 export function getAdminRequests() {
-  if (typeof window === "undefined") return SEED_REQUESTS;
+  if (typeof window === "undefined") return [];
   seedIfEmpty();
   try {
     return JSON.parse(localStorage.getItem(ADMIN_REQUESTS_KEY) || "[]");

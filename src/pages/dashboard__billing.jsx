@@ -20,7 +20,6 @@ import {
   journeyStatus,
   CASE_STATUS,
   getCustomerCase,
-  fetchMyCase,
   refreshCaseAfterPayment,
   isPlanEntitlementActive,
   formatPlanExpiry,
@@ -356,7 +355,6 @@ function CustomerBilling() {
 
   useEffect(() => {
     fetchPlanCatalog().then(setPlans).catch(() => {});
-    fetchMyCase({ force: true }).catch(() => {});
     if (session?.email) {
       fetchInvoicesForEmail(session.email).then(setInvoices).catch(() => {});
     }
@@ -447,11 +445,7 @@ function CustomerBilling() {
     if (!session?.email || !selected || !pricing) return;
     const upgrading = Boolean(isUpgrade);
     const renewing = Boolean(isRenewal) || status === CASE_STATUS.EXPIRED;
-    markPlanPaid(session.email, {
-      planId: selected.id,
-      amountPaid: pricing.total,
-      paymentId,
-    });
+    markPlanPaid(session.email).catch(() => {});
     await refreshCaseAfterPayment(session.email);
     await fetchInvoicesForEmail(session.email).then(setInvoices).catch(() => {});
     // Local invoice only if API has not issued one yet (e.g. Razorpay not configured).

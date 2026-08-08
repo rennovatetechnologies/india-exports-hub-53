@@ -5,7 +5,6 @@ import { CheckCircle2, Circle, Loader2, FileText } from "lucide-react";
 import { getSession, ROLES } from "@/lib/authSession";
 import {
   ensureCaseForSession,
-  fetchMyCase,
   getCaseWorkflowStages,
   listAllCases,
   listCasesForOps,
@@ -16,20 +15,10 @@ import { adminWorkflowPath } from "@/lib/routes";
 
 function CustomerWorkflow() {
   const [tick, setTick] = useState(0);
-  const [loading, setLoading] = useState(true);
   useEffect(() => {
-    let cancelled = false;
-    fetchMyCase({ force: true })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
     const h = () => setTick((t) => t + 1);
     window.addEventListener("iehub-case-updated", h);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("iehub-case-updated", h);
-    };
+    return () => window.removeEventListener("iehub-case-updated", h);
   }, []);
 
   void tick;
@@ -38,7 +27,7 @@ function CustomerWorkflow() {
   const idx = Number(c?.stageIndex) || 0;
   const plan = getPlanById(c?.paidPlanId || c?.planId);
 
-  if (loading && !c) {
+  if (!c) {
     return (
       <div className="flex items-center gap-2 text-sm text-white/55">
         <Loader2 size={16} className="animate-spin" /> Loading workflow…

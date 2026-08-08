@@ -14,11 +14,28 @@ import {
 } from "@/lib/authSession";
 import { api } from "@/lib/api";
 
-const STATS = [
-  { label: "MRR", value: "₹1.42 Cr", delta: "+9.4% MoM", icon: IndianRupee, tone: "text-[var(--gold)]" },
-  { label: "Active customers", value: "1,284", delta: "+184 this month", icon: Users, tone: "text-cyan-300" },
-  { label: "Workflows live", value: "327", delta: "+12 this week", icon: Workflow, tone: "text-emerald-300" },
-];
+function formatInrCompact(n) {
+  const v = Number(n) || 0;
+  if (v >= 1e7) return `₹${(v / 1e7).toLocaleString("en-IN", { maximumFractionDigits: 2 })} Cr`;
+  if (v >= 1e5) return `₹${(v / 1e5).toLocaleString("en-IN", { maximumFractionDigits: 2 })} L`;
+  return `₹${v.toLocaleString("en-IN")}`;
+}
+
+function formatCount(n) {
+  return Number(n || 0).toLocaleString("en-IN");
+}
+
+function formatMomDelta(pct) {
+  const v = Number(pct) || 0;
+  const sign = v > 0 ? "+" : "";
+  return `${sign}${v}% MoM`;
+}
+
+function formatSignedCount(n, suffix) {
+  const v = Number(n) || 0;
+  const sign = v > 0 ? "+" : "";
+  return `${sign}${v.toLocaleString("en-IN")} ${suffix}`;
+}
 
 const statusChip = (s) => {
   if (s === ADMIN_STATUS.PENDING) return "bg-amber-400/10 text-amber-300";
@@ -36,12 +53,41 @@ export default function SuperAdminPage() {
   const [active, setActive] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [actionMsg, setActionMsg] = useState("");
+  const [stats, setStats] = useState(null);
+  const [statsError, setStatsError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const list = await fetchAdminRequests();
       if (!cancelled) setRequests(list);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api("/api/admin/analytics/overview");
+        const data = res?.data || res || {};
+        if (!cancelled) {
+          setStats({
+            revenue: Number(data.revenue ?? data.mrr ?? 0),
+            activeCustomers: Number(data.activeCustomers ?? 0),
+            workflowsLive: Number(data.workflowsLive ?? 0),
+            deltas: data.deltas || {},
+          });
+          setStatsError("");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setStats(null);
+          setStatsError(err?.message || "Could not load stats");
+        }
+      }
     })();
     return () => {
       cancelled = true;
@@ -65,6 +111,39 @@ export default function SuperAdminPage() {
       return true;
     });
   }, [requests, filter, query]);
+
+  const kpiCards = useMemo(() => {
+    if (!stats) {
+      return [
+        { label: "Revenue", value: "—", delta: statsError || "Loading…", icon: IndianRupee, tone: "text-[var(--gold)]" },
+        { label: "Active customers", value: "—", delta: statsError || "Loading…", icon: Users, tone: "text-cyan-300" },
+        { label: "Workflows live", value: "—", delta: statsError || "Loading…", icon: Workflow, tone: "text-emerald-300" },
+      ];
+    }
+    return [
+      {
+        label: "Revenue",
+        value: formatInrCompact(stats.revenue),
+        delta: formatMomDelta(stats.deltas?.mrr),
+        icon: IndianRupee,
+        tone: "text-[var(--gold)]",
+      },
+      {
+        label: "Active customers",
+        value: formatCount(stats.activeCustomers),
+        delta: formatSignedCount(stats.deltas?.activeCustomers, "this month"),
+        icon: Users,
+        tone: "text-cyan-300",
+      },
+      {
+        label: "Workflows live",
+        value: formatCount(stats.workflowsLive),
+        delta: formatSignedCount(stats.deltas?.workflowsLive, "this week"),
+        icon: Workflow,
+        tone: "text-emerald-300",
+      },
+    ];
+  }, [stats, statsError]);
 
   // Only platform admins review staff access requests.
   if (session?.role !== ROLES.ADMIN) {
@@ -118,7 +197,7 @@ export default function SuperAdminPage() {
       </header>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {STATS.map(({ label, value, delta, icon: Icon, tone }) => (
+        {kpiCards.map(({ label, value, delta, icon: Icon, tone }) => (
           <motion.div key={label} whileHover={{ y: -2 }} className="glass-card p-5">
             <div className="flex items-center justify-between">
               <span className="text-xs uppercase tracking-wider text-white/45">{label}</span>

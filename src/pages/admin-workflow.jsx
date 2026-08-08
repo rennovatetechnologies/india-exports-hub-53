@@ -30,7 +30,7 @@ import {
   journeyStatus,
   CASE_STATUS,
   KYC_STATUS,
-  fetchCasesQueue,
+  fetchCaseById,
 } from "@/lib/customerCase";
 import { getPlanById } from "@/lib/planCatalog";
 import { fetchMessagesForCase, getMessagesForCase, sendMessage } from "@/lib/caseMessages";
@@ -76,17 +76,11 @@ export default function AdminWorkflowPage() {
   const [stageError, setStageError] = useState("");
 
   useEffect(() => {
-    let cancelled = false;
-    fetchCasesQueue({ force: true })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setQueueReady(true);
-      });
+    setQueueReady(true);
     const h = () => setTick((t) => t + 1);
     window.addEventListener("iehub-case-updated", h);
     window.addEventListener("iehub-messages-updated", h);
     return () => {
-      cancelled = true;
       window.removeEventListener("iehub-case-updated", h);
       window.removeEventListener("iehub-messages-updated", h);
     };
@@ -98,8 +92,15 @@ export default function AdminWorkflowPage() {
   const customerEmail = c?.customerEmail || "";
 
   useEffect(() => {
+    if (!caseId || !queueReady) return;
+    if (!findCaseByRef(caseId)) {
+      fetchCaseById(caseId).catch(() => {});
+    }
+  }, [caseId, queueReady]);
+
+  useEffect(() => {
     if (!c?.id || !queueReady) return;
-    fetchMessagesForCase(c, { force: true }).catch(() => {});
+    fetchMessagesForCase(c).catch(() => {});
   }, [c?.id, queueReady, tab]);
 
   useEffect(() => {
@@ -406,7 +407,14 @@ export default function AdminWorkflowPage() {
               ["Signatory", c.kycProfile?.signatoryName],
               ["Designation", c.kycProfile?.designation],
               ["PAN", c.kycProfile?.panNumber],
-              ["Aadhaar (last 4)", c.kycProfile?.aadhaarLast4],
+              [
+                "Aadhaar",
+                c.kycProfile?.aadhaarNumber
+                  ? String(c.kycProfile.aadhaarNumber).replace(/(\d{4})(?=\d)/g, "$1 ").trim()
+                  : c.kycProfile?.aadhaarLast4
+                    ? `···· ${c.kycProfile.aadhaarLast4}`
+                    : null,
+              ],
             ].map(([k, v]) => (
               <div key={k} className="rounded-xl bg-white/[0.03] p-3 text-sm">
                 <div className="text-[11px] uppercase tracking-wider text-white/40">{k}</div>

@@ -1,7 +1,8 @@
 /**
  * Customer case — Mongo via /api/me/case and /api/cases.
- * Memory holds the last API response for sync React reads only.
+ * Tab memory holds the last API response for sync React reads only.
  * Never invent or mutate case data locally — always write through the API.
+ * Workflow stages live on the case document (server snapshot), not plan localStorage.
  */
 import { normalizeEmail, markKycComplete, clearKycComplete, getSession, ROLES } from "@/lib/authSession";
 import {
@@ -76,6 +77,10 @@ const caseByEmail = {};
 let opsCaseList = null;
 /** @type {object[] | null} last ops roster snapshot */
 let opsRoster = null;
+/** @type {Promise<object|null> | null} */
+let myCaseInflight = null;
+/** @type {Promise<object[]> | null} */
+let casesQueueInflight = null;
 
 function emit() {
   if (typeof window === "undefined") return;
@@ -84,11 +89,21 @@ function emit() {
   });
 }
 
+function caseSnapshotKey(doc) {
+  if (!doc) return "";
+  try {
+    return JSON.stringify(doc);
+  } catch {
+    return String(doc?.updatedAt || doc?.id || "");
+  }
+}
+
 /** Replace mirror from an API case document only. */
 function mirrorCase(doc) {
   if (!doc?.customerEmail) return doc;
   const key = normalizeEmail(doc.customerEmail);
   const next = { ...doc, kycUploads: { ...(doc.kycUploads || {}) } };
+  const unchanged = caseByEmail[key] && caseSnapshotKey(caseByEmail[key]) === caseSnapshotKey(next);
   caseByEmail[key] = next;
   if (opsCaseList) {
     const i = opsCaseList.findIndex(
@@ -101,7 +116,7 @@ function mirrorCase(doc) {
   }
   if (doc.kycStatus === KYC_STATUS.APPROVED) markKycComplete(key);
   else clearKycComplete(key);
-  emit();
+  if (!unchanged) emit();
   return { ...caseByEmail[key], kycUploads: { ...(caseByEmail[key].kycUploads || {}) } };
 }
 
@@ -130,41 +145,68 @@ export function findCaseByRef(ref) {
   return getCustomerCase(hit.customerEmail) || { ...hit, kycUploads: { ...(hit.kycUploads || {}) } };
 }
 
-/** Always load the signed-in customer's case from Mongo. */
-export async function fetchMyCase() {
+/**
+ * Load the signed-in customer's case from Mongo.
+ * Cached in-tab; concurrent callers share one in-flight request.
+ * Pass `{ force: true }` after mutations or auth changes.
+ */
+export async function fetchMyCase({ force = false } = {}) {
   const session = getSession();
   if (!session?.email || session.role !== ROLES.CUSTOMER) return null;
-  try {
-    const data = await api("/api/me/case");
-    const doc = unwrapCase(data);
-    if (doc?.customerEmail || doc?.id) return mirrorCase(doc);
-  } catch (e) {
-    console.warn("[case] fetchMyCase failed", e.message);
-    throw e;
+  const key = normalizeEmail(session.email);
+  if (!force && caseByEmail[key]) {
+    return { ...caseByEmail[key], kycUploads: { ...(caseByEmail[key].kycUploads || {}) } };
   }
-  return null;
+  // Coalesce concurrent callers (including multiple force:true at boot).
+  if (myCaseInflight) return myCaseInflight;
+  myCaseInflight = (async () => {
+    try {
+      const data = await api("/api/me/case");
+      const doc = unwrapCase(data);
+      if (doc?.customerEmail || doc?.id) return mirrorCase(doc);
+      return null;
+    } catch (e) {
+      console.warn("[case] fetchMyCase failed", e.message);
+      throw e;
+    } finally {
+      myCaseInflight = null;
+    }
+  })();
+  return myCaseInflight;
 }
 
-/** Always load the ops/admin case queue from Mongo. */
-export async function fetchCasesQueue() {
-  try {
-    const data = await api("/api/cases");
-    const list = Array.isArray(data) ? data : data?.items || data?.data || [];
-    opsCaseList = list.map((c) => ({ ...c, kycUploads: { ...(c.kycUploads || {}) } }));
-    for (const c of opsCaseList) {
-      if (c?.customerEmail) {
-        caseByEmail[normalizeEmail(c.customerEmail)] = {
-          ...c,
-          kycUploads: { ...(c.kycUploads || {}) },
-        };
-      }
-    }
-    emit();
+/**
+ * Load the ops/admin case queue from Mongo.
+ * Cached in-tab; pass `{ force: true }` to refresh.
+ */
+export async function fetchCasesQueue({ force = false } = {}) {
+  if (!force && opsCaseList) {
     return opsCaseList.map((c) => ({ ...c }));
-  } catch (e) {
-    console.warn("[case] fetchCasesQueue failed", e.message);
-    throw e;
   }
+  if (casesQueueInflight) return casesQueueInflight;
+  casesQueueInflight = (async () => {
+    try {
+      const data = await api("/api/cases");
+      const list = Array.isArray(data) ? data : data?.items || data?.data || [];
+      opsCaseList = list.map((c) => ({ ...c, kycUploads: { ...(c.kycUploads || {}) } }));
+      for (const c of opsCaseList) {
+        if (c?.customerEmail) {
+          caseByEmail[normalizeEmail(c.customerEmail)] = {
+            ...c,
+            kycUploads: { ...(c.kycUploads || {}) },
+          };
+        }
+      }
+      emit();
+      return opsCaseList.map((c) => ({ ...c }));
+    } catch (e) {
+      console.warn("[case] fetchCasesQueue failed", e.message);
+      throw e;
+    } finally {
+      casesQueueInflight = null;
+    }
+  })();
+  return casesQueueInflight;
 }
 
 /** Load one case by id from Mongo (admin deep links). */
@@ -221,23 +263,26 @@ export async function selectPlan(email, planId) {
   });
   const doc = unwrapCase(data);
   if (doc?.id) return mirrorCase(doc);
-  return fetchMyCase();
+  return fetchMyCase({ force: true });
 }
 
 /** After payment verify — reload case from Mongo (BE marks paid). */
 export async function refreshCaseAfterPayment() {
-  return fetchMyCase();
+  const session = getSession();
+  if (session?.email) delete caseByEmail[normalizeEmail(session.email)];
+  if (myCaseInflight) await myCaseInflight.catch(() => {});
+  return fetchMyCase({ force: true });
 }
 
 /** @deprecated Payment verify on the server is the source of truth. */
 export async function markPlanPaid(email) {
   void email;
-  return fetchMyCase();
+  return fetchMyCase({ force: true });
 }
 
 export async function setKycProfile(_email, profile) {
   await api("/api/kyc/me/profile", { method: "POST", body: profile || {} });
-  return fetchMyCase();
+  return fetchMyCase({ force: true });
 }
 
 /** Upload a KYC file straight to Mongo/Drive. */
@@ -252,25 +297,25 @@ export async function setKycUpload(_email, docId, fileOrMeta) {
     `${docId}.pdf`;
   fd.append("file", file, name);
   await api(`/api/kyc/me/documents/${encodeURIComponent(docId)}`, { method: "POST", formData: fd });
-  return fetchMyCase();
+  return fetchMyCase({ force: true });
 }
 
 export async function clearKycUpload(_email, docId) {
   if (!docId) return null;
   await api(`/api/kyc/me/documents/${encodeURIComponent(docId)}`, { method: "DELETE" });
-  return fetchMyCase();
+  return fetchMyCase({ force: true });
 }
 
 export async function submitKyc() {
   await api("/api/kyc/me/submit", { method: "POST", body: {} });
-  return fetchMyCase();
+  return fetchMyCase({ force: true });
 }
 
 export async function approveKyc(email) {
   const c = getCustomerCase(email);
   if (!c?.id) throw new Error("Case not loaded");
   await api(`/api/kyc/${encodeURIComponent(c.id)}/approve`, { method: "POST", body: {} });
-  await fetchCasesQueue();
+  await fetchCasesQueue({ force: true });
   return getCustomerCase(email);
 }
 
@@ -290,7 +335,7 @@ export async function requestKycMore(email, reason, opts = {}) {
       docNotes: opts.docNotes || {},
     },
   });
-  await fetchCasesQueue();
+  await fetchCasesQueue({ force: true });
   return getCustomerCase(email);
 }
 
@@ -302,7 +347,7 @@ export async function reviewKycDocument(email, docId, status, note = "") {
     method: "POST",
     body: { status, note: note || undefined },
   });
-  await fetchCasesQueue();
+  await fetchCasesQueue({ force: true });
   return getCustomerCase(email);
 }
 
@@ -420,7 +465,7 @@ export async function setCaseStage(email, _stageIndex, note) {
   });
   const doc = unwrapCase(data);
   if (doc?.id) return mirrorCase(doc);
-  await fetchCasesQueue();
+  await fetchCasesQueue({ force: true });
   return getCustomerCase(email);
 }
 
@@ -433,7 +478,7 @@ export async function reassignOps(email, opsEmail, opsName) {
   });
   const doc = unwrapCase(data);
   if (doc?.id) return mirrorCase(doc);
-  await fetchCasesQueue();
+  await fetchCasesQueue({ force: true });
   return getCustomerCase(email);
 }
 
@@ -450,7 +495,7 @@ export async function addOpsDocument(email, { file, stageId, label, note }) {
   if (note && String(note).trim()) fd.append("note", String(note).trim());
   if (stageId) fd.append("stageId", String(stageId));
   await api(`/api/cases/${encodeURIComponent(c.id)}/documents`, { method: "POST", formData: fd });
-  await fetchCasesQueue();
+  await fetchCasesQueue({ force: true });
   return getCustomerCase(email);
 }
 
@@ -470,7 +515,7 @@ export async function addCustomerDocument(email, { file, requestId, label }) {
   } else {
     await api(`/api/cases/${encodeURIComponent(c.id)}/documents`, { method: "POST", formData: fd });
   }
-  return fetchMyCase();
+  return fetchMyCase({ force: true });
 }
 
 /** Ops/admin request a missing document from the customer. */
@@ -484,11 +529,15 @@ export async function requestDocument(email, { label, reason }) {
       reason: (reason || "").trim(),
     },
   });
-  await fetchCasesQueue();
+  await fetchCasesQueue({ force: true });
   return getCustomerCase(email);
 }
 
 export function getCaseWorkflowStages(customerCase) {
+  // Case document is the source of truth (snapshotted at purchase) — not live plan catalog.
+  if (Array.isArray(customerCase?.workflowStages) && customerCase.workflowStages.length) {
+    return customerCase.workflowStages.map((s) => ({ ...s }));
+  }
   if (!customerCase?.paidPlanId && !customerCase?.planId) return [];
   const current = getPlanById(customerCase.paidPlanId || customerCase.planId);
   const prevIds = customerCase.previousPlanIds || [];
@@ -547,7 +596,6 @@ export function isPathAllowedDuringGate(pathname, customerCase) {
   const always = [
     "/dashboard/messages",
     "/dashboard/events",
-    "/dashboard/settings",
     "/dashboard/support",
     "/dashboard/brochures",
     "/dashboard/gallery",

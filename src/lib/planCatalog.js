@@ -1,4 +1,4 @@
-/** Plan catalog — Mongo via GET/PUT /api/plans. In-memory cache; localStorage only as offline cache. */
+/** Plan catalog — Mongo via GET/PUT /api/plans. Request-scoped memory only (no localStorage). */
 
 import { api } from "@/lib/api";
 import { getGstRate } from "@/lib/appConfig";
@@ -91,7 +91,7 @@ export const DEFAULT_PLANS = [
   },
 ];
 
-const STORAGE_KEY = "vistara_billing_plans";
+const STORAGE_KEY = "vistara_billing_plans"; // legacy — cleared on fetch; not used as source of truth
 
 /** @type {object[] | null} */
 let memoryPlans = null;
@@ -177,22 +177,9 @@ function cloneDefaults() {
   return DEFAULT_PLANS.map((x) => normalizePlan(x)).filter(Boolean);
 }
 
-function readLocalCache() {
+function clearLegacyLocalCache() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return null;
-    const cleaned = parsed.map(normalizePlan).filter(Boolean);
-    return cleaned.length ? cleaned : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeLocalCache(plans) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(plans));
+    if (typeof localStorage !== "undefined") localStorage.removeItem(STORAGE_KEY);
   } catch {
     /* ignore */
   }
@@ -200,20 +187,15 @@ function writeLocalCache(plans) {
 
 function setMemory(plans) {
   memoryPlans = plans;
-  writeLocalCache(plans);
+  clearLegacyLocalCache();
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("iehub-plans-updated"));
   }
 }
 
-/** Sync read — prefers API memory, then local cache, then defaults. */
+/** Sync read — API memory for this tab only; defaults until first fetch. Never localStorage. */
 export function loadPlanCatalog() {
   if (memoryPlans?.length) return memoryPlans.map((p) => ({ ...p }));
-  const local = typeof localStorage !== "undefined" ? readLocalCache() : null;
-  if (local?.length) {
-    memoryPlans = local;
-    return local.map((p) => ({ ...p }));
-  }
   return cloneDefaults();
 }
 

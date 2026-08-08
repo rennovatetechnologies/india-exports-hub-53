@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Download, Upload, AlertCircle, FileText } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Download, Upload, AlertCircle, FileText, Loader2 } from "lucide-react";
 import { getSession, ROLES } from "@/lib/authSession";
 import {
   ensureCaseForSession,
@@ -13,12 +13,19 @@ export default function DocumentsPage() {
   const [tab, setTab] = useState("from_ops");
   const [busyId, setBusyId] = useState(null);
   const [dlError, setDlError] = useState("");
+  const [upError, setUpError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+  const fulfillInputRef = useRef(null);
+  const [fulfillRequestId, setFulfillRequestId] = useState(null);
 
   useEffect(() => {
     const h = () => setTick((t) => t + 1);
     window.addEventListener("iehub-case-updated", h);
     return () => window.removeEventListener("iehub-case-updated", h);
   }, []);
+
+  void tick;
 
   if (session?.role !== ROLES.CUSTOMER) {
     return (
@@ -51,71 +58,99 @@ export default function DocumentsPage() {
     }
   };
 
-  const tabs = [
-    { id: "from_ops", label: "From Vistara", count: fromOps.length },
-    { id: "from_you", label: "Your uploads", count: fromYou.length },
-    { id: "requests", label: "Needed from you", count: requests.length },
-  ];
+  const uploadFile = async (file, { requestId, label } = {}) => {
+    if (!session?.email || !file) return;
+    setUpError("");
+    setUploading(true);
+    try {
+      await addCustomerDocument(session.email, { file, requestId, label });
+    } catch (e) {
+      setUpError(e?.message || "Upload failed. Try again.");
+    } finally {
+      setUploading(false);
+      setFulfillRequestId(null);
+    }
+  };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Documents</h1>
-        <p className="mt-1 text-sm text-white/55">
-          Download what ops prepares. Upload if something is missing or requested.
-        </p>
+        <h1 className="text-2xl font-semibold">Documents</h1>
+        <p className="text-sm text-white/55">Files from ops and your uploads — stored in your case on the server.</p>
       </header>
 
-      {dlError && (
-        <p className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-200">
-          {dlError}
-        </p>
-      )}
-
       <div className="flex flex-wrap gap-2">
-        {tabs.map((t) => (
+        {[
+          { id: "from_ops", label: "From ops" },
+          { id: "from_you", label: "Your uploads" },
+          { id: "requests", label: `Requests${requests.length ? ` (${requests.length})` : ""}` },
+        ].map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`rounded-xl px-4 py-2 text-sm transition ${
-              tab === t.id ? "bg-white/10 text-white" : "text-white/50 hover:bg-white/5"
+            className={`rounded-xl px-3 py-1.5 text-xs font-medium ${
+              tab === t.id ? "bg-[var(--gold)]/20 text-[var(--gold)]" : "bg-white/5 text-white/55"
             }`}
           >
             {t.label}
-            {t.count > 0 && (
-              <span className="ml-2 rounded-md bg-[var(--gold)]/20 px-1.5 text-[10px] text-[var(--gold)]">{t.count}</span>
-            )}
           </button>
         ))}
       </div>
 
+      {(dlError || upError) && (
+        <p className="rounded-xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-200">
+          {dlError || upError}
+        </p>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) uploadFile(f);
+        }}
+      />
+      <input
+        ref={fulfillInputRef}
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) uploadFile(f, { requestId: fulfillRequestId });
+        }}
+      />
+
       {tab === "from_ops" && (
-        <ul className="space-y-2">
+        <ul className="space-y-3">
           {fromOps.map((d) => {
             const fileId = d.fileId || d.driveFileId;
             const busy = busyId === (d.id || fileId);
             return (
               <li key={d.id} className="glass-card flex items-center justify-between gap-3 p-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <FileText size={18} className="shrink-0 text-cyan-300" />
+                <div className="flex min-w-0 items-center gap-3">
+                  <FileText size={18} className="shrink-0 text-white/50" />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{d.label || d.name}</div>
-                    <div className="text-[11px] text-white/40">
-                      {d.label && d.name && d.label !== d.name ? `${d.name} · ` : ""}
-                      {d.uploadedAt ? new Date(d.uploadedAt).toLocaleDateString("en-IN") : ""} · ready
-                    </div>
-                    {d.note && <p className="mt-1 text-xs text-white/55">{d.note}</p>}
+                    <div className="text-[11px] text-white/40">From operations</div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  disabled={!fileId || busy}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-lg glass px-3 py-1.5 text-xs hover:bg-white/10 disabled:opacity-50"
-                  onClick={() => downloadDoc(d)}
-                >
-                  <Download size={14} /> {busy ? "Downloading…" : "Download"}
-                </button>
+                {fileId && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-lg glass px-3 py-1.5 text-xs hover:bg-white/10 disabled:opacity-50"
+                    onClick={() => downloadDoc(d)}
+                  >
+                    <Download size={14} /> {busy ? "Downloading…" : "Download"}
+                  </button>
+                )}
               </li>
             );
           })}
@@ -124,16 +159,16 @@ export default function DocumentsPage() {
       )}
 
       {tab === "from_you" && (
-        <ul className="space-y-2">
+        <ul className="space-y-3">
           {fromYou.map((d) => {
             const fileId = d.fileId || d.driveFileId;
             const busy = busyId === (d.id || fileId);
             return (
               <li key={d.id} className="glass-card flex items-center justify-between gap-3 p-4">
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex min-w-0 items-center gap-3">
                   <FileText size={18} className="shrink-0 text-white/50" />
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{d.name}</div>
+                    <div className="truncate text-sm font-medium">{d.label || d.name}</div>
                     <div className="text-[11px] text-white/40">Uploaded by you</div>
                   </div>
                 </div>
@@ -152,13 +187,12 @@ export default function DocumentsPage() {
           })}
           <button
             type="button"
-            onClick={() =>
-              session?.email &&
-              addCustomerDocument(session.email, { name: `customer-upload-${Date.now()}.pdf` })
-            }
-            className="inline-flex items-center gap-2 rounded-xl border border-dashed border-white/20 px-4 py-3 text-sm text-white/60 hover:bg-white/5"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-2 rounded-xl border border-dashed border-white/20 px-4 py-3 text-sm text-white/60 hover:bg-white/5 disabled:opacity-50"
           >
-            <Upload size={16} /> Upload a document
+            {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+            {uploading ? "Uploading…" : "Upload a document"}
           </button>
         </ul>
       )}
@@ -174,13 +208,12 @@ export default function DocumentsPage() {
                   {r.reason && <p className="mt-1 text-xs text-white/45">{r.reason}</p>}
                   <button
                     type="button"
-                    className="btn-gold mt-3 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-black"
-                    onClick={() =>
-                      addCustomerDocument(session.email, {
-                        name: `${r.label.replace(/\s+/g, "-").toLowerCase()}.pdf`,
-                        requestId: r.id,
-                      })
-                    }
+                    disabled={uploading}
+                    className="btn-gold mt-3 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-black disabled:opacity-50"
+                    onClick={() => {
+                      setFulfillRequestId(r.id);
+                      fulfillInputRef.current?.click();
+                    }}
                   >
                     <Upload size={14} /> Upload &amp; mark done
                   </button>
