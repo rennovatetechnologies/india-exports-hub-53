@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, Briefcase, FileCheck2, ChevronRight } from "lucide-react";
+import { Users, Briefcase, FileCheck2, CheckCircle2, ChevronRight } from "lucide-react";
 import { getSession, ROLES } from "@/lib/authSession";
 import {
   listAllCases,
   listCasesForOps,
   journeyStatus,
   CASE_STATUS,
-  getCaseWorkflowStages,
+  currentStageLabel,
+  fetchCasesQueue,
 } from "@/lib/customerCase";
 import { getPlanById, fetchPlanCatalog } from "@/lib/planCatalog";
 import { adminWorkflowPath } from "@/lib/routes";
 
-const FILTER_IDS = new Set(["all", "pending_kyc", "kyc", "active"]);
+const FILTER_IDS = new Set(["all", "pending_kyc", "kyc", "active", "completed"]);
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -26,9 +27,14 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetchPlanCatalog().catch(() => {});
+    fetchCasesQueue({ force: true }).catch(() => {});
     const h = () => setTick((t) => t + 1);
     window.addEventListener("iehub-case-updated", h);
-    return () => window.removeEventListener("iehub-case-updated", h);
+    window.addEventListener("iehub-plans-updated", h);
+    return () => {
+      window.removeEventListener("iehub-case-updated", h);
+      window.removeEventListener("iehub-plans-updated", h);
+    };
   }, []);
 
   const setFilter = (id) => {
@@ -52,6 +58,7 @@ export default function AdminPage() {
       const st = journeyStatus(c);
       if (filter === "kyc" && st !== CASE_STATUS.KYC_PENDING && st !== CASE_STATUS.KYC_INCOMPLETE) return false;
       if (filter === "active" && st !== CASE_STATUS.ACTIVE) return false;
+      if (filter === "completed" && st !== CASE_STATUS.COMPLETED) return false;
       if (filter === "pending_kyc" && st !== CASE_STATUS.KYC_PENDING) return false;
       if (q.trim()) {
         const hay = `${c.customerEmail} ${c.id} ${c.opsName || ""} ${c.planId || ""}`.toLowerCase();
@@ -62,16 +69,24 @@ export default function AdminPage() {
   }, [cases, filter, q]);
 
   const stats = [
-    { label: isAdmin ? "All cases" : "My cases", value: String(cases.length), icon: Briefcase },
+    { id: "all", label: isAdmin ? "All cases" : "My cases", value: String(cases.length), icon: Briefcase },
     {
+      id: "pending_kyc",
       label: "KYC to review",
       value: String(cases.filter((c) => journeyStatus(c) === CASE_STATUS.KYC_PENDING).length),
       icon: FileCheck2,
     },
     {
+      id: "active",
       label: "Active",
       value: String(cases.filter((c) => journeyStatus(c) === CASE_STATUS.ACTIVE).length),
       icon: Users,
+    },
+    {
+      id: "completed",
+      label: "Completed",
+      value: String(cases.filter((c) => journeyStatus(c) === CASE_STATUS.COMPLETED).length),
+      icon: CheckCircle2,
     },
   ];
 
@@ -88,15 +103,21 @@ export default function AdminPage() {
         </p>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        {stats.map(({ label, value, icon: Icon }) => (
-          <motion.div key={label} whileHover={{ y: -2 }} className="glass-card p-5">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map(({ id, label, value, icon: Icon }) => (
+          <motion.button
+            key={label}
+            type="button"
+            whileHover={{ y: -2 }}
+            onClick={() => setFilter(id)}
+            className={`glass-card p-5 text-left ${filter === id ? "ring-1 ring-[var(--gold)]/40" : ""}`}
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs uppercase tracking-wider text-white/45">{label}</span>
               <Icon size={16} className="text-[var(--gold)]" />
             </div>
             <div className="mt-2 text-2xl font-semibold">{value}</div>
-          </motion.div>
+          </motion.button>
         ))}
       </section>
 
@@ -106,6 +127,7 @@ export default function AdminPage() {
           { id: "pending_kyc", label: "KYC review" },
           { id: "kyc", label: "Needs KYC" },
           { id: "active", label: "Active" },
+          { id: "completed", label: "Completed" },
         ].map((f) => (
           <button
             key={f.id}
@@ -140,8 +162,7 @@ export default function AdminPage() {
             {filtered.map((c) => {
               const plan = getPlanById(c.paidPlanId || c.planId);
               const st = journeyStatus(c);
-              const stages = getCaseWorkflowStages(c);
-              const stageLabel = stages[c.stageIndex]?.label || "—";
+              const stageLabel = currentStageLabel(c);
               return (
                 <tr
                   key={c.customerEmail}

@@ -23,6 +23,7 @@ import {
   submitKyc,
   journeyStatus,
   CASE_STATUS,
+  isWorkspaceUnlocked,
   KYC_STATUS,
   getKycActionDocs,
 } from "@/lib/customerCase";
@@ -337,7 +338,7 @@ export default function KycWizardPage() {
     }
   };
 
-  if (status === CASE_STATUS.ACTIVE) {
+  if (isWorkspaceUnlocked(status)) {
     return (
       <div className="space-y-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
@@ -345,7 +346,10 @@ export default function KycWizardPage() {
             <p className="text-xs uppercase tracking-[0.25em] text-white/40">Compliance</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight">KYC approved</h1>
             <p className="mt-1 text-sm text-white/55">
-              Your details and documents are on file. Ops is preparing your documentation pack.
+              Your details and documents are on file.
+              {status === CASE_STATUS.COMPLETED
+                ? " Your documentation workflow is complete."
+                : " Ops is preparing your documentation pack."}
             </p>
           </div>
           <Link to="/dashboard" className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-black">

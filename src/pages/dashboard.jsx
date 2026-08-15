@@ -49,6 +49,9 @@ export default function DashboardOverview() {
   const hello = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   let primary = { to: "/dashboard/workflow", label: "View workflow", hint: "See where your documentation stands" };
+  if (status === CASE_STATUS.COMPLETED) {
+    primary = { to: "/dashboard/documents", label: "View documents", hint: "All documentation stages are complete" };
+  }
   if (openReqs.length) {
     primary = { to: "/dashboard/documents", label: "Upload requested document", hint: openReqs[0].label };
   } else if (readyDocs.length) {
@@ -69,7 +72,9 @@ export default function DashboardOverview() {
             {hello}, {(session?.name || "there").split(" ")[0]}
           </h1>
           <p className="mt-1 text-sm text-white/55">
-            {status === CASE_STATUS.ACTIVE
+            {status === CASE_STATUS.COMPLETED
+              ? "All documentation stages are complete."
+              : status === CASE_STATUS.ACTIVE
               ? currentStage
                 ? `Current stage: ${currentStage.label}`
                 : "Your documentation workspace is ready."

@@ -19,6 +19,7 @@ export const CASE_STATUS = {
   KYC_INCOMPLETE: "kyc_incomplete",
   KYC_PENDING: "kyc_pending",
   ACTIVE: "active",
+  COMPLETED: "completed",
   EXPIRED: "expired",
 };
 
@@ -551,6 +552,28 @@ export function getCaseWorkflowStages(customerCase) {
   return mergeWorkflowStages({ workflowStages: stages }, current);
 }
 
+/** True when ops has marked every plan stage complete. */
+export function isWorkflowComplete(customerCase) {
+  if (!customerCase) return false;
+  if (customerCase.status === CASE_STATUS.COMPLETED) return true;
+  const snap = Array.isArray(customerCase.workflowStages) ? customerCase.workflowStages : [];
+  const stages = snap.length ? snap : getCaseWorkflowStages(customerCase);
+  if (!stages.length) return false;
+  return Math.max(0, Number(customerCase.stageIndex || 0)) >= stages.length;
+}
+
+export function currentStageLabel(customerCase) {
+  const stages = getCaseWorkflowStages(customerCase);
+  const idx = Math.max(0, Number(customerCase?.stageIndex || 0));
+  if (stages.length && idx >= stages.length) return "Completed";
+  return stages[idx]?.label || "—";
+}
+
+/** Paid + KYC approved: customer keeps full dashboard access (in progress or finished). */
+export function isWorkspaceUnlocked(status) {
+  return status === CASE_STATUS.ACTIVE || status === CASE_STATUS.COMPLETED;
+}
+
 export function getRequiredKycDocs(customerCase) {
   const plan = getPlanById(customerCase?.paidPlanId || customerCase?.planId);
   if (!plan) return [];
@@ -577,7 +600,12 @@ export function journeyStatus(customerCase) {
     return CASE_STATUS.KYC_INCOMPLETE;
   }
   if (customerCase.kycStatus === KYC_STATUS.SUBMITTED) return CASE_STATUS.KYC_PENDING;
-  if (customerCase.kycStatus === KYC_STATUS.APPROVED) return CASE_STATUS.ACTIVE;
+  if (customerCase.kycStatus === KYC_STATUS.APPROVED) {
+    if (customerCase.status === CASE_STATUS.COMPLETED || isWorkflowComplete(customerCase)) {
+      return CASE_STATUS.COMPLETED;
+    }
+    return CASE_STATUS.ACTIVE;
+  }
   return CASE_STATUS.KYC_INCOMPLETE;
 }
 
@@ -592,7 +620,7 @@ export function gatePathForCase(customerCase) {
 
 export function isPathAllowedDuringGate(pathname, customerCase) {
   const s = journeyStatus(customerCase);
-  if (s === CASE_STATUS.ACTIVE) return true;
+  if (isWorkspaceUnlocked(s)) return true;
   const path = pathname || "";
   const always = [
     "/dashboard/messages",

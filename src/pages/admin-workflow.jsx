@@ -27,6 +27,7 @@ import {
   reassignOps,
   loadOpsRoster,
   getCaseWorkflowStages,
+  currentStageLabel,
   journeyStatus,
   CASE_STATUS,
   KYC_STATUS,
@@ -357,7 +358,7 @@ export default function AdminWorkflowPage() {
               <span className="text-white/40">Ops</span> · {c.opsName || "—"}
             </div>
             <div>
-              <span className="text-white/40">Stage</span> · {stages[c.stageIndex]?.label || "—"}
+              <span className="text-white/40">Stage</span> · {currentStageLabel(c)}
             </div>
             <div>
               <span className="text-white/40">Docs ready</span> · {(c.documents || []).filter((d) => d.from === "ops").length}
@@ -607,7 +608,11 @@ export default function AdminWorkflowPage() {
             </div>
           )}
 
-          {status === CASE_STATUS.ACTIVE && <p className="text-sm text-emerald-300">KYC approved</p>}
+          {(status === CASE_STATUS.ACTIVE || status === CASE_STATUS.COMPLETED) && (
+            <p className="text-sm text-emerald-300">
+              {status === CASE_STATUS.COMPLETED ? "KYC approved · workflow completed" : "KYC approved"}
+            </p>
+          )}
           {c.kycStatus === KYC_STATUS.NEEDS_MORE && (
             <p className="text-sm text-amber-200">
               Waiting on customer — requested: {(c.kycMissingDocIds || []).join(", ") || "documents"}
@@ -621,6 +626,11 @@ export default function AdminWorkflowPage() {
           {stageError && (
             <p className="rounded-xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-200">
               {stageError}
+            </p>
+          )}
+          {status === CASE_STATUS.COMPLETED && (
+            <p className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-200">
+              All workflow stages are complete.
             </p>
           )}
           <ol className="space-y-3">
@@ -668,12 +678,14 @@ export default function AdminWorkflowPage() {
               );
             })}
           </ol>
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Optional note when advancing stage"
-            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
-          />
+          {status !== CASE_STATUS.COMPLETED && (
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Optional note when advancing stage"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+            />
+          )}
         </div>
       )}
 

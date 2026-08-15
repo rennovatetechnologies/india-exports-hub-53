@@ -23,6 +23,7 @@ import {
   refreshCaseAfterPayment,
   isPlanEntitlementActive,
   formatPlanExpiry,
+  isWorkspaceUnlocked,
 } from "@/lib/customerCase";
 import { issueInvoiceForPayment, listInvoicesForEmail, fetchInvoicesForEmail } from "@/lib/invoice";
 import { downloadInvoicePdf } from "@/lib/downloadInvoicePdf";
@@ -680,7 +681,7 @@ function CustomerBilling() {
           {status === CASE_STATUS.EXPIRED
             ? "Your plan validity ended. Purchase again for another year to restore dashboard access."
             : entitlementActive
-              ? status === CASE_STATUS.ACTIVE
+              ? isWorkspaceUnlocked(status)
                 ? "Your purchased plan is marked below (valid 1 year). Upgrade anytime by selecting a higher plan."
                 : "Your purchased plan is marked below (valid 1 year). Complete KYC to unlock workflow."
               : "Plans are valid for one year. Pay once, then complete KYC. Workflow unlocks after approval."}

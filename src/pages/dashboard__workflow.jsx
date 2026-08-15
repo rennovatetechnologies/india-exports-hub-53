@@ -6,6 +6,7 @@ import { getSession, ROLES } from "@/lib/authSession";
 import {
   ensureCaseForSession,
   getCaseWorkflowStages,
+  currentStageLabel,
   listAllCases,
   listCasesForOps,
   getCustomerCase,
@@ -41,9 +42,13 @@ function CustomerWorkflow() {
         <p className="text-xs uppercase tracking-[0.2em] text-white/40">
           {plan?.name || "Plan"} workflow · Case {c?.id}
         </p>
-        <h1 className="mt-2 text-2xl font-semibold">Documentation progress</h1>
+        <h1 className="mt-2 text-2xl font-semibold">
+          {idx >= stages.length && stages.length ? "Documentation complete" : "Documentation progress"}
+        </h1>
         <p className="mt-1 text-sm text-white/55">
-          Stages come from your plan. Ops advances each step as government filings complete.
+          {idx >= stages.length && stages.length
+            ? "All stages on this case are done. You can still download documents and message operations."
+            : "Stages come from your plan. Ops advances each step as government filings complete."}
         </p>
       </header>
 
@@ -114,8 +119,7 @@ function StaffWorkflowBoard() {
       <div className="space-y-2">
         {cases.map((c) => {
           const plan = getPlanById(c.paidPlanId || c.planId);
-          const stages = getCaseWorkflowStages(c);
-          const label = stages[c.stageIndex]?.label || "—";
+          const label = currentStageLabel(c);
           return (
             <Link
               key={c.customerEmail}

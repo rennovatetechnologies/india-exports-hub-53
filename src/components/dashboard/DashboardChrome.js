@@ -5,6 +5,7 @@ import {
   gatePathForCase,
   getCaseWorkflowStages,
   isPathAllowedDuringGate,
+  isWorkspaceUnlocked,
   journeyStatus,
   CASE_STATUS,
   fetchMyCase,
@@ -157,7 +158,9 @@ export default function DashboardChrome({ children }) {
   const plan = getPlanById(customerCase?.paidPlanId || customerCase?.planId);
   const stages = customerCase ? getCaseWorkflowStages(customerCase) : [];
   const progressPct =
-    status === CASE_STATUS.ACTIVE && stages.length
+    status === CASE_STATUS.COMPLETED && stages.length
+      ? 100
+      : status === CASE_STATUS.ACTIVE && stages.length
       ? Math.round((Math.min(customerCase.stageIndex, stages.length) / stages.length) * 100)
       : status === CASE_STATUS.KYC_PENDING
         ? 40
@@ -169,7 +172,7 @@ export default function DashboardChrome({ children }) {
 
   const customerNav = useMemo(() => {
     if (role !== ROLES.CUSTOMER) return CUSTOMER_NAV_FULL;
-    if (status === CASE_STATUS.ACTIVE) return CUSTOMER_NAV_FULL;
+    if (isWorkspaceUnlocked(status)) return CUSTOMER_NAV_FULL;
     return CUSTOMER_NAV_GATED.filter(
       (i) => i.when === "always" || (Array.isArray(i.when) && i.when.includes(status))
     ).map(({ href, label, icon }) => ({ href, label, icon }));
@@ -235,7 +238,11 @@ export default function DashboardChrome({ children }) {
             ? "Upload KYC docs"
             : status === CASE_STATUS.KYC_PENDING
               ? "KYC under review"
-              : plan
+              : status === CASE_STATUS.COMPLETED
+                ? plan
+                  ? `${plan.name} · completed`
+                  : "Completed"
+                : plan
                 ? `${plan.name} · in progress`
                 : "Active";
 
@@ -313,7 +320,7 @@ export default function DashboardChrome({ children }) {
             />
           </div>
           <p className="mt-3 text-[11px] text-white/45">{statusLabel}</p>
-          {customerCase?.opsName && status === CASE_STATUS.ACTIVE && (
+          {customerCase?.opsName && isWorkspaceUnlocked(status) && (
             <p className="mt-1 flex items-center gap-1 text-[11px] text-white/40">
               <Users size={10} /> Ops · {customerCase.opsName}
             </p>
