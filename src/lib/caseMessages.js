@@ -60,7 +60,7 @@ export async function sendMessage({ customerEmail, caseId: caseIdArg, body }) {
   const email = normalizeEmail(customerEmail);
   const caseId = caseIdArg || resolveCaseId(email) || resolveCaseId(customerEmail);
   if (!text) return null;
-  if (!caseId) throw new Error("Case not loaded — cannot send message");
+  if (!caseId) throw new Error("Your case isn't ready yet. Please wait a moment and try again.");
 
   const data = await api(`/api/cases/${encodeURIComponent(caseId)}/messages`, {
     method: "POST",

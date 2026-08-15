@@ -1,3 +1,5 @@
+import { toUserMessage } from "@/lib/friendlyError";
+
 const STORAGE_KEY = "vistara_session";
 const TOKEN_KEY = "vistara_token";
 const ADMIN_REQUESTS_KEY = "vistara_admin_requests";
@@ -553,7 +555,10 @@ export async function startEmailOtp(email, purpose, profile = {}) {
     if (!allowAuthMock()) {
       return {
         ok: false,
-        message: data.message || data.detail || data.error || "Could not send OTP. Is the backend running?",
+        message: toUserMessage(
+          { message: data.message || data.detail || data.error, status: res.status },
+          "We couldn't send a code right now. Please try again."
+        ),
         code: data.code,
       };
     }
@@ -561,11 +566,11 @@ export async function startEmailOtp(email, purpose, profile = {}) {
     if (!allowAuthMock()) {
       return {
         ok: false,
-        message: "Cannot reach API. Start new-india-exports on :5001 (and MongoDB).",
+        message: toUserMessage(err, "We couldn't send a code right now. Please try again."),
       };
     }
   }
-  if (!allowAuthMock()) return { ok: false, message: "OTP send failed" };
+  if (!allowAuthMock()) return { ok: false, message: "We couldn't send a code right now. Please try again." };
   const code = String(Math.floor(100000 + Math.random() * 900000));
   sessionStorage.setItem(
     OTP_PENDING_KEY,

@@ -1,6 +1,6 @@
 /**
  * Brochures catalog — metadata from Mongo GET /api/brochures.
- * Gallery photos keep static /brochure/*.jpg paths; uploaded bytes in IndexedDB/Drive.
+ * File bytes stream from GET /api/brochures/:id/file (Drive/local via backend).
  */
 
 import { api } from "@/lib/api";
@@ -23,43 +23,10 @@ export const BROCHURE_FILE_ACCEPT =
 let dbPromise = null;
 /** @type {object[] | null} */
 let memoryCatalog = null;
+/** True only after a successful GET /api/brochures. */
+let brochuresFromApi = false;
 
-const DEFAULT_GALLERY_PATHS = Array.from({ length: 17 }, (_, i) => `/brochure/B${i + 1}.jpg`);
-
-export const DEFAULT_BROCHURES = [
-  {
-    id: "pdf-workshop-flyer",
-    name: "Workshop Flyer",
-    kind: "pdf",
-    path: "/new india (4).pdf",
-    showInNav: true,
-    sortOrder: 10,
-  },
-  {
-    id: "pdf-workshop-brochure",
-    name: "Workshop Brochure",
-    kind: "pdf",
-    path: "/BrochureFinal.pdf",
-    showInNav: true,
-    sortOrder: 20,
-  },
-  {
-    id: "pdf-nie-virtual",
-    name: "NIE X Virtual Workshop Brochure",
-    kind: "pdf",
-    path: "/brochure/NIE X VIRTUAL SHIPMENT WORKSHOP (5 DAYS) BROCHURE.pdf",
-    showInNav: true,
-    sortOrder: 30,
-  },
-  ...DEFAULT_GALLERY_PATHS.map((path, i) => ({
-    id: `gallery-b${i + 1}`,
-    name: `Brochure ${i + 1}`,
-    kind: "gallery",
-    path,
-    showInNav: false,
-    sortOrder: 100 + i,
-  })),
-];
+export const DEFAULT_BROCHURES = [];
 
 function openDb() {
   if (typeof indexedDB === "undefined") return Promise.resolve(null);
@@ -79,18 +46,26 @@ function openDb() {
   return dbPromise;
 }
 
+function brochureFilePath(id) {
+  return `/api/brochures/${encodeURIComponent(id)}/file`;
+}
+
+function isApiFilePath(raw) {
+  const s = String(raw || "");
+  return s.startsWith("/api/") || s.includes("/api/files/") || s.includes("/api/brochures/");
+}
+
 function normalizeBrochure(row) {
   if (!row || typeof row !== "object") return null;
   const id = String(row.id || "").trim();
   const name = String(row.name || row.title || "").trim();
   const kind = row.kind === "gallery" ? "gallery" : "pdf";
   if (!id || !name) return null;
-  let path = String(row.path || "").trim();
-  if (!path && row.fileUrl) path = String(row.fileUrl);
-  if (!path && (row.fileId || row.driveFileId)) {
-    path = `/api/brochures/${encodeURIComponent(id)}/file`;
-  }
-  const hasBlob = Boolean(row.hasBlob);
+  let path = String(row.path || row.fileUrl || "").trim();
+  const hasBackendFile = Boolean(row.fileId || row.driveFileId || row.hasFile);
+  if (hasBackendFile) path = brochureFilePath(id);
+  // IndexedDB blobs are local-only; backend files always use the public API path.
+  const hasBlob = Boolean(row.hasBlob) && !isApiFilePath(path);
   if (!path && !hasBlob) return null;
   return {
     id,
@@ -128,28 +103,74 @@ function setMemory(items) {
 }
 
 export function loadBrochuresCatalog() {
-  if (memoryCatalog?.length) return memoryCatalog.map((x) => ({ ...x }));
-  return DEFAULT_BROCHURES.map((x) => ({ ...x }));
+  if (memoryCatalog) return memoryCatalog.map((x) => ({ ...x }));
+  return [];
 }
 
 export async function fetchBrochuresCatalog({ force = false } = {}) {
-  if (memoryCatalog?.length && !force) return memoryCatalog.map((x) => ({ ...x }));
+  if (!force && brochuresFromApi && memoryCatalog) {
+    return memoryCatalog.map((x) => ({ ...x }));
+  }
   try {
     const data = await api("/api/brochures", { auth: false });
     const list = Array.isArray(data) ? data : data?.items || data?.data || [];
     const cleaned = sortCatalog(list.map(normalizeBrochure).filter(Boolean));
-    if (cleaned.length) {
-      setMemory(cleaned);
-      return cleaned.map((x) => ({ ...x }));
-    }
+    brochuresFromApi = true;
+    setMemory(cleaned);
+    return cleaned.map((x) => ({ ...x }));
   } catch (e) {
     console.warn("[brochures] fetch failed", e.message);
+    if (brochuresFromApi && memoryCatalog) return memoryCatalog.map((x) => ({ ...x }));
+    return [];
   }
-  return loadBrochuresCatalog();
 }
 
 export function saveBrochuresCatalog(items) {
   return setMemory((Array.isArray(items) ? items : []).map(normalizeBrochure).filter(Boolean));
+}
+
+function brochureFormData(item, file) {
+  const fd = new FormData();
+  if (item.id) fd.append("id", item.id);
+  fd.append("title", item.name || item.title || "");
+  fd.append("name", item.name || item.title || "");
+  fd.append("kind", item.kind === "gallery" ? "gallery" : "pdf");
+  fd.append("showInNav", item.showInNav !== false ? "true" : "false");
+  fd.append("sortOrder", String(Number(item.sortOrder) || 0));
+  if (item.path) fd.append("path", item.path);
+  if (file) fd.append("file", file);
+  return fd;
+}
+
+export async function upsertBrochure({ item, file, create = false } = {}) {
+  if (!item) throw new Error("Brochure is required");
+  const fd = brochureFormData(item, file);
+  const data = create
+    ? await api("/api/brochures", { method: "POST", formData: fd })
+    : await api(`/api/brochures/${encodeURIComponent(item.id)}`, { method: "PUT", formData: fd });
+  const row = normalizeBrochure(data?.data || data);
+  const current = loadBrochuresCatalog();
+  const next = row
+    ? current.some((b) => b.id === row.id)
+      ? current.map((b) => (b.id === row.id ? row : b))
+      : [...current, row]
+    : current;
+  setMemory(next);
+  return next.map((x) => ({ ...x }));
+}
+
+export async function deleteBrochureFromCatalog(id) {
+  const key = String(id || "").trim();
+  if (!key) return loadBrochuresCatalog();
+  await api(`/api/brochures/${encodeURIComponent(key)}`, { method: "DELETE" });
+  try {
+    await deleteBrochureBlob(key);
+  } catch {
+    /* ignore */
+  }
+  const next = loadBrochuresCatalog().filter((b) => b.id !== key);
+  setMemory(next);
+  return next;
 }
 
 export function subscribeBrochures(onChange) {
@@ -251,34 +272,45 @@ export async function deleteBrochureBlob(id) {
   });
 }
 
-/** Resolve a display/download URL (static path or temporary object URL). Caller must revoke object URLs. */
+function displayPath(item) {
+  if (!item) return null;
+  if (item.path && isApiFilePath(item.path)) return item.path;
+  if (item.path) return encodeURI(item.path);
+  return brochureFilePath(item.id);
+}
+
+/** Resolve a display/download URL (API stream, static path, or object URL). Caller must revoke object URLs. */
 export async function resolveBrochureUrl(item) {
   if (!item) return null;
+  if (item.path && isApiFilePath(item.path)) return item.path;
   if (item.hasBlob) {
     const blob = await getBrochureBlob(item.id);
-    if (!blob) return item.path ? encodeURI(item.path) : null;
-    return URL.createObjectURL(blob);
+    if (blob) return URL.createObjectURL(blob);
   }
   if (item.path) return encodeURI(item.path);
+  if (item.id) return brochureFilePath(item.id);
   return null;
 }
 
-/** Open PDF/image in a new tab (static path or uploaded blob). */
+/** Open PDF/image in a new tab (backend stream, static path, or uploaded blob). */
 export async function openBrochureItem(item) {
   if (!item) return;
+  const apiPath = item.path && isApiFilePath(item.path) ? item.path : null;
+  if (apiPath) {
+    window.open(apiPath, "_blank", "noopener,noreferrer");
+    return;
+  }
   if (item.hasBlob) {
     const blob = await getBrochureBlob(item.id);
     if (blob) {
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank", "noopener,noreferrer");
-      // Revoke after the tab has a chance to load
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
       return;
     }
   }
-  if (item.path) {
-    window.open(encodeURI(item.path), "_blank", "noopener,noreferrer");
-  }
+  const url = displayPath(item);
+  if (url) window.open(url, "_blank", "noopener,noreferrer");
 }
 
 export function newBrochureId(kind) {

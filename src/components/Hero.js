@@ -1,9 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import BookingModal from "./BookingModal";
-import EventBookingModal from "./EventBookingModal";
 import { isAuthenticated } from "@/lib/authSession";
+import {
+  fetchEventsCatalog,
+  loadEventsCatalog,
+  pickFeaturedEvent,
+  formatEventDateRange,
+  eventEffectivePrice,
+  eventHasDiscount,
+  resolveEventImage,
+} from "@/lib/eventsCatalog";
+import { formatInr } from "@/lib/planCatalog";
+import { PATHS, loginWithNext } from "@/lib/routes";
 import {
   ArrowRight,
   ShieldCheck,
@@ -11,15 +21,23 @@ import {
   Sparkles,
   CheckCircle2,
   Calendar,
-  Clock,
   MapPin,
   ArrowUpRight,
 } from "lucide-react";
 
 export default function Hero() {
   const [open, setOpen] = useState(false);
-  const [eventOpen, setEventOpen] = useState(false);
+  const [featured, setFeatured] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchEventsCatalog({ force: true })
+      .then((list) => setFeatured(pickFeaturedEvent(list)))
+      .catch(() => setFeatured(null));
+    const h = () => setFeatured(pickFeaturedEvent(loadEventsCatalog()));
+    window.addEventListener("iehub-events-updated", h);
+    return () => window.removeEventListener("iehub-events-updated", h);
+  }, []);
 
   const openBooking = () => {
     if (!isAuthenticated()) {
@@ -29,13 +47,11 @@ export default function Hero() {
     setOpen(true);
   };
 
-  const openEventBooking = () => {
-    if (!isAuthenticated()) {
-      navigate(`/login?next=${encodeURIComponent("/dashboard")}`);
-      return;
-    }
-    setEventOpen(true);
-  };
+  const reserveHref = isAuthenticated()
+    ? PATHS.dashboardEvents
+    : loginWithNext(PATHS.dashboardEvents);
+  const payable = featured ? eventEffectivePrice(featured) : 0;
+  const discounted = featured ? eventHasDiscount(featured) : false;
 
   return (
     <>
@@ -59,7 +75,7 @@ export default function Hero() {
         <div className="relative z-10 mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
           <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
             {/* Left: headline on hero art */}
-            <div className="lg:col-span-7">
+            <div className={featured ? "lg:col-span-7" : "lg:col-span-12"}>
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -132,7 +148,8 @@ export default function Hero() {
               </motion.div>
             </div>
 
-            {/* Right: upcoming event */}
+            {/* Right: upcoming event from admin catalog */}
+            {featured ? (
             <motion.div
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
@@ -141,73 +158,94 @@ export default function Hero() {
             >
               <div className="relative animate-float-y">
                 <div className="absolute -inset-px rounded-[28px] bg-gradient-to-br from-[var(--gold)]/40 via-white/10 to-emerald-400/20 opacity-60 blur-xl" />
-                <div className="glass-card relative p-6 sm:p-7">
+                <div className="glass-card relative overflow-hidden p-6 sm:p-7">
+                  {featured.img ? (
+                    <div className="relative -mx-6 -mt-6 mb-5 h-36 overflow-hidden sm:-mx-7 sm:-mt-7">
+                      <img
+                        src={resolveEventImage(featured.img)}
+                        alt=""
+                        className="h-full w-full object-cover opacity-80"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0b0e14] to-transparent" />
+                    </div>
+                  ) : null}
                   <div className="flex items-center justify-between gap-3">
                     <div className="inline-flex items-center gap-2 text-xs text-white/60">
                       <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.7)]" />
                       Upcoming event
                     </div>
-                    <span className="shrink-0 text-[10px] uppercase tracking-widest text-white/45">Limited seats</span>
+                    {discounted ? (
+                      <span className="shrink-0 text-[10px] uppercase tracking-widest text-[var(--gold)]">
+                        {featured.discountPercent}% off
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-[10px] uppercase tracking-widest text-white/45">
+                        {payable > 0 ? "Paid" : "Free"}
+                      </span>
+                    )}
                   </div>
 
                   <h3 className="mt-5 text-xl font-semibold leading-snug">
-                    Virtual Shipment Workshop · 5 days
+                    {featured.title}
                   </h3>
-                  <p className="mt-2 text-sm text-white/55">
-                    Live online cohort — documentation, customs, and shipment planning with our ops team.
-                  </p>
+                  {featured.desc ? (
+                    <p className="mt-2 text-sm text-white/55">{featured.desc}</p>
+                  ) : null}
 
                   <ul className="mt-6 space-y-2.5 text-sm text-white/70">
                     <li className="flex items-center gap-2.5">
                       <Calendar size={15} className="shrink-0 text-[var(--gold)]" />
-                      <span>02 – 06 May 2026</span>
+                      <span>{formatEventDateRange(featured.startDate || featured.date, featured.endDate)}</span>
                     </li>
-                    <li className="flex items-center gap-2.5">
-                      <Clock size={15} className="shrink-0 text-[var(--gold)]" />
-                      <span>11:00 AM – 2:00 PM IST</span>
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <MapPin size={15} className="shrink-0 text-[var(--gold)]" />
-                      <span>Online · Zoom</span>
-                    </li>
+                    {featured.city ? (
+                      <li className="flex items-center gap-2.5">
+                        <MapPin size={15} className="shrink-0 text-[var(--gold)]" />
+                        <span>{featured.city}</span>
+                      </li>
+                    ) : null}
                   </ul>
 
-                  <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-xs uppercase tracking-wider text-white/45">Workshop fee</span>
-                      <div className="text-right">
-                        <span className="text-lg font-semibold text-white">₹6,399</span>
-                        <span className="ml-2 text-sm text-white/40 line-through">₹34,999</span>
+                  {payable > 0 ? (
+                    <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-xs uppercase tracking-wider text-white/45">Fee</span>
+                        <div className="text-right">
+                          <span className="text-lg font-semibold text-white">{formatInr(payable)}</span>
+                          {discounted ? (
+                            <span className="ml-2 text-sm text-white/40 line-through">{formatInr(featured.priceInr)}</span>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : null}
 
                   <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:items-center">
-                    <button
-                      type="button"
-                      onClick={openEventBooking}
+                    <Link
+                      to={reserveHref}
                       className="btn-gold inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold"
                     >
                       Reserve a seat
                       <ArrowRight size={15} />
-                    </button>
+                    </Link>
                     <Link
-                      to="/events"
+                      to={PATHS.events}
                       className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/85 transition hover:bg-white/[0.06]"
                     >
-                      Event details
+                      All events
                       <ArrowUpRight size={15} className="text-[var(--gold)]" />
                     </Link>
                   </div>
                 </div>
               </div>
             </motion.div>
+            ) : (
+              <div className="hidden lg:block lg:col-span-5" />
+            )}
           </div>
         </div>
       </section>
 
       <BookingModal open={open} setOpen={setOpen} />
-      <EventBookingModal open={eventOpen} setOpen={setEventOpen} />
     </>
   );
 }

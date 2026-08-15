@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, ArrowRight } from "lucide-react";
 import AdminAuthShell from "@/components/auth/AdminAuthShell";
 import DemoLoginPanel, { staffDemoFilter } from "@/components/auth/DemoLoginPanel";
+import { InlineNotice } from "@/components/FallbackScreen";
 import {
   getSession,
   isStaffSession,
@@ -11,6 +12,7 @@ import {
   safeNextPath,
   workspaceFor,
 } from "@/lib/authSession";
+import { toUserMessage } from "@/lib/friendlyError";
 
 export default function AdminLoginPage() {
   const navigate = useNavigate();
@@ -36,7 +38,7 @@ export default function AdminLoginPage() {
     setLoading(true);
     const { ok, message } = await startEmailOtp(trimmed, OTP_PURPOSE.STAFF_LOGIN);
     if (!ok) {
-      setError(message || "Could not send code. Try again.");
+      setError(toUserMessage(message, "We couldn't send a code. Please try again."));
       setLoading(false);
       return;
     }
@@ -57,7 +59,7 @@ export default function AdminLoginPage() {
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <Field icon={Mail} label="Official email" type="email" placeholder="you@newindiaexport.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-        {error && <p className="text-xs text-rose-300">{error}</p>}
+        {error && <InlineNotice>{error}</InlineNotice>}
         <button
           disabled={loading}
           className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-300 to-cyan-300 px-5 py-3 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-60"
@@ -65,7 +67,7 @@ export default function AdminLoginPage() {
           {loading ? "Sending code…" : (<>Email me a sign-in code <ArrowRight size={15} /></>)}
         </button>
         <p className="text-center text-[11px] text-white/40">
-          Your role (operations or admin) comes from your <span className="text-white/70">approved</span> access request — same as production once the API is wired.
+          Your role (operations or admin) comes from your <span className="text-white/70">approved</span> access request.
         </p>
       </form>
       <DemoLoginPanel filter={staffDemoFilter} />

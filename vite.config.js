@@ -3,27 +3,13 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
-/** Vite still injects @vite/client (and opens a WS) even with hmr:false — strip it. */
-function disableViteWebSocket() {
-  return {
-    name: "disable-vite-websocket",
-    transformIndexHtml: {
-      order: "post",
-      handler(html) {
-        return html.replace(
-          /<script\b[^>]*\bsrc=["']\/@vite\/client["'][^>]*><\/script>\n?/gi,
-          ""
-        );
-      },
-    },
-  };
-}
+const frontendPort = Number(process.env.FRONTEND_PORT || 5173);
+const backendPort = Number(process.env.BACKEND_PORT || 5001);
 
 export default defineConfig({
   plugins: [
     react({ include: /\.(js|jsx|ts|tsx)$/ }),
     tailwindcss(),
-    disableViteWebSocket(),
   ],
   resolve: {
     alias: { "@": path.resolve(process.cwd(), "src") },
@@ -34,12 +20,17 @@ export default defineConfig({
   },
   server: {
     host: true,
-    port: 5173,
-    hmr: false,
-    ws: false,
+    port: frontendPort,
+    strictPort: true,
+    allowedHosts: true,
+    hmr: {
+      protocol: "ws",
+      host: "localhost",
+      clientPort: frontendPort,
+    },
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:5001",
+        target: `http://127.0.0.1:${backendPort}`,
         changeOrigin: true,
       },
     },

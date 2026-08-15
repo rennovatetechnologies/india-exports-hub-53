@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, ArrowRight } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
 import DemoLoginPanel from "@/components/auth/DemoLoginPanel";
+import { InlineNotice } from "@/components/FallbackScreen";
 import {
   getSession,
   isStaffSession,
@@ -12,6 +13,7 @@ import {
   customerPostLoginPath,
   workspaceFor,
 } from "@/lib/authSession";
+import { toUserMessage } from "@/lib/friendlyError";
 
 export default function LoginPage() {
   const router = useNavigate();
@@ -44,7 +46,7 @@ export default function LoginPage() {
     setLoading(true);
     const { ok, message } = await startEmailOtp(trimmed, OTP_PURPOSE.CUSTOMER_LOGIN);
     if (!ok) {
-      setError(message || "Could not start sign-in. Try again.");
+      setError(toUserMessage(message, "We couldn't start sign-in. Please try again."));
       setLoading(false);
       return;
     }
@@ -81,7 +83,7 @@ export default function LoginPage() {
           <Link to="/forgot-password" className="text-white/60 hover:text-white">Didn’t get a code?</Link>
         </div>
 
-        {error && <p className="text-xs text-rose-300">{error}</p>}
+        {error && <InlineNotice>{error}</InlineNotice>}
 
         <button
           disabled={loading}

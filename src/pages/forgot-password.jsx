@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, ArrowRight } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
 import { startEmailOtp, OTP_PURPOSE, safeNextPath } from "@/lib/authSession";
+import { toUserMessage } from "@/lib/friendlyError";
+import { InlineNotice } from "@/components/FallbackScreen";
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();
@@ -19,7 +21,7 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     const { ok, message } = await startEmailOtp(trimmed, OTP_PURPOSE.CUSTOMER_LOGIN);
     if (!ok) {
-      setError(message || "Could not send a code. Try again.");
+      setError(toUserMessage(message, "We couldn't send a code. Please try again."));
       setLoading(false);
       return;
     }
@@ -42,7 +44,7 @@ export default function ForgotPasswordPage() {
       }
     >
       <form onSubmit={onSubmit} className="space-y-4">
-        {error && <p className="text-xs text-rose-300">{error}</p>}
+        {error && <InlineNotice>{error}</InlineNotice>}
         <label className="block">
           <span className="text-[11px] uppercase tracking-wider text-white/55">Work email</span>
           <div className="mt-1.5 relative flex items-center rounded-xl border border-white/10 bg-white/[0.03] focus-within:border-[var(--gold)]/50 transition">

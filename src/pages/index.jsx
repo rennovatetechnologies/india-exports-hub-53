@@ -3,7 +3,6 @@ import AboutUsSection from "@/components/Aboutus";
 import WorkflowSection from "@/components/WorkflowSection";
 import WhyChooseUs from "@/components/WhyChooseUs";
 import PlansSection from "@/components/PlansSection";
-import TestimonialsSection from "@/components/TestimonialsSection";
 import ProductsSection from "@/components/ProductsSection";
 import EventsHighlight from "@/components/EventsHighlight";
 
@@ -17,7 +16,6 @@ export default function Home() {
       <PlansSection />
       <ProductsSection />
       <EventsHighlight />
-      <TestimonialsSection />
     </>
   );
 }

@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
+
 /**
  * Razorpay checkout — amount in INR (rupees). Backend: /api/create-order, /api/verify-payment.
  */
@@ -19,6 +22,9 @@ export async function loadRazorpayScript() {
  *   planId?: string,
  *   purpose?: string,
  *   eventId?: string,
+ *   payInInstallments?: boolean,
+ *   installmentPlanId?: string,
+ *   installmentNumber?: number,
  *   description?: string,
  *   customer?: { name?: string, email?: string, contact?: string, phone?: string },
  *   onSuccess?: (result: object) => void,
@@ -33,22 +39,25 @@ export async function startRazorpayCheckout(opts) {
     eventId,
     description = "Plan payment",
     customer = {},
+    payInInstallments = false,
+    installmentPlanId,
+    installmentNumber,
     onSuccess,
     onFailure,
   } = opts || {};
 
   try {
     const scriptLoaded = await loadRazorpayScript();
-    if (!scriptLoaded) throw new Error("Failed to load Razorpay SDK");
+    if (!scriptLoaded) throw new Error(USER_MESSAGES.payment);
 
     const amountPaise = Math.round(Number(amountInr) * 100);
     if (!Number.isFinite(amountPaise) || amountPaise < 100) {
-      throw new Error("Invalid payment amount");
+      throw new Error("Enter a valid amount to pay.");
     }
 
     const cfg = await fetch("/api/config/public").then((r) => r.json()).catch(() => ({}));
     const key = import.meta.env.VITE_RAZORPAY_KEY_ID || cfg.razorpayKeyId;
-    if (!key) throw new Error("Razorpay key not configured (VITE_RAZORPAY_KEY_ID or /api/config/public)");
+    if (!key) throw new Error(USER_MESSAGES.payment);
 
     const resolvedPurpose = purpose || (eventId ? "event" : "plan");
     const token = localStorage.getItem("vistara_token") || "";
@@ -64,6 +73,9 @@ export async function startRazorpayCheckout(opts) {
     } else {
       orderBody.planId = planId;
     }
+    if (payInInstallments) orderBody.payInInstallments = true;
+    if (installmentPlanId) orderBody.installmentPlanId = installmentPlanId;
+    if (installmentNumber) orderBody.installmentNumber = installmentNumber;
     const res = await fetch("/api/create-order", {
       method: "POST",
       headers: {
@@ -75,7 +87,7 @@ export async function startRazorpayCheckout(opts) {
 
     const order = await res.json().catch(() => ({}));
     if (!res.ok || !order.id) {
-      throw new Error(order.message || order.detail || order.error || "Order creation failed");
+      throw new Error(toUserMessage({ message: order.message || order.detail || order.error, status: res.status }, USER_MESSAGES.payment));
     }
 
     await new Promise((resolve, reject) => {
@@ -103,31 +115,37 @@ export async function startRazorpayCheckout(opts) {
             });
             const result = await verifyRes.json().catch(() => ({}));
             if (!verifyRes.ok || result.success === false) {
-              throw new Error(result.message || "Payment verification failed");
+              throw new Error(toUserMessage({ message: result.message, status: verifyRes.status }, USER_MESSAGES.paymentVerify));
             }
             onSuccess?.({ ...result, ...response, planId, amountInr });
             resolve(result);
           } catch (err) {
-            onFailure?.(err);
             reject(err);
           }
         },
         modal: {
-          ondismiss: () => reject(new Error("Payment cancelled")),
+          ondismiss: () => reject(new Error(USER_MESSAGES.paymentCancelled)),
         },
       };
 
       const rzp = new window.Razorpay(options);
       rzp.on("payment.failed", (response) => {
-        const err = new Error(response?.error?.description || "Payment failed");
-        onFailure?.(err);
-        reject(err);
+        reject(
+          new Error(
+            toUserMessage(
+              { message: response?.error?.description },
+              USER_MESSAGES.payment
+            )
+          )
+        );
       });
       rzp.open();
     });
   } catch (err) {
-    onFailure?.(err instanceof Error ? err : new Error(String(err)));
-    throw err;
+    const friendly = new Error(toUserMessage(err, USER_MESSAGES.payment));
+    friendly.status = err?.status;
+    onFailure?.(friendly);
+    throw friendly;
   }
 }
 
@@ -141,7 +159,10 @@ export default function PayButton({
   onSuccess,
   onFailure,
 }) {
+  const [localError, setLocalError] = useState("");
+
   const handlePayment = async () => {
+    setLocalError("");
     try {
       await startRazorpayCheckout({
         amountInr,
@@ -153,20 +174,26 @@ export default function PayButton({
       });
     } catch (err) {
       console.error("Payment initiation error:", err);
-      alert("Payment error: " + (err?.message || "Something went wrong."));
+      const msg = toUserMessage(err, USER_MESSAGES.payment);
+      if (!onFailure) setLocalError(msg);
     }
   };
 
   return (
-    <button
-      type="button"
-      onClick={handlePayment}
-      className={
-        className ||
-        "px-6 py-3 bg-black text-white rounded-xl font-semibold hover:bg-gray-800 transition-colors"
-      }
-    >
-      {label || `Pay ₹${Number(amountInr).toLocaleString("en-IN")}`}
-    </button>
+    <div className="inline-flex flex-col items-stretch gap-2">
+      <button
+        type="button"
+        onClick={handlePayment}
+        className={
+          className ||
+          "px-6 py-3 bg-black text-white rounded-xl font-semibold hover:bg-gray-800 transition-colors"
+        }
+      >
+        {label || `Pay ₹${Number(amountInr).toLocaleString("en-IN")}`}
+      </button>
+      {localError ? (
+        <p className="max-w-xs text-xs text-rose-300">{localError}</p>
+      ) : null}
+    </div>
   );
 }

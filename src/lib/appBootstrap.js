@@ -27,7 +27,7 @@ export async function bootstrapAppData() {
     fetchPublicConfig(),
     fetchPlanCatalog(),
     fetchEventsCatalog(),
-    fetchBrochuresCatalog(),
+    fetchBrochuresCatalog({ force: true }),
   ]);
   await loadSessionData();
 }

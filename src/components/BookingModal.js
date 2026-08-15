@@ -5,11 +5,13 @@ import { X, ArrowRight, Ship, Plane, Box, PackageSearch, Weight } from "lucide-r
 import { getSession, isAuthenticated } from "@/lib/authSession";
 import { issueInvoiceForPayment } from "@/lib/invoice";
 import InvoiceModal from "@/components/InvoiceModal";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 
 export default function BookingModal({ open, setOpen }) {
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeInvoice, setActiveInvoice] = useState(null);
+  const [payError, setPayError] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -69,16 +71,17 @@ export default function BookingModal({ open, setOpen }) {
     }
     const session = getSession();
     if (!session?.email) {
-      alert("Please sign in again.");
+      setPayError("Please sign in again to continue.");
       return;
     }
 
+    setPayError("");
     setIsSubmitting(true);
 
     try {
       // 0. Ensure Razorpay script is loaded
       const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) throw new Error("Failed to load Razorpay SDK");
+      if (!scriptLoaded) throw new Error(USER_MESSAGES.payment);
 
       // 1. Create Razorpay Order via Next.js API route
       const orderRes = await fetch("/api/create-order", {
@@ -104,11 +107,11 @@ export default function BookingModal({ open, setOpen }) {
       });
 
       const order = await orderRes.json();
-      if (!order.id) throw new Error(order.message || order.detail || order.error || "Order creation failed");
+      if (!order.id) throw new Error(toUserMessage({ message: order.message || order.detail || order.error }, USER_MESSAGES.payment));
 
       const cfg = await fetch("/api/config/public").then((r) => r.json()).catch(() => ({}));
       const rzKey = import.meta.env.VITE_RAZORPAY_KEY_ID || cfg.razorpayKeyId;
-      if (!rzKey) throw new Error("Razorpay key not configured");
+      if (!rzKey) throw new Error(USER_MESSAGES.payment);
 
       // 2. Open Razorpay Checkout
       const options = {
@@ -187,10 +190,10 @@ export default function BookingModal({ open, setOpen }) {
                 country: "",
               });
             } else {
-              alert("Payment Success but booking save failed. Please contact support.");
+              setPayError("Payment went through, but we couldn't save the booking. Please contact support.");
             }
           } else {
-            alert("Payment verification failed. Please contact support.");
+            setPayError("We received your payment but couldn't confirm it. Contact support if you were charged.");
           }
         },
         prefill: {
@@ -204,15 +207,15 @@ export default function BookingModal({ open, setOpen }) {
       };
 
       const rzp = new window.Razorpay(options);
-      rzp.on('payment.failed', function (response){
-        alert("Payment failed: " + response.error.description);
+      rzp.on('payment.failed', function (){
+        setPayError(USER_MESSAGES.payment);
         setIsSubmitting(false);
       });
       rzp.open();
 
     } catch (e) {
       console.error("Payment error:", e);
-      alert("Payment error: " + (e.message || "Something went wrong."));
+      setPayError(toUserMessage(e, USER_MESSAGES.payment));
     } finally {
       setIsSubmitting(false);
     }
@@ -442,6 +445,10 @@ export default function BookingModal({ open, setOpen }) {
                   {form.country && <p><strong>Country:</strong> {form.country}</p>}
                   {form.address && <p><strong>Address:</strong> {form.address}</p>}
                 </div>
+
+                {payError ? (
+                  <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{payError}</p>
+                ) : null}
 
                 <div className="flex justify-between mt-4">
                   <button type="button" onClick={() => setStep(4)} className="text-sm text-gray-600">

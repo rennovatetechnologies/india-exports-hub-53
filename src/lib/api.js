@@ -1,6 +1,7 @@
 /** API client for VIRASTRA INTERNATIONAL EXPORT backend (proxied via Vite /api). */
 
 import { clearSession } from "@/lib/authSession";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 
 const TOKEN_KEY = "vistara_token";
 
@@ -40,7 +41,14 @@ export async function api(path, { method = "GET", body, headers = {}, auth = tru
     opts.headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body);
   }
-  const res = await fetch(path.startsWith("/") ? path : `/${path}`, opts);
+  let res;
+  try {
+    res = await fetch(path.startsWith("/") ? path : `/${path}`, opts);
+  } catch (e) {
+    const err = new Error(toUserMessage(e, USER_MESSAGES.network));
+    err.status = 0;
+    throw err;
+  }
   const ct = res.headers.get("content-type") || "";
   const data = ct.includes("application/json") ? await res.json().catch(() => ({})) : await res.text();
   if (!res.ok) {
@@ -48,23 +56,15 @@ export async function api(path, { method = "GET", body, headers = {}, auth = tru
     if (auth && res.status === 401) {
       clearSession();
     }
-    let msg = "Request failed";
+    let msg = "";
     if (data && typeof data === "object") {
-      const fieldErrors = data.details?.fieldErrors;
-      if (fieldErrors && typeof fieldErrors === "object") {
-        const parts = Object.entries(fieldErrors).flatMap(([field, errs]) =>
-          (Array.isArray(errs) ? errs : [errs]).map((e) => `${field}: ${e}`)
-        );
-        if (parts.length) msg = parts.join("; ");
-        else if (typeof data.error === "string") msg = data.error;
-      } else if (typeof data.message === "string") msg = data.message;
+      if (typeof data.message === "string") msg = data.message;
       else if (typeof data.detail === "string") msg = data.detail;
-      else if (Array.isArray(data.detail)) msg = data.detail.map((d) => d.msg || JSON.stringify(d)).join("; ");
       else if (typeof data.error === "string") msg = data.error;
-    } else if (typeof data === "string" && data) {
+    } else if (typeof data === "string" && data && !/^\s*</.test(data)) {
       msg = data;
     }
-    const err = new Error(msg);
+    const err = new Error(toUserMessage({ message: msg, status: res.status }, USER_MESSAGES.generic));
     err.status = res.status;
     err.data = data;
     throw err;

@@ -5,6 +5,7 @@ import Footer from "@/components/Footer";
 import DashboardChrome from "@/components/dashboard/DashboardChrome";
 import AuthGuard from "@/components/AuthGuard";
 import RedirectIfAuthenticated from "@/components/RedirectIfAuthenticated";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { startAppDataBootstrap } from "@/lib/appBootstrap";
 import { initSessionExpiryWatch } from "@/lib/authSession";
 import { PATHS, adminWorkflowPath } from "@/lib/routes";
@@ -43,6 +44,7 @@ import AdminLogin from "@/pages/admin-login.jsx";
 import AdminRegister from "@/pages/admin-register.jsx";
 import AdminSuper from "@/pages/admin-super.jsx";
 import AdminAudit from "@/pages/admin-audit.jsx";
+import NotFound from "@/pages/not-found.jsx";
 
 /** Email/legacy `/ops/cases/:id` → canonical admin workflow. */
 function OpsCaseRedirect() {
@@ -66,6 +68,7 @@ function ScrollToTop() {
 }
 
 function PublicLayout() {
+  const { pathname } = useLocation();
   return (
     <RedirectIfAuthenticated>
       <Navbar />
@@ -78,7 +81,9 @@ function PublicLayout() {
           <div className="absolute top-1/3 -right-24 h-[380px] w-[380px] rounded-full bg-emerald-400/10 blur-3xl" />
         </div>
         <div className="relative z-[1]">
-          <Outlet />
+          <ErrorBoundary resetKey={pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </div>
       </main>
       <Footer />
@@ -87,9 +92,12 @@ function PublicLayout() {
 }
 
 function ChromeLayout() {
+  const { pathname } = useLocation();
   return (
     <DashboardChrome>
-      <Outlet />
+      <ErrorBoundary resetKey={pathname} compact>
+        <Outlet />
+      </ErrorBoundary>
     </DashboardChrome>
   );
 }
@@ -153,6 +161,7 @@ export default function App() {
           <Route path="messages" element={<DashMessages />} />
           <Route path="vault/:caseId?" element={<Navigate to={PATHS.dashboardDocuments} replace />} />
           <Route path="workflow" element={<DashWorkflow />} />
+          <Route path="*" element={<NotFound compact />} />
         </Route>
 
         <Route
@@ -170,6 +179,7 @@ export default function App() {
           <Route path="super" element={<Navigate to={PATHS.adminPlatform} replace />} />
           <Route path="staff" element={<Navigate to={PATHS.adminPlatform} replace />} />
           <Route path="support" element={<Navigate to={PATHS.dashboardSupport} replace />} />
+          <Route path="*" element={<NotFound compact />} />
         </Route>
 
         {/* Legacy / email deep-link aliases → canonical staff paths */}
@@ -186,6 +196,19 @@ export default function App() {
           <Route path="cases/:caseId" element={<OpsCaseRedirect />} />
           <Route path="bookings" element={<Navigate to={PATHS.dashboardEvents} replace />} />
         </Route>
+
+        <Route
+          path="*"
+          element={
+            <>
+              <Navbar />
+              <main className="relative isolate min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+                <NotFound />
+              </main>
+              <Footer />
+            </>
+          }
+        />
       </Routes>
     </>
   );

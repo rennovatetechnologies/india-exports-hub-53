@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Check, CreditCard, Save, Pencil, ArrowLeft, Sparkles, FileText, Download } from "lucide-react";
 import { getSession, ROLES } from "@/lib/authSession";
@@ -27,7 +27,10 @@ import {
 import { issueInvoiceForPayment, listInvoicesForEmail, fetchInvoicesForEmail } from "@/lib/invoice";
 import { downloadInvoicePdf } from "@/lib/downloadInvoicePdf";
 import { startRazorpayCheckout } from "@/components/PayButton";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 import InvoiceModal from "@/components/InvoiceModal";
+import { fetchMyInstallmentPlans } from "@/lib/eventsCatalog";
+import { PATHS } from "@/lib/routes";
 
 function singleFeatured(plans) {
   const idx = plans.findIndex((p) => p.featured);
@@ -35,13 +38,13 @@ function singleFeatured(plans) {
 }
 
 function AdminPlanEditor() {
-  const [plans, setPlans] = useState(() => loadPlanCatalog());
+  const [plans, setPlans] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState(null);
   const [savedAt, setSavedAt] = useState(null);
 
   useEffect(() => {
-    fetchPlanCatalog().then(setPlans).catch(() => {});
+    fetchPlanCatalog({ force: true }).then(setPlans).catch(() => setPlans([]));
     const h = () => setPlans(loadPlanCatalog());
     window.addEventListener("iehub-plans-updated", h);
     return () => window.removeEventListener("iehub-plans-updated", h);
@@ -52,9 +55,10 @@ function AdminPlanEditor() {
     if (!p) return;
     setDraft({
       ...p,
-      features: [...p.features],
-      kycDocs: p.kycDocs.map((d) => ({ ...d })),
-      workflowStages: p.workflowStages.map((s) => ({ ...s })),
+      features: [...(p.features || [])],
+      marketingFeatures: (p.marketingFeatures || []).map((f) => ({ ...f })),
+      kycDocs: (p.kycDocs || []).map((d) => ({ ...d })),
+      workflowStages: (p.workflowStages || []).map((s) => ({ ...s })),
     });
     setEditingId(id);
   };
@@ -72,7 +76,14 @@ function AdminPlanEditor() {
       return {
         ...draft,
         id: editingId,
+        timeline: String(draft.timeline || "").trim(),
         features: (draft.features || []).map((s) => String(s).trim()).filter(Boolean),
+        marketingFeatures: (draft.marketingFeatures || [])
+          .map((f) => ({
+            label: String(f.label || "").trim(),
+            included: f.included !== false,
+          }))
+          .filter((f) => f.label),
         kycDocs: (draft.kycDocs || []).filter((d) => d.id && d.label),
         workflowStages: (draft.workflowStages || []).filter((s) => s.id && s.label),
       };
@@ -90,7 +101,9 @@ function AdminPlanEditor() {
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">Edit plan · {draft.name}</h1>
-            <p className="mt-1 text-sm text-white/55">List price, discount %, KYC pack, and workflow stages.</p>
+            <p className="mt-1 text-sm text-white/55">
+              Price, homepage checklist, billing bullets, KYC pack, and workflow stages.
+            </p>
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={leaveEdit} className="btn-ghost inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm">
@@ -142,6 +155,15 @@ function AdminPlanEditor() {
                 onChange={(e) => setDraft({ ...draft, tagline: e.target.value })}
               />
             </label>
+            <label className="block text-xs text-white/45 sm:col-span-2">
+              Timeline (shown on home page)
+              <input
+                className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+                value={draft.timeline || ""}
+                onChange={(e) => setDraft({ ...draft, timeline: e.target.value })}
+                placeholder="Liaisoning · 22 days"
+              />
+            </label>
           </div>
           <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/55">
             Effective before GST:{" "}
@@ -158,6 +180,103 @@ function AdminPlanEditor() {
             <input type="checkbox" checked={Boolean(draft.featured)} onChange={(e) => setDraft({ ...draft, featured: e.target.checked })} />
             Featured plan
           </label>
+
+          <div>
+            <div className="mb-2 text-xs uppercase tracking-wider text-white/45">Home page checklist</div>
+            <p className="mb-2 text-[11px] text-white/40">
+              Unchecked rows show as struck-through on the public plans section.
+            </p>
+            <div className="space-y-2">
+              {(draft.marketingFeatures || []).map((f, i) => (
+                <div key={`mf-${i}`} className="flex flex-wrap items-center gap-2">
+                  <input
+                    className="min-w-[200px] flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs"
+                    value={f.label}
+                    onChange={(e) => {
+                      const marketingFeatures = [...draft.marketingFeatures];
+                      marketingFeatures[i] = { ...f, label: e.target.value };
+                      setDraft({ ...draft, marketingFeatures });
+                    }}
+                    placeholder="Feature name"
+                  />
+                  <label className="flex items-center gap-1 text-xs text-white/50">
+                    <input
+                      type="checkbox"
+                      checked={f.included !== false}
+                      onChange={(e) => {
+                        const marketingFeatures = [...draft.marketingFeatures];
+                        marketingFeatures[i] = { ...f, included: e.target.checked };
+                        setDraft({ ...draft, marketingFeatures });
+                      }}
+                    />
+                    Included
+                  </label>
+                  <button
+                    type="button"
+                    className="text-xs text-red-300/80"
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        marketingFeatures: draft.marketingFeatures.filter((_, j) => j !== i),
+                      })
+                    }
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="text-xs text-[var(--gold)]"
+                onClick={() =>
+                  setDraft({
+                    ...draft,
+                    marketingFeatures: [
+                      ...(draft.marketingFeatures || []),
+                      { label: "New feature", included: true },
+                    ],
+                  })
+                }
+              >
+                + Add home page feature
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 text-xs uppercase tracking-wider text-white/45">Billing card bullets</div>
+            <p className="mb-2 text-[11px] text-white/40">Short list shown after login on Dashboard → Billing.</p>
+            <div className="space-y-2">
+              {(draft.features || []).map((line, i) => (
+                <div key={`feat-${i}`} className="flex flex-wrap gap-2">
+                  <input
+                    className="min-w-[200px] flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs"
+                    value={line}
+                    onChange={(e) => {
+                      const features = [...draft.features];
+                      features[i] = e.target.value;
+                      setDraft({ ...draft, features });
+                    }}
+                    placeholder="Included highlight"
+                  />
+                  <button
+                    type="button"
+                    className="text-xs text-red-300/80"
+                    onClick={() => setDraft({ ...draft, features: draft.features.filter((_, j) => j !== i) })}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="text-xs text-[var(--gold)]"
+                onClick={() => setDraft({ ...draft, features: [...(draft.features || []), "New highlight"] })}
+              >
+                + Add billing bullet
+              </button>
+            </div>
+          </div>
 
           <div>
             <div className="mb-2 text-xs uppercase tracking-wider text-white/45">KYC documents</div>
@@ -291,7 +410,7 @@ function AdminPlanEditor() {
       <header>
         <h1 className="text-2xl font-semibold">Plan catalog</h1>
         <p className="mt-1 text-sm text-white/55">
-          Define list price, discount %, KYC documents, and workflow stages. Events are always charged separately.
+          Prices, home-page checklist, billing bullets, KYC documents, and workflow stages. Events are always charged separately.
         </p>
         {savedAt && (
           <p className="mt-2 text-xs text-emerald-300/90">Saved {savedAt.toLocaleTimeString("en-IN")}</p>
@@ -320,6 +439,8 @@ function AdminPlanEditor() {
             <p className="mt-1 text-xs text-white/45">+ {Math.round(GST_RATE * 100)}% GST</p>
             <p className="mt-2 text-sm text-white/55">{p.tagline}</p>
             <ul className="mt-3 space-y-1 text-xs text-white/50">
+              <li>{p.timeline || "No timeline"}</li>
+              <li>{p.marketingFeatures?.length || 0} home page features</li>
               <li>{p.kycDocs?.length || 0} KYC docs</li>
               <li>{p.workflowStages?.length || 0} workflow stages</li>
               <li>Events billed separately</li>
@@ -341,7 +462,7 @@ function AdminPlanEditor() {
 function CustomerBilling() {
   const navigate = useNavigate();
   const session = getSession();
-  const [plans, setPlans] = useState(() => loadPlanCatalog());
+  const [plans, setPlans] = useState([]);
   const [tick, setTick] = useState(0);
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState("");
@@ -352,11 +473,13 @@ function CustomerBilling() {
   const [invoices, setInvoices] = useState(() =>
     session?.email ? listInvoicesForEmail(session.email) : [],
   );
+  const [installmentPlans, setInstallmentPlans] = useState([]);
 
   useEffect(() => {
-    fetchPlanCatalog().then(setPlans).catch(() => {});
+    fetchPlanCatalog({ force: true }).then(setPlans).catch(() => setPlans([]));
     if (session?.email) {
       fetchInvoicesForEmail(session.email).then(setInvoices).catch(() => {});
+      fetchMyInstallmentPlans().then(setInstallmentPlans).catch(() => {});
     }
     const h = () => {
       setPlans(loadPlanCatalog());
@@ -436,7 +559,7 @@ function CustomerBilling() {
       try {
         await selectPlan(session.email, id);
       } catch (e) {
-        setError(e.message || "Could not save plan selection");
+        setError(toUserMessage(e, USER_MESSAGES.save));
       }
     }
   };
@@ -513,7 +636,7 @@ function CustomerBilling() {
             orderId: result.razorpay_order_id || result.orderId,
           });
         },
-        onFailure: (err) => setError(err?.message || "Payment failed"),
+        onFailure: (err) => setError(toUserMessage(err, USER_MESSAGES.payment)),
       });
     } catch (err) {
       // Allow local demo when backend/Razorpay unavailable
@@ -521,7 +644,7 @@ function CustomerBilling() {
       if (allowMock) {
         finalizePlanPayment({ paymentId: `mock_${Date.now()}`, orderId: `mock_order_${Date.now()}` });
       } else {
-        setError(err?.message || "Payment failed. Is the backend running?");
+        setError(toUserMessage(err, USER_MESSAGES.payment));
       }
     } finally {
       setPaying(false);
@@ -563,6 +686,39 @@ function CustomerBilling() {
               : "Plans are valid for one year. Pay once, then complete KYC. Workflow unlocks after approval."}
         </p>
       </header>
+
+      {installmentPlans.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-white/80">Event installment payments</h2>
+          {installmentPlans.map((plan) => (
+            <div key={plan.id} className="glass-card flex flex-wrap items-center justify-between gap-3 p-4">
+              <div>
+                <p className="text-sm font-medium">{plan.eventTitle}</p>
+                <p className="mt-1 text-xs text-white/50">
+                  {plan.paidCount} of {plan.installmentCount} paid
+                  {plan.next
+                    ? ` · next ${formatInr(plan.next.amounts?.total)} due ${
+                        plan.next.dueAt
+                          ? new Date(plan.next.dueAt).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : ""
+                      }`
+                    : ""}
+                </p>
+              </div>
+              <Link
+                to={PATHS.dashboardEvents}
+                className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold"
+              >
+                Pay on Events
+              </Link>
+            </div>
+          ))}
+        </section>
+      )}
 
       {status === CASE_STATUS.EXPIRED && paidPlan && (
         <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-50">
@@ -708,7 +864,7 @@ function CustomerBilling() {
                 </>
               )}
             </p>
-            {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
+            {error && <p className="mt-2 text-xs text-rose-200">{error}</p>}
           </div>
           <button
             type="button"

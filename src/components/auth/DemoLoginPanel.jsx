@@ -50,7 +50,7 @@ export default function DemoLoginPanel({ filter }) {
     <div className="mt-5 rounded-xl border border-dashed border-amber-300/35 bg-amber-300/[0.06] p-3.5">
       <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-amber-200/90">
         <FlaskConical size={13} />
-        Demo mode — no backend
+        Demo mode
       </div>
       <p className="mt-1.5 text-[11px] leading-relaxed text-white/50">
         Jump straight into a role. Data falls back to local seed catalogs.

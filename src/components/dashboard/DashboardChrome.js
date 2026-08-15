@@ -14,6 +14,7 @@ import { getPlanById, fetchPlanCatalog } from "@/lib/planCatalog";
 import { getSession, ROLES, subscribeAuth, clearSession, workspaceFor } from "@/lib/authSession";
 import { DASHBOARD_EXPLORE_LINKS } from "@/lib/siteNav";
 import { PATHS } from "@/lib/routes";
+import { api } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -24,7 +25,6 @@ import {
   CreditCard,
   LifeBuoy,
   Bell,
-  Search,
   Menu,
   LogOut,
   ChevronRight,
@@ -86,14 +86,39 @@ export default function DashboardChrome({ children }) {
   const pathname = useLocation().pathname;
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [workspaceQ, setWorkspaceQ] = useState("");
   const [caseTick, setCaseTick] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef(null);
   const [session, setSessionState] = useState(() =>
     typeof window !== "undefined" ? getSession() : null
   );
-  const workspaceSearchRef = useRef(null);
-  const workspaceWrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!session?.email) {
+      setNotifications([]);
+      return undefined;
+    }
+    let cancelled = false;
+    api("/api/notifications")
+      .then((rows) => {
+        if (!cancelled) setNotifications(Array.isArray(rows) ? rows : rows?.items || []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.email]);
+
+  useEffect(() => {
+    if (!notifOpen) return undefined;
+    const onDown = (e) => {
+      if (!notifRef.current?.contains(e.target)) setNotifOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [notifOpen]);
 
   useEffect(() => {
     fetchPlanCatalog().catch(() => {});
@@ -151,24 +176,6 @@ export default function DashboardChrome({ children }) {
   }, [role, status]);
 
   const NAV = role === ROLES.ADMIN ? ADMIN_NAV : role === ROLES.OPERATIONS ? OPS_NAV : customerNav;
-
-  useEffect(() => {
-    const onKey = (e) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key !== "k") return;
-      e.preventDefault();
-      workspaceSearchRef.current?.focus();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  useEffect(() => {
-    const onDown = (e) => {
-      if (!workspaceWrapRef.current?.contains(e.target)) setWorkspaceQ((q) => (q ? "" : q));
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, []);
 
   const isAdminShell = pathname.startsWith("/admin");
   // Gate using cached case. Only hit the network if we have no snapshot yet —
@@ -378,24 +385,7 @@ export default function DashboardChrome({ children }) {
               <Menu size={18} />
             </button>
 
-            <div ref={workspaceWrapRef} className="relative hidden min-w-0 flex-1 sm:block">
-              <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm text-white/60">
-                <Search size={15} className="shrink-0" />
-                <input
-                  ref={workspaceSearchRef}
-                  value={workspaceQ}
-                  onChange={(e) => setWorkspaceQ(e.target.value)}
-                  className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-white/30"
-                  placeholder={
-                    role === ROLES.CUSTOMER
-                      ? "Search documents, stages…"
-                      : "Search cases by email or id…"
-                  }
-                />
-                <kbd className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">⌘K</kbd>
-              </div>
-            </div>
-            <div className="flex flex-1 sm:hidden" />
+            <div className="flex-1" />
 
             <button
               type="button"
@@ -408,9 +398,61 @@ export default function DashboardChrome({ children }) {
               <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
               <span className="hidden sm:inline">{refreshing ? "Refreshing…" : "Refresh"}</span>
             </button>
-            <button type="button" className="relative flex h-9 w-9 items-center justify-center rounded-lg glass">
-              <Bell size={16} />
-            </button>
+            <div ref={notifRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setNotifOpen((o) => !o)}
+                className="relative flex h-9 w-9 items-center justify-center rounded-lg glass"
+                aria-label="Notifications"
+              >
+                <Bell size={16} />
+                {notifications.some((n) => !n.read) && (
+                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--gold)]" />
+                )}
+              </button>
+              {notifOpen && (
+                <div className="absolute right-0 top-11 z-40 w-80 overflow-hidden rounded-xl border border-white/10 bg-[#0a0d14]">
+                  <div className="border-b border-white/10 px-3 py-2 text-[11px] uppercase tracking-wider text-white/45">
+                    Payment reminders
+                  </div>
+                  <ul className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 && (
+                      <li className="px-3 py-4 text-xs text-white/45">No reminders yet.</li>
+                    )}
+                    {notifications.slice(0, 12).map((n) => (
+                      <li key={n.id}>
+                        <Link
+                          to={n.href || PATHS.dashboardEvents}
+                          onClick={async () => {
+                            setNotifOpen(false);
+                            if (!n.read) {
+                              try {
+                                await api(`/api/notifications/${encodeURIComponent(n.id)}/read`, {
+                                  method: "POST",
+                                });
+                                setNotifications((prev) =>
+                                  prev.map((x) => (x.id === n.id ? { ...x, read: true } : x))
+                                );
+                              } catch {
+                                /* ignore */
+                              }
+                            }
+                          }}
+                          className={`block px-3 py-2.5 text-left hover:bg-white/5 ${
+                            n.read ? "opacity-60" : ""
+                          }`}
+                        >
+                          <div className="text-xs font-medium text-white">{n.title}</div>
+                          {n.body ? (
+                            <div className="mt-0.5 line-clamp-2 text-[11px] text-white/50">{n.body}</div>
+                          ) : null}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
             <div className="flex h-9 items-center gap-2 rounded-lg glass px-2 pr-3">
               <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--grad-gold)] text-xs font-bold text-black">
                 {initials}

@@ -7,6 +7,8 @@ import {
   getCustomerCase,
 } from "@/lib/customerCase";
 import { fetchMessagesForCase, getMessagesForCase, sendMessage } from "@/lib/caseMessages";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
+import FallbackScreen, { InlineNotice } from "@/components/FallbackScreen";
 
 export default function MessagesPage() {
   const session = getSession();
@@ -16,6 +18,7 @@ export default function MessagesPage() {
   const [loadingThread, setLoadingThread] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [retryKey, setRetryKey] = useState(0);
   const [queueReady, setQueueReady] = useState(false);
   const bottomRef = useRef(null);
 
@@ -59,7 +62,7 @@ export default function MessagesPage() {
     setError("");
     fetchMessagesForCase(caseInfo || customerEmail, { force: true })
       .catch((e) => {
-        if (!cancelled) setError(e?.message || "Could not load messages");
+        if (!cancelled) setError(toUserMessage(e, USER_MESSAGES.load));
       })
       .finally(() => {
         if (!cancelled) setLoadingThread(false);
@@ -69,7 +72,7 @@ export default function MessagesPage() {
     };
     // caseInfo.id changes when queue loads
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerEmail, caseInfo?.id, queueReady]);
+  }, [customerEmail, caseInfo?.id, queueReady, retryKey]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -91,7 +94,7 @@ export default function MessagesPage() {
       });
       setBody("");
     } catch (err) {
-      setError(err?.message || "Could not send message");
+      setError(toUserMessage(err, USER_MESSAGES.send));
     } finally {
       setSending(false);
     }
@@ -136,7 +139,7 @@ export default function MessagesPage() {
               ? "Your assigned operations owner — admin can also join when needed."
               : "Case thread with the customer"}
           </p>
-          {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
+          {error && <InlineNotice className="mt-2">{error}</InlineNotice>}
         </header>
 
         <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
@@ -170,7 +173,16 @@ export default function MessagesPage() {
               </div>
             );
           })}
-          {!loadingThread && !msgs.length && (
+          {!loadingThread && !msgs.length && error && (
+            <FallbackScreen
+              kind="unavailable"
+              compact
+              className="m-4 border-0 bg-transparent"
+              message="We couldn't load this conversation. Try again in a moment."
+              onRetry={() => setRetryKey((n) => n + 1)}
+            />
+          )}
+          {!loadingThread && !msgs.length && !error && (
             <p className="py-8 text-center text-sm text-white/40">
               No messages yet. Say hello to start the thread.
             </p>

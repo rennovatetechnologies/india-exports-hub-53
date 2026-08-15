@@ -7,12 +7,14 @@ import { FiCheckCircle } from "react-icons/fi";
 import { getSession, isAuthenticated } from "@/lib/authSession";
 import { issueInvoiceForPayment } from "@/lib/invoice";
 import InvoiceModal from "@/components/InvoiceModal";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 
 const WORKSHOP_AMOUNT_INR = 6399;
 
 export default function EventBookingModal({ open, setOpen }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeInvoice, setActiveInvoice] = useState(null);
+  const [payError, setPayError] = useState("");
   const loginHref = `/login?next=${encodeURIComponent("/dashboard")}`;
 
   const loadRazorpayScript = () =>
@@ -31,15 +33,16 @@ export default function EventBookingModal({ open, setOpen }) {
 
     const session = getSession();
     if (!session?.email) {
-      alert("Please sign in again.");
+      setPayError("Please sign in again to continue.");
       return;
     }
 
+    setPayError("");
     setIsSubmitting(true);
 
     try {
       const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) throw new Error("Failed to load Razorpay SDK");
+      if (!scriptLoaded) throw new Error(USER_MESSAGES.payment);
 
       const orderRes = await fetch("/api/create-order", {
         method: "POST",
@@ -60,11 +63,11 @@ export default function EventBookingModal({ open, setOpen }) {
       });
 
       const order = await orderRes.json();
-      if (!order.id) throw new Error(order.message || order.detail || order.error || "Order creation failed");
+      if (!order.id) throw new Error(toUserMessage({ message: order.message || order.detail || order.error }, USER_MESSAGES.payment));
 
       const cfg = await fetch("/api/config/public").then((r) => r.json()).catch(() => ({}));
       const rzKey = import.meta.env.VITE_RAZORPAY_KEY_ID || cfg.razorpayKeyId;
-      if (!rzKey) throw new Error("Razorpay key not configured");
+      if (!rzKey) throw new Error(USER_MESSAGES.payment);
 
       const options = {
         key: rzKey,
@@ -119,7 +122,7 @@ export default function EventBookingModal({ open, setOpen }) {
             setActiveInvoice(invoice);
             setOpen(false);
           } else {
-            alert("Payment verification failed. Please contact support.");
+            setPayError("We received your payment but couldn't confirm it. Contact support if you were charged.");
           }
         },
         prefill: {
@@ -133,14 +136,14 @@ export default function EventBookingModal({ open, setOpen }) {
       };
 
       const rzp = new window.Razorpay(options);
-      rzp.on("payment.failed", function (response) {
-        alert("Payment failed: " + response.error.description);
+      rzp.on("payment.failed", function () {
+        setPayError(USER_MESSAGES.payment);
         setIsSubmitting(false);
       });
       rzp.open();
     } catch (error) {
       console.error("Payment error:", error);
-      alert("Payment error: " + (error.message || "Something went wrong."));
+      setPayError(toUserMessage(error, USER_MESSAGES.payment));
     } finally {
       setIsSubmitting(false);
     }
@@ -203,6 +206,10 @@ export default function EventBookingModal({ open, setOpen }) {
                   <div className="mt-1 font-medium text-white">{getSession().name}</div>
                   <div className="text-neutral-400">{getSession().email}</div>
                 </div>
+
+                {payError ? (
+                  <p className="rounded-xl border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-xs text-rose-100/90">{payError}</p>
+                ) : null}
 
                 <div className="pt-4">
                   <button

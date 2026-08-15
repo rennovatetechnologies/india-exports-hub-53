@@ -7,6 +7,8 @@ import {
 import { getSession, ROLES } from "@/lib/authSession";
 import { api } from "@/lib/api";
 import { PATHS, adminWorkflowPath } from "@/lib/routes";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
+import FallbackScreen from "@/components/FallbackScreen";
 
 const PERIODS = [
   { value: "week", label: "Last 7 days" },
@@ -61,6 +63,7 @@ export default function AdminAuditPage() {
   const [summary, setSummary] = useState({ count: 0, paidCount: 0, paidTotal: 0 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [reload, setReload] = useState(0);
   const [active, setActive] = useState(null);
 
   useEffect(() => {
@@ -90,7 +93,7 @@ export default function AdminAuditPage() {
         if (!cancelled) {
           setItems([]);
           setSummary({ count: 0, paidCount: 0, paidTotal: 0 });
-          setError(e?.message || "Could not load payments");
+          setError(toUserMessage(e, USER_MESSAGES.load));
         }
       } finally {
         if (!cancelled) setBusy(false);
@@ -99,7 +102,7 @@ export default function AdminAuditPage() {
     return () => {
       cancelled = true;
     };
-  }, [session?.role, period, status, debouncedQ]);
+  }, [session?.role, period, status, debouncedQ, reload]);
 
   const headline = useMemo(() => {
     if (busy) return "Loading…";
@@ -176,13 +179,16 @@ export default function AdminAuditPage() {
       </div>
 
       {error && (
-        <p className="rounded-xl border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-xs text-rose-200">
-          {error}
-        </p>
+        <FallbackScreen
+          kind="unavailable"
+          compact
+          message={error}
+          onRetry={() => setReload((n) => n + 1)}
+        />
       )}
 
       <div className="grid gap-3">
-        {!busy && items.length === 0 && (
+        {!busy && !error && items.length === 0 && (
           <div className="glass-card p-8 text-center text-sm text-white/45">
             No payments for this filter.
           </div>

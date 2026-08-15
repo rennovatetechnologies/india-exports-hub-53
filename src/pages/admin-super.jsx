@@ -13,6 +13,7 @@ import {
   ROLES,
 } from "@/lib/authSession";
 import { api } from "@/lib/api";
+import { USER_MESSAGES } from "@/lib/friendlyError";
 
 function formatInrCompact(n) {
   const v = Number(n) || 0;
@@ -85,7 +86,7 @@ export default function SuperAdminPage() {
       } catch (err) {
         if (!cancelled) {
           setStats(null);
-          setStatsError(err?.message || "Could not load stats");
+          setStatsError(USER_MESSAGES.load);
         }
       }
     })();
@@ -115,9 +116,9 @@ export default function SuperAdminPage() {
   const kpiCards = useMemo(() => {
     if (!stats) {
       return [
-        { label: "Revenue", value: "—", delta: statsError || "Loading…", icon: IndianRupee, tone: "text-[var(--gold)]" },
-        { label: "Active customers", value: "—", delta: statsError || "Loading…", icon: Users, tone: "text-cyan-300" },
-        { label: "Workflows live", value: "—", delta: statsError || "Loading…", icon: Workflow, tone: "text-emerald-300" },
+        { label: "Revenue", value: "—", delta: statsError ? "Unavailable" : "Loading…", icon: IndianRupee, tone: "text-[var(--gold)]" },
+        { label: "Active customers", value: "—", delta: statsError ? "Unavailable" : "Loading…", icon: Users, tone: "text-cyan-300" },
+        { label: "Workflows live", value: "—", delta: statsError ? "Unavailable" : "Loading…", icon: Workflow, tone: "text-emerald-300" },
       ];
     }
     return [
@@ -194,6 +195,9 @@ export default function SuperAdminPage() {
         <p className="mt-1 text-sm text-white/55">
           Review operations and admin access requests — approve or reject each one.
         </p>
+        {statsError ? (
+          <p className="mt-3 text-xs text-white/45">Overview figures are unavailable right now. You can still review requests below.</p>
+        ) : null}
       </header>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

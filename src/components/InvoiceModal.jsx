@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Printer, Mail, CheckCircle2, Download } from "lucide-react";
 import { formatInr } from "@/lib/planCatalog";
 import { getSellerAddressBlock } from "@/lib/invoice";
-import { downloadInvoicePdf } from "@/lib/downloadInvoicePdf";
+import { BRAND_LOGO_SRC, downloadInvoicePdf } from "@/lib/downloadInvoicePdf";
 
 function formatDate(iso) {
   if (!iso) return "—";
@@ -40,11 +40,11 @@ export default function InvoiceModal({ invoice, open, onClose, emailNotice = fal
   const customer = invoice?.customer;
   const amounts = invoice?.amounts;
 
-  const onDownloadPdf = () => {
+  const onDownloadPdf = async () => {
     if (!invoice || downloading) return;
     setDownloading(true);
     try {
-      downloadInvoicePdf(invoice);
+      await downloadInvoicePdf(invoice);
     } finally {
       setDownloading(false);
     }
@@ -114,8 +114,7 @@ export default function InvoiceModal({ invoice, open, onClose, emailNotice = fal
                   <div>
                     <p className="font-medium">Payment received — invoice issued</p>
                     <p className="mt-0.5 text-xs text-emerald-800/80">
-                      A copy of this tax invoice has been emailed to <strong>{customer?.email}</strong>
-                      {invoice.source === "ui_mock" ? " (UI mock until backend SMTP is live)" : ""}.
+                      A copy of this tax invoice has been emailed to <strong>{customer?.email}</strong>.
                       You can download the PDF anytime from Billing.
                     </p>
                   </div>
@@ -125,13 +124,15 @@ export default function InvoiceModal({ invoice, open, onClose, emailNotice = fal
               <header className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 pb-5">
                 <div>
                   <p className="text-[10px] uppercase tracking-[0.2em] text-black/45">Tax Invoice</p>
-                  <h2 id="invoice-title" className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
+                  <img
+                    src={BRAND_LOGO_SRC}
+                    alt="VIRASTRA INTERNATIONAL EXPORT"
+                    className="mt-2 h-14 w-auto max-w-[220px] object-contain object-left sm:h-16"
+                  />
+                  <h2 id="invoice-title" className="mt-3 text-base font-semibold tracking-tight sm:text-lg">
                     {seller?.legalName || "New India Export"}
                   </h2>
-                  {seller?.brandName ? (
-                    <p className="mt-0.5 text-xs text-black/50">{seller.brandName}</p>
-                  ) : null}
-                  <p className="mt-3 max-w-sm text-xs leading-relaxed text-black/65">
+                  <p className="mt-2 max-w-sm text-xs leading-relaxed text-black/65">
                     {getSellerAddressBlock()}
                   </p>
                   <p className="mt-2 text-xs font-medium">

@@ -6,6 +6,7 @@ import {
   addCustomerDocument,
   downloadCaseFile,
 } from "@/lib/customerCase";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 
 export default function DocumentsPage() {
   const session = getSession();
@@ -52,7 +53,7 @@ export default function DocumentsPage() {
     try {
       await downloadCaseFile(fileId, d.name || d.label || "document");
     } catch (e) {
-      setDlError(e?.message || "Could not download file.");
+      setDlError(toUserMessage(e, USER_MESSAGES.download));
     } finally {
       setBusyId(null);
     }
@@ -65,7 +66,7 @@ export default function DocumentsPage() {
     try {
       await addCustomerDocument(session.email, { file, requestId, label });
     } catch (e) {
-      setUpError(e?.message || "Upload failed. Try again.");
+      setUpError(toUserMessage(e, USER_MESSAGES.upload));
     } finally {
       setUploading(false);
       setFulfillRequestId(null);

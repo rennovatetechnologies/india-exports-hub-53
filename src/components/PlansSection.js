@@ -9,69 +9,22 @@ import {
   formatInr,
   planEffectivePrice,
   planHasDiscount,
+  planMarketingRows,
 } from "@/lib/planCatalog";
 
-/** Marketing feature rows keyed by plan id (static checklist; prices come from catalog). */
-const PLAN_FEATURE_ROWS = {
-  basic: [
-    ["Gumasta / Shop Act Registration", true],
-    ["MSME Registration", true],
-    ["IEC (Import Export Code)", true],
-    ["Bank Account Assistance", true],
-    ["GST Registration & LUT Filing", true],
-    ["AD Code Generation", true],
-    ["RCMC Certificate", true],
-    ["Phytosanitary / Fumigation", true],
-    ["DSC (Class 3)", true],
-    ["DGFT Registration", false],
-    ["ICEGATE Integration", false],
-    ["Company Formation", false],
-  ],
-  standard: [
-    ["Everything in Basic", true],
-    ["DGFT Registration & Integration", true],
-    ["ICEGATE Registration & Integration", true],
-    ["AD Code Approval", true],
-    ["IFSC / PFMS Approval", true],
-    ["Company Formation", false],
-    ["Trademark Application", false],
-    ["Quality Assessment Support", false],
-    ["Pre & Post Shipment Docs", false],
-    ["Shipment Cost Analysis", false],
-    ["Expert Compliance Reviews", false],
-    ["Exhibition Networking", false],
-  ],
-  premium: [
-    ["Everything in Standard", true],
-    ["Company Formation", true],
-    ["Trademark Application", true],
-    ["Digital Platform Assistance", true],
-    ["Quality Assessment Certification", true],
-    ["Pre & Post Shipment Documentation", true],
-    ["Shipment Cost Analysis & Statement", true],
-    ["Expert Reviews & Compliance", true],
-    ["Exhibition Exposure & Networking", true],
-    ["Dedicated success manager", true],
-    ["Priority operations queue", true],
-    ["Investor & buyer intros", true],
-  ],
-};
-
-const TIMELINES = {
-  basic: "Liaisoning · 22 days",
-  standard: "Liaisoning · 22 days",
-  premium: "Liaisoning · 45 days",
-};
-
 export default function PlansSection() {
-  const [plans, setPlans] = useState(() => loadPlanCatalog());
+  const [plans, setPlans] = useState([]);
 
   useEffect(() => {
-    fetchPlanCatalog().then(setPlans).catch(() => setPlans(loadPlanCatalog()));
+    fetchPlanCatalog({ force: true })
+      .then(setPlans)
+      .catch(() => setPlans([]));
     const h = () => setPlans(loadPlanCatalog());
     window.addEventListener("iehub-plans-updated", h);
     return () => window.removeEventListener("iehub-plans-updated", h);
   }, []);
+
+  if (!plans.length) return null;
 
   return (
     <section id="plans" className="relative py-24 sm:py-28 overflow-hidden">
@@ -95,7 +48,7 @@ export default function PlansSection() {
             const planHref = isAuthenticated()
               ? "/dashboard/billing"
               : `/login?next=${encodeURIComponent("/dashboard/billing")}`;
-            const features = PLAN_FEATURE_ROWS[p.id] || (p.features || []).map((f) => [f, true]);
+            const features = planMarketingRows(p);
             const effective = planEffectivePrice(p);
             const discounted = planHasDiscount(p);
             const glow = p.featured ? "rgba(244,196,106,0.35)" : "rgba(255,255,255,0.12)";
@@ -149,7 +102,7 @@ export default function PlansSection() {
                     )}
                     <span className="text-sm text-white/50">+ GST</span>
                   </div>
-                  <div className="text-xs text-white/50 mt-1">{TIMELINES[p.id] || "Liaisoning"}</div>
+                  <div className="text-xs text-white/50 mt-1">{p.timeline || "Liaisoning"}</div>
 
                   <div className="my-6 divider-glow" />
 

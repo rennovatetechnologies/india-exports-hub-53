@@ -1,46 +1,61 @@
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Download, FileText, X } from "lucide-react";
 import {
+  fetchBrochuresCatalog,
+  formatBrochureSize,
   getGalleryBrochures,
+  getPdfBrochures,
+  loadBrochuresCatalog,
+  openBrochureItem,
   resolveBrochureUrl,
   subscribeBrochures,
 } from "@/lib/brochuresCatalog";
 
 export default function BrochuresPage() {
+  const [catalog, setCatalog] = useState(() => loadBrochuresCatalog());
   const [images, setImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [ready, setReady] = useState(() => loadBrochuresCatalog().length > 0);
+
+  const pdfs = useMemo(() => getPdfBrochures(catalog), [catalog]);
+
+  useEffect(() => {
+    fetchBrochuresCatalog({ force: true })
+      .then((list) => {
+        setCatalog(list);
+        setReady(true);
+      })
+      .catch(() => setReady(true));
+    return subscribeBrochures(() => setCatalog(loadBrochuresCatalog()));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     /** @type {string[]} */
     const objectUrls = [];
 
-    async function load() {
-      const rows = getGalleryBrochures();
+    async function loadImages() {
+      const rows = getGalleryBrochures(catalog);
       const resolved = await Promise.all(
         rows.map(async (row) => {
           const src = await resolveBrochureUrl(row);
           if (!src) return null;
-          if (row.hasBlob) objectUrls.push(src);
+          if (src.startsWith("blob:")) objectUrls.push(src);
           return { id: row.id, name: row.name, src };
         })
       );
       if (!cancelled) setImages(resolved.filter(Boolean));
     }
 
-    load();
-    const unsub = subscribeBrochures(() => {
-      objectUrls.splice(0).forEach((u) => URL.revokeObjectURL(u));
-      load();
-    });
-
+    loadImages();
     return () => {
       cancelled = true;
-      unsub();
       objectUrls.forEach((u) => URL.revokeObjectURL(u));
     };
-  }, []);
+  }, [catalog]);
+
+  const empty = ready && pdfs.length === 0 && images.length === 0;
 
   return (
     <div className="flex flex-col min-h-screen text-[var(--foreground)]">
@@ -70,30 +85,73 @@ export default function BrochuresPage() {
       </section>
 
       <section className="w-full py-10 px-2 sm:px-6">
-        {images.length === 0 ? (
-          <p className="text-center text-white/50 py-16">No brochure images yet.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 max-w-7xl mx-auto">
-            {images.map((img, i) => (
-              <motion.div
-                key={img.id}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: Math.min(i * 0.05, 0.4) }}
-                viewport={{ once: true }}
-                className="relative w-full h-[60vh] sm:h-[80vh] overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-md cursor-pointer hover:border-[var(--gold)]/25 transition-colors"
-                onClick={() => setSelectedImage(img.src)}
-              >
-                <img
-                  src={img.src}
-                  alt={img.name || `Brochure ${i + 1}`}
-                  loading="lazy"
-                  className="absolute inset-0 h-full w-full object-contain rounded-xl hover:scale-[1.02] transition-transform duration-300"
-                />
-              </motion.div>
-            ))}
-          </div>
-        )}
+        <div className="max-w-7xl mx-auto space-y-12">
+          {empty ? (
+            <p className="text-center text-white/50 py-16">No brochures published yet.</p>
+          ) : (
+            <>
+              {(pdfs.length > 0 || !ready) && (
+                <div className="space-y-4">
+                  <h2 className="px-2 text-sm font-medium uppercase tracking-wider text-white/55">
+                    PDF catalogues
+                  </h2>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {pdfs.map((row) => (
+                      <button
+                        key={row.id}
+                        type="button"
+                        onClick={() => openBrochureItem(row)}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-left transition hover:border-[var(--gold)]/25 hover:bg-white/[0.06]"
+                      >
+                        <span className="flex min-w-0 items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--gold)]/15 text-[var(--gold)]">
+                            <FileText size={16} />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium text-white">{row.name}</span>
+                            <span className="text-xs text-white/40">
+                              {row.fileName || "PDF"}
+                              {row.fileSize ? ` · ${formatBrochureSize(row.fileSize)}` : ""}
+                            </span>
+                          </span>
+                        </span>
+                        <Download size={15} className="shrink-0 text-[var(--gold)]" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {images.length > 0 && (
+                <div className="space-y-4">
+                  <h2 className="px-2 text-sm font-medium uppercase tracking-wider text-white/55">
+                    Visual brochures
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    {images.map((img, i) => (
+                      <motion.div
+                        key={img.id}
+                        initial={{ opacity: 0, y: 30 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: Math.min(i * 0.05, 0.4) }}
+                        viewport={{ once: true }}
+                        className="relative w-full h-[60vh] sm:h-[80vh] overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-md cursor-pointer hover:border-[var(--gold)]/25 transition-colors"
+                        onClick={() => setSelectedImage(img.src)}
+                      >
+                        <img
+                          src={img.src}
+                          alt={img.name || `Brochure ${i + 1}`}
+                          loading="lazy"
+                          className="absolute inset-0 h-full w-full object-contain rounded-xl hover:scale-[1.02] transition-transform duration-300"
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </section>
 
       {selectedImage && (

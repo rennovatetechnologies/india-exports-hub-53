@@ -13,6 +13,8 @@ import {
   verifyPendingEmailOtp,
   clearPendingEmailOtp,
 } from "@/lib/authSession";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
+import { InlineNotice } from "@/components/FallbackScreen";
 
 const ROLE_OPTIONS = [
   { value: ROLES.OPERATIONS, label: "Operations Admin", desc: "Run customer cases and workflow ops." },
@@ -44,7 +46,7 @@ export default function AdminRegisterPage() {
     if (!em) return;
     const { ok, message } = await startEmailOtp(em, OTP_PURPOSE.STAFF_REGISTER);
     if (!ok) {
-      setOtpError(message || "Could not send verification email. Try again.");
+      setOtpError(toUserMessage(message, USER_MESSAGES.otp));
       return;
     }
     setStaffRegisterDraft({ ...form, email: em });
@@ -163,7 +165,7 @@ export default function AdminRegisterPage() {
         }
       >
         <div className="space-y-4">
-          {otpError && <p className="text-xs text-rose-300">{otpError}</p>}
+          {otpError && <InlineNotice>{otpError}</InlineNotice>}
           <div className="flex justify-between gap-2">
             {code.map((d, i) => (
               <input
@@ -256,7 +258,7 @@ export default function AdminRegisterPage() {
           />
         </label>
 
-        {otpError && <p className="text-xs text-rose-300">{otpError}</p>}
+        {otpError && <InlineNotice>{otpError}</InlineNotice>}
 
         <button className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-300 to-cyan-300 px-5 py-3 text-sm font-semibold text-black hover:opacity-90">
           Send email code &amp; continue <ArrowRight size={15} />

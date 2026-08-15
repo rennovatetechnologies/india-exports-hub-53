@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Mail, User, Building2, ArrowRight } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
 import { startEmailOtp, OTP_PURPOSE, setSignupDraft } from "@/lib/authSession";
+import { toUserMessage } from "@/lib/friendlyError";
+import { InlineNotice } from "@/components/FallbackScreen";
 
 const inputCls = "w-full rounded-xl bg-white/5 border border-white/10 focus:border-[var(--gold)]/60 focus:bg-white/[0.07] outline-none pl-10 pr-3 py-2.5 text-sm placeholder:text-white/30 transition";
 
@@ -29,7 +31,7 @@ export default function SignupPage() {
       setError(
         code === "already_registered"
           ? "An account already exists for this email. Please sign in."
-          : message || "Could not send verification code. Try again."
+          : toUserMessage(message, "We couldn't send a verification code. Please try again.")
       );
       setLoading(false);
       return;
@@ -62,7 +64,7 @@ export default function SignupPage() {
             <input type="email" className={inputCls} placeholder="Work email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
         </div>
-        {error && <p className="text-xs text-rose-300">{error}</p>}
+        {error && <InlineNotice>{error}</InlineNotice>}
         <p className="text-[11px] text-white/45">By continuing you agree to VIRASTRA INTERNATIONAL EXPORT&apos;s Terms and Privacy.</p>
         <button disabled={loading} className="btn-gold w-full inline-flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-black disabled:opacity-60">
           {loading ? "Sending code…" : (<>Continue with email code <ArrowRight size={15} /></>)}

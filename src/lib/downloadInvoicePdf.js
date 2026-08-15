@@ -2,6 +2,9 @@ import { jsPDF } from "jspdf";
 import { formatInr } from "@/lib/planCatalog";
 import { getSellerAddressBlock, INVOICE_SELLER } from "@/lib/invoice";
 
+export const BRAND_LOGO_SRC = "/Logo.png";
+const LOGO_ASPECT = 638 / 1820;
+
 function formatDate(iso) {
   if (!iso) return "—";
   try {
@@ -22,14 +25,47 @@ function safeFileName(invoice) {
   return `${num}.pdf`;
 }
 
+function loadBrandLogo() {
+  return new Promise((resolve) => {
+    if (typeof Image === "undefined") {
+      resolve(null);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(null);
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+        resolve({
+          dataUrl: canvas.toDataURL("image/png"),
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+        });
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = BRAND_LOGO_SRC;
+  });
+}
+
 /**
  * Build a tax-invoice PDF in the browser and trigger a download.
  * Nothing is uploaded or stored remotely.
  * @param {object} invoice
  */
-export function downloadInvoicePdf(invoice) {
+export async function downloadInvoicePdf(invoice) {
   if (!invoice) return;
 
+  const logo = await loadBrandLogo();
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 48;
@@ -41,18 +77,30 @@ export function downloadInvoicePdf(invoice) {
   const amounts = invoice.amounts || {};
   const address = getSellerAddressBlock();
 
+  if (logo?.dataUrl) {
+    const logoW = 176;
+    const logoH = logoW * (logo.height && logo.width ? logo.height / logo.width : LOGO_ASPECT);
+    doc.addImage(logo.dataUrl, "PNG", margin, y - 8, logoW, logoH);
+    y += logoH + 6;
+  }
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
+  doc.setFontSize(14);
+  doc.setTextColor(0);
   doc.text(seller.legalName || "New India Export", margin, y);
   y += 16;
+
+  if (!logo && seller.brandName) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(80);
+    doc.text(seller.brandName, margin, y);
+    y += 14;
+  }
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(80);
-  if (seller.brandName) {
-    doc.text(seller.brandName, margin, y);
-    y += 14;
-  }
   const addrLines = doc.splitTextToSize(address, 280);
   doc.text(addrLines, margin, y);
   y += addrLines.length * 12 + 4;

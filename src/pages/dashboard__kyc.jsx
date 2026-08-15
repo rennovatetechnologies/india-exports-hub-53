@@ -28,6 +28,7 @@ import {
 } from "@/lib/customerCase";
 import { getPlanById } from "@/lib/planCatalog";
 import { KYC_FILE_ACCEPT, validateKycFile, formatFileSize } from "@/lib/kycUploads";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 
 const STEPS = [
   { id: "business", label: "Business", icon: Building2 },
@@ -269,7 +270,7 @@ export default function KycWizardPage() {
       setSubmitError("");
       return true;
     } catch (e) {
-      setSubmitError(e?.message || "Could not save profile");
+      setSubmitError(toUserMessage(e, USER_MESSAGES.save));
       return false;
     }
   };
@@ -290,7 +291,7 @@ export default function KycWizardPage() {
     try {
       await setKycUpload(session.email, docId, file);
     } catch (err) {
-      setFileErrors((e) => ({ ...e, [docId]: err?.message || "Could not upload file. Try again." }));
+      setFileErrors((e) => ({ ...e, [docId]: toUserMessage(err, USER_MESSAGES.upload) }));
     } finally {
       setUploadBusy(null);
     }
@@ -302,7 +303,7 @@ export default function KycWizardPage() {
     try {
       await clearKycUpload(session.email, docId);
     } catch (err) {
-      setFileErrors((e) => ({ ...e, [docId]: err?.message || "Could not remove file." }));
+      setFileErrors((e) => ({ ...e, [docId]: toUserMessage(err, "We couldn't remove that file. Please try again.") }));
     } finally {
       setUploadBusy(null);
     }
@@ -330,7 +331,7 @@ export default function KycWizardPage() {
       if (!saved) return;
       await submitKyc();
     } catch (e) {
-      setSubmitError(e?.message || "KYC submit failed. Please try again.");
+      setSubmitError(toUserMessage(e, "We couldn't submit your details. Please try again."));
     } finally {
       setSubmitting(false);
     }

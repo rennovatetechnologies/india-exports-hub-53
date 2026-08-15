@@ -2,6 +2,7 @@
 
 import { api } from "@/lib/api";
 import { allowAuthMock } from "@/lib/authSession";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 
 export const EVENT_IMAGE_OPTIONS = [
   { value: "/event.png", label: "Conference hall" },
@@ -27,33 +28,14 @@ export function resolveEventImage(raw) {
   return "/event.png";
 }
 
-export const DEFAULT_EVENTS = [
-  {
-    id: "e1",
-    title: "Global Buyer-Seller Meet 2026",
-    date: "2026-06-22",
-    city: "Mumbai, India",
-    img: "/event.png",
-    capacity: 120,
-    priceInr: 4999,
-    desc: "Curated meet between Indian exporters and 40+ international buyers across spices, organic food and fresh produce.",
-  },
-  {
-    id: "e2",
-    title: "VIRASTRA INTERNATIONAL EXPORT Summit",
-    date: "2026-08-14",
-    city: "Dubai, UAE",
-    img: "/event2.webp",
-    capacity: 200,
-    priceInr: 0,
-    desc: "Two-day summit on MENA market access, halal certification and trade finance for Indian exporters.",
-  },
-];
+export const DEFAULT_EVENTS = [];
 
 const STORAGE_KEY = "vistara_events_catalog";
 
 /** @type {object[] | null} */
 let memoryEvents = null;
+/** True only after a successful GET /api/events. */
+let eventsFromApi = false;
 /** @type {Record<string, object[]>} */
 let memoryRegs = {};
 /** @type {Record<string, number>} */
@@ -73,12 +55,63 @@ export function toDateInputValue(raw) {
   return "";
 }
 
+/** Calendar date in India (YYYY-MM-DD). Events are date-only, not timed. */
+export function todayIso() {
+  try {
+    return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+/** True when the event's last day is before today. Undated events stay visible. */
+export function isEventExpired(event, today = todayIso()) {
+  if (event?.expired === true) return true;
+  const end = toDateInputValue(event?.endDate || event?.startDate || event?.date);
+  if (!end) return false;
+  return end < today;
+}
+
+export function filterActiveEvents(events) {
+  return (Array.isArray(events) ? events : []).filter((e) => e && !isEventExpired(e));
+}
+
 export function formatEventDate(raw) {
   const iso = toDateInputValue(raw);
   if (!iso) return String(raw || "").trim() || "Date TBA";
   const d = new Date(`${iso}T12:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+export function formatEventDateRange(startRaw, endRaw) {
+  const startIso = toDateInputValue(startRaw);
+  const endIso = toDateInputValue(endRaw);
+  if (!startIso && !endIso) return "Date TBA";
+  if (!endIso || endIso === startIso) return formatEventDate(startRaw || endRaw);
+  return `${formatEventDate(startIso)} – ${formatEventDate(endIso)}`;
+}
+
+function normalizeDiscountPercent(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  if (n >= 100) return 100;
+  return Math.round(n * 100) / 100;
+}
+
+export function eventEffectivePrice(event) {
+  if (event?.effectivePrice != null && Number.isFinite(Number(event.effectivePrice))) {
+    return Math.max(0, Math.round(Number(event.effectivePrice)));
+  }
+  const list = Math.max(0, Math.round(Number(event?.priceInr) || 0));
+  const pct = normalizeDiscountPercent(event?.discountPercent);
+  if (pct <= 0) return list;
+  return Math.max(0, Math.round(list * (1 - pct / 100)));
+}
+
+export function eventHasDiscount(event) {
+  const list = Math.max(0, Math.round(Number(event?.priceInr) || 0));
+  return normalizeDiscountPercent(event?.discountPercent) > 0 && eventEffectivePrice(event) < list;
 }
 
 function parseCapacity(raw, seatsLabel) {
@@ -96,19 +129,39 @@ function normalizeEvent(e) {
   const title = String(e.title || "").trim();
   if (!title) return null;
   const capacity = parseCapacity(e.capacity, e.seats);
-  const date = toDateInputValue(e.date) || String(e.date || "").trim();
+  const startDate = toDateInputValue(e.startDate || e.date) || String(e.startDate || e.date || "").trim();
+  const endDate =
+    toDateInputValue(e.endDate) ||
+    String(e.endDate || "").trim() ||
+    startDate;
+  const date = startDate;
   const img = resolveEventImage(e.img);
   const priceInr = Math.max(0, Math.round(Number(e.priceInr) || 0));
+  const discountPercent = normalizeDiscountPercent(e.discountPercent);
   return {
     id,
     title,
     date,
+    startDate,
+    endDate,
     city: String(e.city || "").trim(),
     img,
     capacity,
     seats: `${capacity} seats`,
     desc: String(e.desc || "").trim(),
     priceInr,
+    discountPercent,
+    effectivePrice: eventEffectivePrice({ priceInr, discountPercent, effectivePrice: e.effectivePrice }),
+    payableTotalInr: Math.max(0, Math.round(Number(e.payableTotalInr) || 0)) || null,
+    installmentEligible: Boolean(e.installmentEligible),
+    installmentOptions: e.installmentOptions || null,
+    createdAt: e.createdAt || null,
+    expired: Boolean(e.expired) || isEventExpired({
+      endDate,
+      startDate,
+      date,
+      expired: e.expired,
+    }),
   };
 }
 
@@ -124,12 +177,15 @@ function normalizeRegistration(r, eventId) {
     company: String(r.company || "").trim(),
     status: r.status || "registered",
     paymentId: r.paymentId || null,
+    installmentPlanId: r.installmentPlanId || null,
+    paidInstallments: r.paidInstallments != null ? Number(r.paidInstallments) : null,
+    installmentCount: r.installmentCount != null ? Number(r.installmentCount) : null,
     at: r.at || r.createdAt || r.updatedAt || null,
   };
 }
 
 function setMemory(events) {
-  memoryEvents = events;
+  memoryEvents = Array.isArray(events) ? events : [];
   try {
     if (typeof localStorage !== "undefined") localStorage.removeItem(STORAGE_KEY);
   } catch {
@@ -147,43 +203,86 @@ function emitRegs() {
 }
 
 export function loadEventsCatalog() {
-  if (memoryEvents?.length) return memoryEvents.map((x) => ({ ...x }));
-  return DEFAULT_EVENTS.map((x) => ({ ...x }));
+  if (memoryEvents) return memoryEvents.map((x) => ({ ...x }));
+  return [];
+}
+
+/** Next upcoming event by start date. Never returns an expired event. */
+export function pickFeaturedEvent(events) {
+  const list = filterActiveEvents(events);
+  if (!list.length) return null;
+  const upcoming = [...list].sort((a, b) =>
+    String(a.startDate || a.date || "").localeCompare(String(b.startDate || b.date || ""))
+  );
+  return upcoming[0] || null;
 }
 
 export async function fetchEventsCatalog({ force = false } = {}) {
-  if (memoryEvents?.length && !force) return memoryEvents.map((x) => ({ ...x }));
+  if (!force && eventsFromApi && memoryEvents) {
+    return memoryEvents.map((x) => ({ ...x }));
+  }
   try {
-    const data = await api("/api/events", { auth: false });
+    const data = await api("/api/events");
     const list = Array.isArray(data) ? data : data?.items || data?.data || [];
     const cleaned = list.map(normalizeEvent).filter(Boolean);
-    if (cleaned.length) {
-      setMemory(cleaned);
-      return cleaned.map((x) => ({ ...x }));
-    }
+    eventsFromApi = true;
+    setMemory(cleaned);
+    return cleaned.map((x) => ({ ...x }));
   } catch (e) {
     console.warn("[events] fetch failed", e.message);
+    // Never substitute a client catalog — prices must come from the API.
+    if (eventsFromApi && memoryEvents) return memoryEvents.map((x) => ({ ...x }));
+    return [];
   }
-  return loadEventsCatalog();
 }
 
-export async function saveEventsCatalog(events, { onlyIds } = {}) {
+function eventPayload(e) {
+  const startDate = toDateInputValue(e.startDate || e.date);
+  const endDate = toDateInputValue(e.endDate) || startDate;
+  const capacity = Math.max(1, Number(e.capacity) || 1);
+  return {
+    title: e.title,
+    date: startDate,
+    startDate,
+    endDate,
+    city: e.city || "",
+    img: resolveEventImage(e.img),
+    capacity: String(capacity),
+    seats: `${capacity} seats`,
+    desc: e.desc || "",
+    priceInr: Math.max(0, Math.round(Number(e.priceInr) || 0)),
+    discountPercent: normalizeDiscountPercent(e.discountPercent),
+  };
+}
+
+export async function saveEventsCatalog(events, { onlyIds, create } = {}) {
+  if (create) {
+    const source = Array.isArray(events) ? events[0] : events;
+    const created = await api("/api/events", { method: "POST", body: eventPayload(source) });
+    const normalized = normalizeEvent(created);
+    const current = loadEventsCatalog().filter((e) => e.id !== normalized?.id);
+    const next = normalized ? [...current, normalized] : current;
+    setMemory(next);
+    return next;
+  }
+
   const next = (Array.isArray(events) ? events : []).map(normalizeEvent).filter(Boolean);
-  setMemory(next);
   const toSave = onlyIds?.length
     ? next.filter((e) => onlyIds.includes(e.id))
     : next;
   for (const e of toSave) {
-    try {
-      await api(`/api/events/${encodeURIComponent(e.id)}`, { method: "PUT", body: e });
-    } catch {
-      try {
-        await api("/api/events", { method: "POST", body: e });
-      } catch (err) {
-        console.warn("[events] save failed", e.id, err.message);
-      }
-    }
+    await api(`/api/events/${encodeURIComponent(e.id)}`, { method: "PUT", body: eventPayload(e) });
   }
+  setMemory(next);
+  return next;
+}
+
+export async function deleteEventFromCatalog(eventId) {
+  const id = String(eventId || "").trim();
+  if (!id) return loadEventsCatalog();
+  await api(`/api/events/${encodeURIComponent(id)}`, { method: "DELETE" });
+  const next = loadEventsCatalog().filter((e) => e.id !== id);
+  setMemory(next);
   return next;
 }
 
@@ -219,6 +318,16 @@ export function isEmailRegistered(eventId, email) {
   const key = String(email || "").trim().toLowerCase();
   if (!key) return false;
   return getEventRegistrations(eventId).some((r) => String(r.email || "").toLowerCase() === key);
+}
+
+export function getMyRegistration(eventId, email) {
+  const key = String(email || "").trim().toLowerCase();
+  if (!key) return null;
+  return getEventRegistrations(eventId).find((r) => String(r.email || "").toLowerCase() === key) || null;
+}
+
+export function isPartialRegistration(reg) {
+  return String(reg?.status || "") === "partial";
 }
 
 function rememberRegistration(eventId, registration) {
@@ -310,10 +419,12 @@ export async function fetchEventCommunications(eventId) {
   }
 }
 
-async function payAndRegisterForEvent(eventId, { email, name, company, priceInr, title } = {}) {
+async function payAndRegisterForEvent(eventId, {
+  email, name, company, priceInr, title, payInInstallments, installmentPlanId,
+} = {}) {
   const { startRazorpayCheckout } = await import("@/components/PayButton");
   const amount = Math.max(0, Math.round(Number(priceInr) || 0));
-  if (amount <= 0) throw new Error("Invalid event price");
+  if (amount <= 0) throw new Error("Event price is not available");
   await startRazorpayCheckout({
     amountInr: amount,
     planId: eventId,
@@ -321,24 +432,34 @@ async function payAndRegisterForEvent(eventId, { email, name, company, priceInr,
     purpose: "event",
     description: title || "Event registration",
     customer: { name, email },
+    payInInstallments: Boolean(payInInstallments),
+    installmentPlanId: installmentPlanId || undefined,
   });
   const registration = {
     email,
     name: name || String(email).split("@")[0],
     company: company || "",
+    status: payInInstallments || installmentPlanId ? "partial" : "registered",
     at: new Date().toISOString(),
   };
   rememberRegistration(eventId, registration);
-  return { ok: true, registration, paid: true };
+  return { ok: true, registration, paid: true, installment: Boolean(payInInstallments || installmentPlanId) };
 }
 
-export async function registerForEvent(eventId, { email, name, company, priceInr, title } = {}) {
+export async function registerForEvent(eventId, {
+  email, name, company, priceInr, title, payInInstallments, installmentPlanId,
+} = {}) {
   const key = String(email || "").trim().toLowerCase();
   if (!key) return { ok: false, reason: "Sign in required" };
 
+  const catalogEvent = loadEventsCatalog().find((e) => e.id === eventId);
+  if (catalogEvent && isEventExpired(catalogEvent)) {
+    return { ok: false, reason: "This event has ended." };
+  }
+
   const knownPrice = Math.max(0, Math.round(Number(priceInr) || 0));
   // Paid events must go through Razorpay; verify-payment creates the registration.
-  if (knownPrice > 0) {
+  if (knownPrice > 0 || installmentPlanId) {
     try {
       return await payAndRegisterForEvent(eventId, {
         email: key,
@@ -346,11 +467,13 @@ export async function registerForEvent(eventId, { email, name, company, priceInr
         company,
         priceInr: knownPrice,
         title,
+        payInInstallments,
+        installmentPlanId,
       });
     } catch (e) {
       const msg = String(e.message || "");
       if (/cancel/i.test(msg)) return { ok: false, reason: "cancelled" };
-      return { ok: false, reason: msg || "Payment failed" };
+      return { ok: false, reason: toUserMessage(e, USER_MESSAGES.payment) };
     }
   }
 
@@ -370,24 +493,36 @@ export async function registerForEvent(eventId, { email, name, company, priceInr
   } catch (e) {
     // Backend may still require payment if catalog price was stale/0 on the client.
     if (e.status === 402 || e.data?.code === "PAYMENT_REQUIRED") {
+      const serverPrice = Math.max(
+        0,
+        Math.round(Number(e.data?.effectivePrice ?? e.data?.priceInr) || 0)
+      );
+      if (serverPrice <= 0) {
+        return { ok: false, reason: "Event price is not available" };
+      }
       try {
         return await payAndRegisterForEvent(eventId, {
           email: key,
           name,
           company,
-          priceInr: e.data?.priceInr ?? priceInr,
+          priceInr: serverPrice,
           title,
+          payInInstallments,
+          installmentPlanId,
         });
       } catch (payErr) {
         const msg = String(payErr.message || "");
         if (/cancel/i.test(msg)) return { ok: false, reason: "cancelled" };
-        return { ok: false, reason: msg || "Payment failed" };
+        return { ok: false, reason: toUserMessage(payErr, USER_MESSAGES.payment) };
       }
     }
     const msg = String(e.message || "").toLowerCase();
     if (msg.includes("already")) return { ok: false, reason: "already" };
     if (msg.includes("full")) return { ok: false, reason: "full" };
-    return { ok: false, reason: e.message || "failed" };
+    if (e.status === 410 || e.data?.code === "EVENT_EXPIRED" || msg.includes("ended")) {
+      return { ok: false, reason: "This event has ended." };
+    }
+    return { ok: false, reason: toUserMessage(e, "We couldn't complete that reservation. Please try again.") };
   }
 }
 
@@ -399,14 +534,24 @@ export async function unregisterFromEvent(eventId, email) {
       method: "DELETE",
       body: { email: key },
     });
-  } catch {
-    /* still update local */
+  } catch (e) {
+    throw e;
   }
   const list = Array.isArray(memoryRegs[eventId]) ? memoryRegs[eventId] : [];
   memoryRegs[eventId] = list.filter((r) => String(r.email || "").toLowerCase() !== key);
   memoryCounts[eventId] = memoryRegs[eventId].length;
   emitRegs();
   return true;
+}
+
+export async function fetchMyInstallmentPlans() {
+  try {
+    const data = await api("/api/me/installment-plans");
+    return data?.items || data?.data || [];
+  } catch (e) {
+    console.warn("[events] installment plans failed", e.message);
+    return [];
+  }
 }
 
 export function occupancyLabel(event) {

@@ -35,6 +35,7 @@ import {
 import { getPlanById } from "@/lib/planCatalog";
 import { fetchMessagesForCase, getMessagesForCase, sendMessage } from "@/lib/caseMessages";
 import { PATHS } from "@/lib/routes";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 
 function reviewBadge(status) {
   if (status === "approved") return "bg-emerald-400/15 text-emerald-300";
@@ -229,7 +230,7 @@ export default function AdminWorkflowPage() {
         setDocNotes((n) => ({ ...n, [docId]: note }));
       }
     } catch (e) {
-      setKycError(e?.message || "Review update failed");
+      setKycError(toUserMessage(e, "We couldn't update this review. Please try again."));
     } finally {
       setKycBusy(null);
     }
@@ -264,7 +265,7 @@ export default function AdminWorkflowPage() {
         };
       });
     } catch (e) {
-      const msg = e?.message || "Could not open file. Try download instead.";
+      const msg = toUserMessage(e, "We couldn't open that file. Try downloading it instead.");
       if (errorKey === "doc") setDocError(msg);
       else setKycError(msg);
     } finally {
@@ -654,7 +655,7 @@ export default function AdminWorkflowPage() {
                           await setCaseStage(customerEmail, i + 1, note || undefined);
                           setNote("");
                         } catch (e) {
-                          setStageError(e?.message || "Could not advance stage. Try again.");
+                          setStageError(toUserMessage(e, "We couldn't move this stage forward. Please try again."));
                         } finally {
                           setStageBusy(false);
                         }
@@ -738,7 +739,7 @@ export default function AdminWorkflowPage() {
                       setDocNote("");
                       if (docFileInputRef.current) docFileInputRef.current.value = "";
                     } catch (e) {
-                      setDocError(e?.message || "Upload failed");
+                      setDocError(toUserMessage(e, USER_MESSAGES.upload));
                     } finally {
                       setDocUploading(false);
                     }
@@ -823,7 +824,7 @@ export default function AdminWorkflowPage() {
                     setReqLabel("");
                     setReqReason("");
                   } catch (e) {
-                    setReqError(e?.message || "Request failed");
+                    setReqError(toUserMessage(e, "We couldn't send that request. Please try again."));
                   } finally {
                     setReqBusy(false);
                   }

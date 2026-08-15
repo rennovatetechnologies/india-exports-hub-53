@@ -33,8 +33,23 @@ export const DEFAULT_PLANS = [
     price: 33999,
     discountPercent: 0,
     tagline: "For first-time exporters",
+    timeline: "Liaisoning · 22 days",
     featured: false,
     features: ["IEC + AD code", "Core KYC pack", "Email support", "Formation workflow"],
+    marketingFeatures: [
+      { label: "Gumasta / Shop Act Registration", included: true },
+      { label: "MSME Registration", included: true },
+      { label: "IEC (Import Export Code)", included: true },
+      { label: "Bank Account Assistance", included: true },
+      { label: "GST Registration & LUT Filing", included: true },
+      { label: "AD Code Generation", included: true },
+      { label: "RCMC Certificate", included: true },
+      { label: "Phytosanitary / Fumigation", included: true },
+      { label: "DSC (Class 3)", included: true },
+      { label: "DGFT Registration", included: false },
+      { label: "ICEGATE Integration", included: false },
+      { label: "Company Formation", included: false },
+    ],
     kycDocs: BASIC_KYC,
     workflowStages: BASIC_STAGES,
   },
@@ -44,12 +59,27 @@ export const DEFAULT_PLANS = [
     price: 43999,
     discountPercent: 0,
     tagline: "Most exporters pick this",
+    timeline: "Liaisoning · 22 days",
     featured: true,
     features: [
       "Everything in Basic",
       "RCMC + DGFT advisory",
       "GST & board resolution in KYC",
       "Priority ops support",
+    ],
+    marketingFeatures: [
+      { label: "Everything in Basic", included: true },
+      { label: "DGFT Registration & Integration", included: true },
+      { label: "ICEGATE Registration & Integration", included: true },
+      { label: "AD Code Approval", included: true },
+      { label: "IFSC / PFMS Approval", included: true },
+      { label: "Company Formation", included: false },
+      { label: "Trademark Application", included: false },
+      { label: "Quality Assessment Support", included: false },
+      { label: "Pre & Post Shipment Docs", included: false },
+      { label: "Shipment Cost Analysis", included: false },
+      { label: "Expert Compliance Reviews", included: false },
+      { label: "Exhibition Networking", included: false },
     ],
     kycDocs: [
       ...BASIC_KYC,
@@ -68,12 +98,27 @@ export const DEFAULT_PLANS = [
     price: 83999,
     discountPercent: 0,
     tagline: "Full white-glove desk",
+    timeline: "Liaisoning · 45 days",
     featured: false,
     features: [
       "Everything in Standard",
       "Dedicated operations owner",
       "Priority event seating support",
       "Extended documentation pack",
+    ],
+    marketingFeatures: [
+      { label: "Everything in Standard", included: true },
+      { label: "Company Formation", included: true },
+      { label: "Trademark Application", included: true },
+      { label: "Digital Platform Assistance", included: true },
+      { label: "Quality Assessment Certification", included: true },
+      { label: "Pre & Post Shipment Documentation", included: true },
+      { label: "Shipment Cost Analysis & Statement", included: true },
+      { label: "Expert Reviews & Compliance", included: true },
+      { label: "Exhibition Exposure & Networking", included: true },
+      { label: "Dedicated success manager", included: true },
+      { label: "Priority operations queue", included: true },
+      { label: "Investor & buyer intros", included: true },
     ],
     kycDocs: [
       ...BASIC_KYC,
@@ -95,6 +140,8 @@ const STORAGE_KEY = "vistara_billing_plans"; // legacy — cleared on fetch; not
 
 /** @type {object[] | null} */
 let memoryPlans = null;
+/** True only after a successful GET /api/plans. */
+let plansFromApi = false;
 
 function normalizeKycDoc(d) {
   if (!d || typeof d !== "object") return null;
@@ -114,6 +161,24 @@ function normalizeStage(s) {
     label,
     description: String(s.description || "").trim(),
   };
+}
+
+function normalizeMarketingFeature(row) {
+  if (typeof row === "string") {
+    const label = row.trim();
+    return label ? { label, included: true } : null;
+  }
+  if (!row || typeof row !== "object") return null;
+  const label = String(row.label || row.text || "").trim();
+  if (!label) return null;
+  return { label, included: row.included !== false };
+}
+
+/** Homepage comparison rows: [label, included]. Falls back to short billing bullets. */
+export function planMarketingRows(plan) {
+  const rows = Array.isArray(plan?.marketingFeatures) ? plan.marketingFeatures : [];
+  if (rows.length) return rows.map((f) => [f.label, f.included !== false]);
+  return (plan?.features || []).map((f) => [f, true]);
 }
 
 export function normalizeDiscountPercent(raw) {
@@ -150,6 +215,10 @@ function normalizePlan(p) {
   const featured = Boolean(p.featured);
   const features = Array.isArray(p.features) ? p.features.map((f) => String(f).trim()).filter(Boolean) : [];
   const fallback = DEFAULT_PLANS.find((x) => x.id === id);
+  const timeline = String(p.timeline || fallback?.timeline || "").trim();
+  const marketingFeatures = (Array.isArray(p.marketingFeatures) ? p.marketingFeatures : fallback?.marketingFeatures || [])
+    .map(normalizeMarketingFeature)
+    .filter(Boolean);
   const kycDocs = (Array.isArray(p.kycDocs) ? p.kycDocs : fallback?.kycDocs || [])
     .map(normalizeKycDoc)
     .filter(Boolean);
@@ -163,18 +232,18 @@ function normalizePlan(p) {
     price,
     discountPercent,
     tagline,
+    timeline,
     featured,
     features,
+    marketingFeatures: marketingFeatures.length
+      ? marketingFeatures
+      : (fallback?.marketingFeatures || []).map((x) => ({ ...x })),
     kycDocs: kycDocs.length ? kycDocs : (fallback?.kycDocs || []).map((x) => ({ ...x })),
     workflowStages: workflowStages.length
       ? workflowStages
       : (fallback?.workflowStages || []).map((x) => ({ ...x })),
     effectivePrice: planEffectivePrice({ price, discountPercent, effectivePrice: p.effectivePrice }),
   };
-}
-
-function cloneDefaults() {
-  return DEFAULT_PLANS.map((x) => normalizePlan(x)).filter(Boolean);
 }
 
 function clearLegacyLocalCache() {
@@ -193,26 +262,28 @@ function setMemory(plans) {
   }
 }
 
-/** Sync read — API memory for this tab only; defaults until first fetch. Never localStorage. */
+/** Sync read — API memory for this tab only. Empty until the first successful fetch. */
 export function loadPlanCatalog() {
-  if (memoryPlans?.length) return memoryPlans.map((p) => ({ ...p }));
-  return cloneDefaults();
+  if (memoryPlans) return memoryPlans.map((p) => ({ ...p }));
+  return [];
 }
 
 export async function fetchPlanCatalog({ force = false } = {}) {
-  if (memoryPlans?.length && !force) return memoryPlans.map((p) => ({ ...p }));
+  if (!force && plansFromApi && memoryPlans) {
+    return memoryPlans.map((p) => ({ ...p }));
+  }
   try {
     const data = await api("/api/plans", { auth: false });
     const list = Array.isArray(data) ? data : data?.items || data?.data || [];
     const cleaned = list.map(normalizePlan).filter(Boolean);
-    if (cleaned.length) {
-      setMemory(cleaned);
-      return cleaned.map((p) => ({ ...p }));
-    }
+    plansFromApi = true;
+    setMemory(cleaned);
+    return cleaned.map((p) => ({ ...p }));
   } catch (e) {
     console.warn("[plans] API fetch failed", e.message);
+    if (plansFromApi && memoryPlans) return memoryPlans.map((p) => ({ ...p }));
+    return [];
   }
-  return loadPlanCatalog();
 }
 
 /** Persist catalog (admin). Writes each plan to API. */

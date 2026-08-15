@@ -4,7 +4,7 @@ import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Download } from "lucide-react";
 import { getBrochureMenu, PRODUCT_CATEGORIES, openBrochureDownload } from "@/lib/siteNav";
-import { subscribeBrochures } from "@/lib/brochuresCatalog";
+import { fetchBrochuresCatalog, subscribeBrochures } from "@/lib/brochuresCatalog";
 import { PATHS } from "@/lib/routes";
 import {
   clearSession,
@@ -51,7 +51,9 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    setBrochureMenu(getBrochureMenu());
+    fetchBrochuresCatalog({ force: true })
+      .then(() => setBrochureMenu(getBrochureMenu()))
+      .catch(() => setBrochureMenu(getBrochureMenu()));
     return subscribeBrochures(() => setBrochureMenu(getBrochureMenu()));
   }, []);
 
@@ -106,13 +108,13 @@ export default function Navbar() {
       !pathname.startsWith("/admin/register"));
   if (hideForDedicatedChrome) return null;
 
+  const brochureDownloads = brochureMenu.filter((x) => x.type === "download");
   const navItems = [
     { name: "Home", path: PATHS.home },
     { name: "Plans", path: "/#plans" },
-    {
-      name: "Brochures",
-      sub: brochureMenu,
-    },
+    brochureDownloads.length
+      ? { name: "Brochures", sub: brochureMenu }
+      : { name: "Brochures", path: PATHS.brochures },
     {
       name: "Products",
       sub: PRODUCT_CATEGORIES.map(({ name, path }) => ({ name, path })),

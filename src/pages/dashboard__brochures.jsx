@@ -7,10 +7,7 @@ import { getSession, ROLES } from "@/lib/authSession";
 import {
   loadBrochuresCatalog,
   fetchBrochuresCatalog,
-  saveBrochuresCatalog,
   subscribeBrochures,
-  putBrochureBlob,
-  deleteBrochureBlob,
   validateBrochureFile,
   formatBrochureSize,
   newBrochureId,
@@ -18,7 +15,10 @@ import {
   getPdfBrochures,
   getGalleryBrochures,
   resolveBrochureUrl,
+  upsertBrochure,
+  deleteBrochureFromCatalog,
 } from "@/lib/brochuresCatalog";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 
 const emptyPdfDraft = () => ({
   id: newBrochureId("pdf"),
@@ -35,6 +35,21 @@ const emptyPdfDraft = () => ({
   _preview: null,
 });
 
+const emptyGalleryDraft = () => ({
+  id: newBrochureId("gallery"),
+  name: "New brochure image",
+  kind: "gallery",
+  path: "",
+  hasBlob: false,
+  showInNav: false,
+  sortOrder: 100,
+  fileName: "",
+  fileType: "",
+  fileSize: 0,
+  _file: null,
+  _preview: null,
+});
+
 function AdminBrochuresEditor() {
   const [catalog, setCatalog] = useState(() => loadBrochuresCatalog());
   const [savedAt, setSavedAt] = useState(null);
@@ -44,7 +59,7 @@ function AdminBrochuresEditor() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    fetchBrochuresCatalog().then(setCatalog).catch(() => {});
+    fetchBrochuresCatalog({ force: true }).then(setCatalog).catch(() => {});
     return subscribeBrochures(setCatalog);
   }, []);
 
@@ -55,18 +70,19 @@ function AdminBrochuresEditor() {
   }, [draft?._preview]);
 
   const pdfs = useMemo(() => getPdfBrochures(catalog), [catalog]);
+  const gallery = useMemo(() => getGalleryBrochures(catalog), [catalog]);
 
   const openEditExisting = useCallback((id) => {
     const row = catalog.find((b) => b.id === id);
-    if (!row || row.kind !== "pdf") return;
+    if (!row) return;
     setError("");
     setDraft({ ...row, _file: null, _preview: null });
     setEditKey(id);
   }, [catalog]);
 
-  const openNew = useCallback(() => {
+  const openNew = useCallback((kind = "pdf") => {
     setError("");
-    setDraft(emptyPdfDraft());
+    setDraft(kind === "gallery" ? emptyGalleryDraft() : emptyPdfDraft());
     setEditKey("new");
   }, []);
 
@@ -88,14 +104,8 @@ function AdminBrochuresEditor() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !draft) return;
-    const isPdf =
-      String(file.type || "").toLowerCase() === "application/pdf" ||
-      /\.pdf$/i.test(file.name || "");
-    if (!isPdf) {
-      setError("Use a PDF file");
-      return;
-    }
-    const check = validateBrochureFile(file, "pdf");
+    const kind = draft.kind === "gallery" ? "gallery" : "pdf";
+    const check = validateBrochureFile(file, kind);
     if (!check.ok) {
       setError(check.message);
       return;
@@ -104,9 +114,9 @@ function AdminBrochuresEditor() {
     if (draft._preview) URL.revokeObjectURL(draft._preview);
     updateDraft({
       _file: file,
-      _preview: null,
+      _preview: kind === "gallery" ? URL.createObjectURL(file) : null,
       fileName: file.name,
-      fileType: file.type || "application/pdf",
+      fileType: file.type || (kind === "gallery" ? "image/jpeg" : "application/pdf"),
       fileSize: file.size,
       hasBlob: true,
       path: "",
@@ -114,14 +124,14 @@ function AdminBrochuresEditor() {
   };
 
   const saveDraft = async () => {
-    if (!draft || draft.kind !== "pdf") return;
+    if (!draft) return;
     const name = String(draft.name || "").trim();
     if (!name) {
       setError("Name is required");
       return;
     }
     if (!draft.hasBlob && !draft.path && !draft._file) {
-      setError("Upload a file or keep an existing site path");
+      setError("Upload a file");
       return;
     }
 
@@ -129,47 +139,24 @@ function AdminBrochuresEditor() {
     setError("");
     try {
       const id = editKey === "new" ? draft.id : editKey;
-      let hasBlob = Boolean(draft.hasBlob);
-      let path = draft.path || undefined;
-      let fileName = draft.fileName;
-      let fileType = draft.fileType;
-      let fileSize = draft.fileSize;
-
-      if (draft._file) {
-        await putBrochureBlob(id, draft._file);
-        hasBlob = true;
-        path = undefined;
-        fileName = draft._file.name;
-        fileType = draft._file.type || fileType;
-        fileSize = draft._file.size;
-      }
-
-      const payload = {
-        id,
-        name,
-        kind: "pdf",
-        path,
-        hasBlob,
-        fileName,
-        fileType,
-        fileSize,
-        showInNav: draft.showInNav !== false,
-        sortOrder: Number(draft.sortOrder) || 0,
-        createdAt: draft.createdAt || new Date().toISOString(),
-      };
-
-      let next;
-      if (editKey === "new") {
-        next = [...catalog, payload];
-      } else {
-        next = catalog.map((b) => (b.id === editKey ? payload : b));
-      }
-      saveBrochuresCatalog(next);
-      setCatalog(loadBrochuresCatalog());
+      await upsertBrochure({
+        item: {
+          id,
+          name,
+          kind: draft.kind === "gallery" ? "gallery" : "pdf",
+          path: draft._file ? "" : draft.path,
+          showInNav: draft.kind === "gallery" ? false : draft.showInNav !== false,
+          sortOrder: Number(draft.sortOrder) || 0,
+        },
+        file: draft._file || undefined,
+        create: editKey === "new",
+      });
+      const list = await fetchBrochuresCatalog({ force: true });
+      setCatalog(list);
       setSavedAt(new Date());
       leaveEdit();
     } catch (err) {
-      setError(err?.message || "Could not save brochure");
+      setError(toUserMessage(err, USER_MESSAGES.save));
     } finally {
       setBusy(false);
     }
@@ -178,21 +165,19 @@ function AdminBrochuresEditor() {
   const removeById = async (id) => {
     if (!id || id === "new") return;
     const row = catalog.find((b) => b.id === id);
-    if (!row || row.kind !== "pdf") return;
+    if (!row) return;
     const label = row.name || "this brochure";
     if (!window.confirm(`Remove “${label}” from the site? This cannot be undone.`)) return;
 
     setBusy(true);
     setError("");
     try {
-      if (row.hasBlob) await deleteBrochureBlob(id);
-      const next = catalog.filter((b) => b.id !== id);
-      saveBrochuresCatalog(next.length ? next : []);
+      await deleteBrochureFromCatalog(id);
       setCatalog(loadBrochuresCatalog());
       setSavedAt(new Date());
       if (editKey === id) leaveEdit();
     } catch (err) {
-      setError(err?.message || "Could not remove brochure");
+      setError(toUserMessage(err, "We couldn't remove that brochure. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -211,18 +196,29 @@ function AdminBrochuresEditor() {
           <h1 className="text-2xl font-semibold tracking-tight">Brochures</h1>
           <p className="mt-1 text-sm text-white/55">
             {isEditing
-              ? "Upload a PDF — it appears in the nav downloads after you save."
-              : "Add, edit, or remove PDF brochure downloads shown in the nav."}
+              ? draft.kind === "gallery"
+                ? "Upload an image for the public brochures gallery."
+                : "Upload a PDF — it appears in the nav downloads after you save."
+              : "Add PDFs and gallery images. Only what you save here is shown on the site."}
           </p>
         </div>
         {!isEditing ? (
-          <button
-            type="button"
-            onClick={openNew}
-            className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
-          >
-            <Plus size={16} /> Add PDF
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => openNew("gallery")}
+              className="btn-ghost inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+            >
+              <Plus size={16} /> Add image
+            </button>
+            <button
+              type="button"
+              onClick={() => openNew("pdf")}
+              className="btn-gold inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+            >
+              <Plus size={16} /> Add PDF
+            </button>
+          </div>
         ) : (
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={leaveEdit} disabled={busy} className="btn-ghost inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold">
@@ -262,7 +258,7 @@ function AdminBrochuresEditor() {
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
             <span className="font-mono text-[11px] text-white/50">{draft.id}</span>
             <span className="rounded-full border border-white/10 px-2.5 py-0.5 text-[10px] uppercase tracking-wider text-white/55">
-              PDF download
+              {draft.kind === "gallery" ? "Gallery image" : "PDF download"}
             </span>
           </div>
 
@@ -290,6 +286,7 @@ function AdminBrochuresEditor() {
                 className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white outline-none focus:border-[var(--gold)]/40"
               />
             </label>
+            {draft.kind !== "gallery" ? (
             <label className="flex items-end gap-2 pb-2 text-sm text-white/70">
               <input
                 type="checkbox"
@@ -299,18 +296,21 @@ function AdminBrochuresEditor() {
               />
               Show in top nav Brochures menu
             </label>
+            ) : <div />}
           </div>
 
           <div>
             <div className="text-xs uppercase tracking-wider text-white/45">File</div>
             <p className="mt-1 text-[11px] text-white/40">
-              PDF (up to 20MB). Uploads replace any static path.
+              {draft.kind === "gallery"
+                ? "JPG, PNG, or WebP (up to 8MB)."
+                : "PDF (up to 20MB)."}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <label className="btn-ghost inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold">
                 <input
                   type="file"
-                  accept="application/pdf,.pdf"
+                  accept={draft.kind === "gallery" ? "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" : "application/pdf,.pdf"}
                   className="hidden"
                   onChange={onPickFile}
                 />
@@ -327,6 +327,7 @@ function AdminBrochuresEditor() {
           </div>
         </div>
       ) : (
+        <>
         <section className="space-y-4">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-white/50">
             <FileText size={14} /> PDF downloads ({pdfs.length})
@@ -365,6 +366,44 @@ function AdminBrochuresEditor() {
             )}
           </div>
         </section>
+        <section className="space-y-4">
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-white/50">
+            Gallery images ({gallery.length})
+          </h2>
+          <div className="grid gap-3 md:grid-cols-2">
+            {gallery.map((row) => (
+              <article key={row.id} className="glass-card flex items-start justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <h3 className="font-medium text-white truncate">{row.name}</h3>
+                  <p className="mt-1 text-xs text-white/45 truncate">
+                    {row.fileName || row.path || "Uploaded image"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <button type="button" onClick={() => previewOrOpen(row)} disabled={busy} className="rounded-lg p-2 text-white/55 hover:bg-white/5 hover:text-white" title="Open">
+                    <Eye size={16} />
+                  </button>
+                  <button type="button" onClick={() => openEditExisting(row.id)} disabled={busy} className="rounded-lg p-2 text-white/55 hover:bg-white/5 hover:text-white" title="Edit">
+                    <Pencil size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeById(row.id)}
+                    disabled={busy}
+                    className="rounded-lg p-2 text-rose-300/80 hover:bg-rose-400/10 hover:text-rose-200"
+                    title="Remove"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </article>
+            ))}
+            {gallery.length === 0 && (
+              <p className="text-sm text-white/45">No gallery images yet.</p>
+            )}
+          </div>
+        </section>
+        </>
       )}
     </div>
   );
@@ -384,7 +423,7 @@ function CustomerBrochures() {
   const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
-    fetchBrochuresCatalog().then(setCatalog).catch(() => {});
+    fetchBrochuresCatalog({ force: true }).then(setCatalog).catch(() => {});
     return subscribeBrochures(setCatalog);
   }, []);
 
@@ -401,7 +440,7 @@ function CustomerBrochures() {
         rows.map(async (row) => {
           const src = await resolveBrochureUrl(row);
           if (!src) return null;
-          if (row.hasBlob) objectUrls.push(src);
+          if (src.startsWith("blob:")) objectUrls.push(src);
           return { id: row.id, name: row.name, src };
         })
       );

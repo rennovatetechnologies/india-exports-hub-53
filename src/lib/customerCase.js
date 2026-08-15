@@ -11,6 +11,7 @@ import {
   remainingKycDocs,
 } from "@/lib/planCatalog";
 import { api } from "@/lib/api";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 
 export const CASE_STATUS = {
   NO_PLAN: "no_plan",
@@ -359,10 +360,10 @@ export async function fetchCaseFileBlob(fileId) {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) {
-    let msg = "Could not download file";
+    let msg = USER_MESSAGES.download;
     try {
       const data = await res.clone().json();
-      if (typeof data?.message === "string") msg = data.message;
+      if (typeof data?.message === "string") msg = toUserMessage({ message: data.message, status: res.status }, USER_MESSAGES.download);
     } catch {
       /* ignore */
     }

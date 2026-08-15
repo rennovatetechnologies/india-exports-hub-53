@@ -21,6 +21,8 @@ import {
 } from "@/lib/authSession";
 import { api } from "@/lib/api";
 import { getCustomerCase, gatePathForCase, fetchMyCase } from "@/lib/customerCase";
+import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
+import { InlineNotice } from "@/components/FallbackScreen";
 
 export default function VerifyPage() {
   const router = useNavigate();
@@ -104,7 +106,7 @@ export default function VerifyPage() {
             kycComplete: hasCompletedKyc(email),
           });
         } else {
-          setError("Sign-in failed. Ensure the backend issued a session for this email.");
+          setError("We couldn't complete sign-in. Please request a new code and try again.");
           setLoading(false);
           return;
         }
@@ -151,7 +153,7 @@ export default function VerifyPage() {
             router(gatePathForCase(getCustomerCase(email)));
             return;
           }
-          setError(err.message || "Could not create account. Is the backend running?");
+          setError("We couldn't create your account. Please try again in a moment.");
           setLoading(false);
         }
         return;
@@ -185,7 +187,7 @@ export default function VerifyPage() {
         }
         // Offline demo only — never mint a staff session without a backend JWT.
         if (!allowAuthMock()) {
-          setError("Staff sign-in failed. Is the API running on :5001?");
+          setError("We couldn't complete staff sign-in. Please request a new code and try again.");
           setLoading(false);
           return;
         }
@@ -213,10 +215,10 @@ export default function VerifyPage() {
         return;
       }
 
-      setError("Unknown verification flow. Start again.");
+      setError("This sign-in link isn't valid. Start again from the previous step.");
       setLoading(false);
     } catch (err) {
-      setError(err.message || "Verification failed");
+      setError(toUserMessage(err, USER_MESSAGES.verify));
       setLoading(false);
     }
   };
@@ -255,7 +257,7 @@ export default function VerifyPage() {
       }
     >
       <form onSubmit={onSubmit} className="space-y-6">
-        {error && <p className="text-center text-xs text-rose-300">{error}</p>}
+        {error && <InlineNotice>{error}</InlineNotice>}
         <div className="flex justify-between gap-2">
           {code.map((d, i) => (
             <input
