@@ -68,6 +68,7 @@ export async function startRazorpayCheckout(opts) {
       purpose: resolvedPurpose,
       description,
     };
+    if (customer.email) orderBody.email = customer.email;
     if (resolvedPurpose === "event" || eventId) {
       orderBody.eventId = eventId || planId;
     } else {

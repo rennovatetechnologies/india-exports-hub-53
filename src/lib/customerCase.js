@@ -538,21 +538,9 @@ export async function requestDocument(email, { label, reason }) {
 
 export function getCaseWorkflowStages(customerCase) {
   const current = getPlanById(customerCase?.paidPlanId || customerCase?.planId);
-  const live = current?.workflowStages || [];
-  const snap = Array.isArray(customerCase?.workflowStages) ? customerCase.workflowStages : [];
   const prevIds = customerCase?.previousPlanIds || [];
-
-  if (live.length && !prevIds.length) {
-    const snapIds = snap.map((s) => s.id).join("|");
-    const liveIds = live.map((s) => s.id).join("|");
-    if (!snap.length || snapIds !== liveIds) {
-      return live.map((s) => ({ ...s }));
-    }
-  }
-
-  if (snap.length) return snap.map((s) => ({ ...s }));
   if (!customerCase?.paidPlanId && !customerCase?.planId) return [];
-  if (!prevIds.length) return live.map((s) => ({ ...s }));
+  if (!prevIds.length) return (current?.workflowStages || []).map((s) => ({ ...s }));
   let stages = [];
   for (const id of prevIds) {
     const p = getPlanById(id);
@@ -565,8 +553,7 @@ export function getCaseWorkflowStages(customerCase) {
 export function isWorkflowComplete(customerCase) {
   if (!customerCase) return false;
   if (customerCase.status === CASE_STATUS.COMPLETED) return true;
-  const snap = Array.isArray(customerCase.workflowStages) ? customerCase.workflowStages : [];
-  const stages = snap.length ? snap : getCaseWorkflowStages(customerCase);
+  const stages = getCaseWorkflowStages(customerCase);
   if (!stages.length) return false;
   return Math.max(0, Number(customerCase.stageIndex || 0)) >= stages.length;
 }
@@ -585,15 +572,15 @@ export function isWorkspaceUnlocked(status) {
 
 export function getRequiredKycDocs(customerCase) {
   const plan = getPlanById(customerCase?.paidPlanId || customerCase?.planId);
-  const fromCase = Array.isArray(customerCase?.kycDocs) ? customerCase.kycDocs : [];
-  const fromPlan = Array.isArray(plan?.kycDocs) ? plan.kycDocs : [];
-  const docs = fromPlan.length ? fromPlan : fromCase;
+  const docs = Array.isArray(plan?.kycDocs) ? plan.kycDocs : [];
   if (!docs.length) return [];
-  if (customerCase?.paymentStatus !== "paid" || !isPlanEntitlementActive(customerCase)) return docs.map((d) => ({ ...d }));
+  if (customerCase?.paymentStatus !== "paid" || !isPlanEntitlementActive(customerCase)) {
+    return docs.map((d) => ({ ...d }));
+  }
   const uploaded = Object.keys(customerCase.kycUploads || {});
   if (customerCase.kycStatus === KYC_STATUS.APPROVED) return [];
   if ((customerCase.previousPlanIds || []).length) {
-    return remainingKycDocs({ kycDocs: docs }, uploaded);
+    return remainingKycDocs(plan, uploaded);
   }
   return docs.map((d) => ({ ...d }));
 }

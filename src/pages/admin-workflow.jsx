@@ -142,8 +142,7 @@ export default function AdminWorkflowPage() {
   const plan = getPlanById(c.paidPlanId || c.planId);
   const stages = getCaseWorkflowStages(c);
   const status = journeyStatus(c);
-  const kycDocs =
-    Array.isArray(c.kycDocs) && c.kycDocs.length ? c.kycDocs : plan?.kycDocs || [];
+  const kycDocs = plan?.kycDocs || [];
   const msgs = getMessagesForCase(c || customerEmail);
   const roster = loadOpsRoster();
   const canReviewKyc = c.kycStatus === KYC_STATUS.SUBMITTED;

@@ -398,7 +398,7 @@ export default function KycWizardPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.25em] text-white/40">
-            {plan?.name || "Plan"} · {required.length || c?.kycDocs?.length || 0} documents
+            {plan?.name || "Plan"} · {required.length} documents
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
             {c?.kycStatus === KYC_STATUS.NEEDS_MORE ? "Update your KYC" : "KYC & onboarding"}
