@@ -28,15 +28,15 @@ export default function WhyChooseUs() {
               tracked in one workflow with operations support attached.
             </p>
             <div className="mt-8 grid grid-cols-3 gap-4">
-              <BentoStat n="30+" l="Countries" />
-              <BentoStat n="1.2k" l="Exporters" />
-              <BentoStat n="22 days" l="Avg onboarding" />
+              <BentoStat n="IEC" l="DGFT filing" />
+              <BentoStat n="GST" l="LUT & registration" />
+              <BentoStat n="AD" l="Bank code setup" />
             </div>
           </motion.div>
 
           <BentoCard Icon={Layers} title="Modular plans" body="Basic to Premium with white-glove ops." />
           <BentoCard Icon={ShieldCheck} title="Compliance-grade" body="Built around DGFT and ICEGATE flows." />
-          <BentoCard Icon={Zap} title="Fast operations" body="Median KYC review under 24 hours." />
+          <BentoCard Icon={Zap} title="Fast operations" body="KYC review with operations support attached." />
           <BentoCard Icon={Users2} title="Real humans" body="Expert reviews and practical export guidance on Premium." />
         </div>
       </div>

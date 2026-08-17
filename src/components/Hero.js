@@ -143,8 +143,8 @@ export default function Hero() {
                 className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-white/60"
               >
                 <span className="inline-flex items-center gap-2"><ShieldCheck size={14} className="text-[var(--gold)]" /> DGFT · ICEGATE compliant</span>
-                <span className="inline-flex items-center gap-2"><Globe2 size={14} className="text-emerald-300" /> 30+ countries served</span>
-                <span className="inline-flex items-center gap-2"><CheckCircle2 size={14} className="text-cyan-300" /> 1,200+ exporters onboarded</span>
+                <span className="inline-flex items-center gap-2"><Globe2 size={14} className="text-emerald-300" /> IEC · GST · AD code</span>
+                <span className="inline-flex items-center gap-2"><CheckCircle2 size={14} className="text-cyan-300" /> KYC to shipment in one timeline</span>
               </motion.div>
             </div>
 

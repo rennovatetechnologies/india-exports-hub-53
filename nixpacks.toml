@@ -1,2 +1,7 @@
 [variables]
 NIXPACKS_NODE_VERSION = "20"
+
+# Always rebuild the SPA from source. Serving a committed dist/ without
+# this step ships stale mock homepage content.
+[phases.build]
+cmds = ["npm run build"]
