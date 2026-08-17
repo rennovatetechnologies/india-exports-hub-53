@@ -11,7 +11,6 @@ import {
   planHasDiscount,
   planMarketingGroups,
 } from "@/lib/planCatalog";
-import PlanPackLists from "@/components/PlanPackLists";
 
 export default function PlansSection() {
   const [plans, setPlans] = useState([]);
@@ -133,8 +132,6 @@ export default function PlansSection() {
                       </div>
                     ))}
                   </div>
-
-                  <PlanPackLists plan={p} className="mt-6 border-t border-white/10 pt-5" />
 
                   <Link
                     to={planHref}
