@@ -1,7 +1,12 @@
 /** Backend origin for production (Railway). Empty in local Vite so `/api` uses the proxy. */
 
+const RAILWAY_API = "https://new-india-exports-production.up.railway.app";
+
 export function apiBase() {
-  return String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+  const fromEnv = String(import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+  if (fromEnv) return fromEnv;
+  if (import.meta.env.PROD) return RAILWAY_API;
+  return "";
 }
 
 export function apiUrl(path) {
