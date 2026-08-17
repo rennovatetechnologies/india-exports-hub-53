@@ -28,9 +28,11 @@ export default function DashboardOverview() {
     const h = () => setTick((t) => t + 1);
     window.addEventListener("iehub-case-updated", h);
     window.addEventListener("iehub-messages-updated", h);
+    window.addEventListener("iehub-plans-updated", h);
     return () => {
       window.removeEventListener("iehub-case-updated", h);
       window.removeEventListener("iehub-messages-updated", h);
+      window.removeEventListener("iehub-plans-updated", h);
     };
   }, []);
 

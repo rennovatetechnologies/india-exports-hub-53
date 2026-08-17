@@ -82,9 +82,11 @@ export default function AdminWorkflowPage() {
     const h = () => setTick((t) => t + 1);
     window.addEventListener("iehub-case-updated", h);
     window.addEventListener("iehub-messages-updated", h);
+    window.addEventListener("iehub-plans-updated", h);
     return () => {
       window.removeEventListener("iehub-case-updated", h);
       window.removeEventListener("iehub-messages-updated", h);
+      window.removeEventListener("iehub-plans-updated", h);
     };
   }, []);
 
@@ -140,7 +142,8 @@ export default function AdminWorkflowPage() {
   const plan = getPlanById(c.paidPlanId || c.planId);
   const stages = getCaseWorkflowStages(c);
   const status = journeyStatus(c);
-  const kycDocs = plan?.kycDocs || [];
+  const kycDocs =
+    Array.isArray(c.kycDocs) && c.kycDocs.length ? c.kycDocs : plan?.kycDocs || [];
   const msgs = getMessagesForCase(c || customerEmail);
   const roster = loadOpsRoster();
   const canReviewKyc = c.kycStatus === KYC_STATUS.SUBMITTED;

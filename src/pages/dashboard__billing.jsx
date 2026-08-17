@@ -30,6 +30,7 @@ import { downloadInvoicePdf } from "@/lib/downloadInvoicePdf";
 import { startRazorpayCheckout } from "@/components/PayButton";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 import InvoiceModal from "@/components/InvoiceModal";
+import PlanPackLists from "@/components/PlanPackLists";
 import { fetchMyInstallmentPlans } from "@/lib/eventsCatalog";
 import { PATHS } from "@/lib/routes";
 
@@ -78,11 +79,13 @@ function AdminPlanEditor() {
         ...draft,
         id: editingId,
         timeline: String(draft.timeline || "").trim(),
+        description: String(draft.description || "").trim(),
         features: (draft.features || []).map((s) => String(s).trim()).filter(Boolean),
         marketingFeatures: (draft.marketingFeatures || [])
           .map((f) => ({
             label: String(f.label || "").trim(),
             included: f.included !== false,
+            group: String(f.group || "").trim(),
           }))
           .filter((f) => f.label),
         kycDocs: (draft.kycDocs || []).filter((d) => d.id && d.label),
@@ -157,6 +160,15 @@ function AdminPlanEditor() {
               />
             </label>
             <label className="block text-xs text-white/45 sm:col-span-2">
+              Description (shown on home page cards)
+              <textarea
+                rows={3}
+                className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
+                value={draft.description || ""}
+                onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+              />
+            </label>
+            <label className="block text-xs text-white/45 sm:col-span-2">
               Timeline (shown on home page)
               <input
                 className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm"
@@ -185,11 +197,21 @@ function AdminPlanEditor() {
           <div>
             <div className="mb-2 text-xs uppercase tracking-wider text-white/45">Home page checklist</div>
             <p className="mb-2 text-[11px] text-white/40">
-              Unchecked rows show as struck-through on the public plans section.
+              Included rows appear on the public plans section. Optional group labels (e.g. Premium A–G) render as section headers.
             </p>
             <div className="space-y-2">
               {(draft.marketingFeatures || []).map((f, i) => (
                 <div key={`mf-${i}`} className="flex flex-wrap items-center gap-2">
+                  <input
+                    className="w-40 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs"
+                    value={f.group || ""}
+                    onChange={(e) => {
+                      const marketingFeatures = [...draft.marketingFeatures];
+                      marketingFeatures[i] = { ...f, group: e.target.value };
+                      setDraft({ ...draft, marketingFeatures });
+                    }}
+                    placeholder="Group (optional)"
+                  />
                   <input
                     className="min-w-[200px] flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs"
                     value={f.label}
@@ -234,7 +256,7 @@ function AdminPlanEditor() {
                     ...draft,
                     marketingFeatures: [
                       ...(draft.marketingFeatures || []),
-                      { label: "New feature", included: true },
+                      { label: "New feature", included: true, group: "" },
                     ],
                   })
                 }
@@ -439,11 +461,11 @@ function AdminPlanEditor() {
             </div>
             <p className="mt-1 text-xs text-white/45">+ {Math.round(GST_RATE * 100)}% GST</p>
             <p className="mt-2 text-sm text-white/55">{p.tagline}</p>
+            {p.description ? <p className="mt-2 text-xs leading-relaxed text-white/40">{p.description}</p> : null}
+            <PlanPackLists plan={p} className="mt-4" />
             <ul className="mt-3 space-y-1 text-xs text-white/50">
               <li>{p.timeline || "No timeline"}</li>
               <li>{p.marketingFeatures?.length || 0} home page features</li>
-              <li>{p.kycDocs?.length || 0} KYC docs</li>
-              <li>{p.workflowStages?.length || 0} workflow stages</li>
               <li>Events billed separately</li>
             </ul>
             <button
@@ -805,6 +827,7 @@ function CustomerBilling() {
               </div>
               <p className="text-xs text-white/40">+ GST · valid 1 year</p>
               <p className="mt-2 text-sm text-white/55">{p.tagline}</p>
+              {p.description ? <p className="mt-2 text-xs leading-relaxed text-white/40">{p.description}</p> : null}
               <ul className="mt-4 space-y-2">
                 {(p.features || []).map((f) => (
                   <li key={f} className="flex gap-2 text-xs text-white/60">
@@ -812,9 +835,8 @@ function CustomerBilling() {
                   </li>
                 ))}
               </ul>
-              <p className="mt-4 text-[11px] text-white/40">
-                {p.kycDocs?.length || 0} KYC docs · {p.workflowStages?.length || 0} stages · Events paid separately
-              </p>
+              <PlanPackLists plan={p} className="mt-4 border-t border-white/10 pt-4" />
+              <p className="mt-4 text-[11px] text-white/40">Events paid separately</p>
               {current && (
                 <p className="mt-3 text-xs font-medium text-emerald-300">
                   This is the plan you purchased{expiryLabel ? ` · until ${expiryLabel}` : ""}

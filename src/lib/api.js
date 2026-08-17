@@ -2,6 +2,7 @@
 
 import { clearSession } from "@/lib/authSession";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
+import { apiUrl } from "@/lib/apiBase";
 
 const TOKEN_KEY = "vistara_token";
 
@@ -43,7 +44,7 @@ export async function api(path, { method = "GET", body, headers = {}, auth = tru
   }
   let res;
   try {
-    res = await fetch(path.startsWith("/") ? path : `/${path}`, opts);
+    res = await fetch(apiUrl(path), opts);
   } catch (e) {
     const err = new Error(toUserMessage(e, USER_MESSAGES.network));
     err.status = 0;

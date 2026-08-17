@@ -176,7 +176,11 @@ export default function KycWizardPage() {
   useEffect(() => {
     const h = () => setTick((t) => t + 1);
     window.addEventListener("iehub-case-updated", h);
-    return () => window.removeEventListener("iehub-case-updated", h);
+    window.addEventListener("iehub-plans-updated", h);
+    return () => {
+      window.removeEventListener("iehub-case-updated", h);
+      window.removeEventListener("iehub-plans-updated", h);
+    };
   }, []);
 
   const c = session?.email ? getCustomerCase(session.email) : null;
@@ -394,7 +398,7 @@ export default function KycWizardPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.25em] text-white/40">
-            {plan?.name || "Plan"} · Compliance
+            {plan?.name || "Plan"} · {required.length || c?.kycDocs?.length || 0} documents
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
             {c?.kycStatus === KYC_STATUS.NEEDS_MORE ? "Update your KYC" : "KYC & onboarding"}

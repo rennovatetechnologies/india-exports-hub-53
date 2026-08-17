@@ -37,7 +37,7 @@ export default function WhyChooseUs() {
           <BentoCard Icon={Layers} title="Modular plans" body="Basic to Premium with white-glove ops." />
           <BentoCard Icon={ShieldCheck} title="Compliance-grade" body="Built around DGFT and ICEGATE flows." />
           <BentoCard Icon={Zap} title="Fast operations" body="Median KYC review under 24 hours." />
-          <BentoCard Icon={Users2} title="Real humans" body="Dedicated success manager on Premium." />
+          <BentoCard Icon={Users2} title="Real humans" body="Expert reviews and practical export guidance on Premium." />
         </div>
       </div>
     </section>

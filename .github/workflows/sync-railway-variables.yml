@@ -1,0 +1,41 @@
+name: Sync GitHub secrets to Railway
+
+# Optional: copy GitHub secrets → Railway variables (same names).
+# Production deploys are Railway’s GitHub integration on push to master.
+# This workflow does not deploy. Vite inlines VITE_* at build time, so
+# those variables must already exist on the Railway service.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Push variables to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          VITE_ALLOW_AUTH_MOCK: ${{ secrets.VITE_ALLOW_AUTH_MOCK }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_RAZORPAY_KEY_ID: ${{ secrets.VITE_RAZORPAY_KEY_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RAILWAY_TOKEN:-}" ] || [ -z "${RAILWAY_PROJECT_ID:-}" ] || [ -z "${RAILWAY_SERVICE_ID:-}" ]; then
+            echo "Add GitHub secrets RAILWAY_TOKEN, RAILWAY_PROJECT_ID, and RAILWAY_SERVICE_ID, then re-run."
+            exit 1
+          fi
+          for key in VITE_ALLOW_AUTH_MOCK VITE_API_BASE_URL VITE_RAZORPAY_KEY_ID; do
+            val="${!key-}"
+            if [ -n "$val" ]; then
+              railway variables set --skip-deploys \
+                --project "$RAILWAY_PROJECT_ID" \
+                --service "$RAILWAY_SERVICE_ID" \
+                --environment production \
+                "$key=$val"
+            fi
+          done

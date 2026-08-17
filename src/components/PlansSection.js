@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Check, Minus, Sparkles } from "lucide-react";
+import { Check, Sparkles } from "lucide-react";
 import { isAuthenticated } from "@/lib/authSession";
 import {
   loadPlanCatalog,
@@ -9,8 +9,9 @@ import {
   formatInr,
   planEffectivePrice,
   planHasDiscount,
-  planMarketingRows,
+  planMarketingGroups,
 } from "@/lib/planCatalog";
+import PlanPackLists from "@/components/PlanPackLists";
 
 export default function PlansSection() {
   const [plans, setPlans] = useState([]);
@@ -38,8 +39,9 @@ export default function PlansSection() {
             Pick a plan. <span className="text-gold-gradient">Start exporting.</span>
           </h2>
           <p className="mt-4 text-white/60">
-            Transparent pricing with optional admin discounts. Every plan is valid for one year —
-            renew if you need another year. Event tickets are billed separately on every plan.
+            Transparent pricing with optional admin discounts. Choose Basic documentation, Standard
+            compliance integrations, or Premium end-to-end export setup. Every plan is valid for one
+            year — renew if you need another year. Event tickets are billed separately on every plan.
           </p>
         </div>
 
@@ -48,7 +50,7 @@ export default function PlansSection() {
             const planHref = isAuthenticated()
               ? "/dashboard/billing"
               : `/login?next=${encodeURIComponent("/dashboard/billing")}`;
-            const features = planMarketingRows(p);
+            const groups = planMarketingGroups(p);
             const effective = planEffectivePrice(p);
             const discounted = planHasDiscount(p);
             const glow = p.featured ? "rgba(244,196,106,0.35)" : "rgba(255,255,255,0.12)";
@@ -75,7 +77,7 @@ export default function PlansSection() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs uppercase tracking-[0.2em] text-white/55">
-                      {p.tagline || p.name}
+                      {p.name} plan
                     </span>
                     <div className="flex flex-col items-end gap-1">
                       {p.featured && (
@@ -94,6 +96,7 @@ export default function PlansSection() {
                   <h3 className={`mt-3 text-2xl font-semibold ${p.featured ? "text-gold-gradient" : "text-white"}`}>
                     {p.name}
                   </h3>
+                  {p.tagline ? <p className="mt-1 text-sm text-white/55">{p.tagline}</p> : null}
 
                   <div className="mt-4 flex flex-wrap items-baseline gap-2">
                     <span className="text-4xl font-semibold tracking-tight">{formatInr(effective)}</span>
@@ -103,23 +106,35 @@ export default function PlansSection() {
                     <span className="text-sm text-white/50">+ GST</span>
                   </div>
                   <div className="text-xs text-white/50 mt-1">{p.timeline || "Liaisoning"}</div>
+                  {p.description ? (
+                    <p className="mt-3 text-sm leading-relaxed text-white/55">{p.description}</p>
+                  ) : null}
 
                   <div className="my-6 divider-glow" />
 
-                  <ul className="space-y-2.5 flex-1">
-                    {features.map(([text, on]) => (
-                      <li key={text} className="flex items-start gap-2.5 text-sm">
-                        <span
-                          className={`mt-0.5 flex h-4 w-4 items-center justify-center rounded-full ${
-                            on ? "bg-emerald-400/15 text-emerald-300" : "bg-white/5 text-white/30"
-                          }`}
-                        >
-                          {on ? <Check size={11} /> : <Minus size={11} />}
-                        </span>
-                        <span className={on ? "text-white/85" : "text-white/35 line-through"}>{text}</span>
-                      </li>
+                  <div className="space-y-4 flex-1">
+                    {groups.map((g) => (
+                      <div key={g.group || p.id}>
+                        {g.group ? (
+                          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--gold)]/80">
+                            {g.group}
+                          </div>
+                        ) : null}
+                        <ul className="space-y-2.5">
+                          {g.items.map((item) => (
+                            <li key={item.label} className="flex items-start gap-2.5 text-sm">
+                              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-300">
+                                <Check size={11} />
+                              </span>
+                              <span className="text-white/85">{item.label}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
+
+                  <PlanPackLists plan={p} className="mt-6 border-t border-white/10 pt-5" />
 
                   <Link
                     to={planHref}

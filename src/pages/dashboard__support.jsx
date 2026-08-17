@@ -90,7 +90,7 @@ export default function SupportPage() {
           </div>
           <div className="glass-card p-6">
             <div className="inline-flex items-center gap-2 text-[var(--gold)]"><Sparkles size={16} /><span className="text-sm font-semibold">Concierge desk</span></div>
-            <p className="mt-2 text-xs text-white/55">Premium plan customers get a dedicated success manager. Book a 30-min strategy call.</p>
+            <p className="mt-2 text-xs text-white/55">Premium includes expert reviews and practical export guidance. Book a 30-min strategy call.</p>
             <button className="btn-gold mt-4 w-full rounded-xl px-4 py-2 text-xs font-semibold">Book a call</button>
           </div>
         </div>
