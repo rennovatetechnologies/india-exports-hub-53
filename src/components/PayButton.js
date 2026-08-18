@@ -1,16 +1,21 @@
 import { useState } from "react";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
+import { apiUrl } from "@/lib/apiBase";
 
 /**
- * Key that created the order must open Checkout. Backend wins over a stale Vite bake.
+ * Key that created the order must open Checkout.
+ * Prefer the API / runtime key so a stale Vite bake cannot open Test Mode against live orders.
  */
 export function razorpayCheckoutKey(cfg = {}) {
   const fromApi = String(cfg.razorpayKeyId || cfg.data?.razorpayKeyId || "").trim();
+  const fromRuntime =
+    typeof window !== "undefined" ? String(window.__VIRASTRA_RAZORPAY_KEY_ID || "").trim() : "";
   const fromEnv = String(import.meta.env.VITE_RAZORPAY_KEY_ID || "").trim();
+  const key = fromApi || fromRuntime || fromEnv;
   if (fromApi && fromEnv && fromApi !== fromEnv && typeof console !== "undefined") {
     console.warn("Razorpay key mismatch: using /api/config/public key so Checkout matches the order.");
   }
-  return fromApi || fromEnv;
+  return key;
 }
 
 export async function loadRazorpayScript() {
@@ -64,7 +69,7 @@ export async function startRazorpayCheckout(opts) {
       throw new Error("Enter a valid amount to pay.");
     }
 
-    const cfg = await fetch("/api/config/public").then((r) => r.json()).catch(() => ({}));
+    const cfg = await fetch(apiUrl("/api/config/public")).then((r) => r.json()).catch(() => ({}));
     const key = razorpayCheckoutKey(cfg);
     if (!key) throw new Error(USER_MESSAGES.payment);
 
@@ -86,7 +91,7 @@ export async function startRazorpayCheckout(opts) {
     if (payInInstallments) orderBody.payInInstallments = true;
     if (installmentPlanId) orderBody.installmentPlanId = installmentPlanId;
     if (installmentNumber) orderBody.installmentNumber = installmentNumber;
-    const res = await fetch("/api/create-order", {
+    const res = await fetch(apiUrl("/api/create-order"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -115,7 +120,7 @@ export async function startRazorpayCheckout(opts) {
         },
         handler: async function (response) {
           try {
-            const verifyRes = await fetch("/api/verify-payment", {
+            const verifyRes = await fetch(apiUrl("/api/verify-payment"), {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
