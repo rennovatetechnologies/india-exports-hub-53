@@ -326,9 +326,9 @@ export async function setKycUpload(_email, docId, fileOrMeta, { onProgress } = {
   fd.append("file", file, name);
   const uploaded = await apiUpload(`/api/kyc/me/documents/${encodeURIComponent(docId)}`, {
     formData: fd,
-    onProgress: (info) => onProgress?.({ ...info, percent: Math.min(96, Number(info?.percent) || 0) }),
+    onProgress,
   });
-  onProgress?.({ percent: 97, phase: "saving" });
+  onProgress?.({ percent: 100, phase: "done" });
   const session = getSession();
   const current = session?.email ? getCustomerCase(session.email) : null;
   const meta = kycUploadMetaFromResponse(docId, uploaded, name);
@@ -336,11 +336,11 @@ export async function setKycUpload(_email, docId, fileOrMeta, { onProgress } = {
     mirrorCase({
       ...current,
       kycUploads: { ...(current.kycUploads || {}), [docId]: meta },
+      kycMissingDocIds: (current.kycMissingDocIds || []).filter((id) => id !== docId),
     });
   }
-  const updated = await fetchMyCase({ force: true });
-  onProgress?.({ percent: 100, phase: "done" });
-  return updated;
+  void fetchMyCase({ force: true }).catch(() => {});
+  return session?.email ? getCustomerCase(session.email) : current;
 }
 
 export async function clearKycUpload(_email, docId) {

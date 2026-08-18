@@ -78,7 +78,8 @@ export async function api(path, { method = "GET", body, headers = {}, auth = tru
 
 /**
  * Multipart upload with byte-level progress.
- * `onProgress({ percent, phase })` — phase is "upload" while sending, "saving" while waiting on the server.
+ * `onProgress({ percent, phase })` — phase is "upload" while sending bytes,
+ * "saving" while waiting for the server, "done" only after HTTP 2xx.
  */
 export function apiUpload(path, { formData, method = "POST", auth = true, onProgress } = {}) {
   return new Promise((resolve, reject) => {
@@ -87,43 +88,67 @@ export function apiUpload(path, { formData, method = "POST", auth = true, onProg
     const headers = authHeader(auth);
     Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
 
+    let settled = false;
     let saveTick = null;
+    let lastPercent = 4;
+
     const stopSaveTick = () => {
       if (saveTick) {
         clearInterval(saveTick);
         saveTick = null;
       }
     };
+
+    const report = (percent, phase) => {
+      lastPercent = percent;
+      onProgress?.({ percent, phase });
+    };
+
     const startSaving = () => {
-      let p = 85;
-      onProgress?.({ percent: p, phase: "saving" });
-      stopSaveTick();
+      if (settled || saveTick) return;
+      let p = Math.max(lastPercent, 80);
+      report(p, "saving");
       saveTick = setInterval(() => {
-        p = Math.min(96, p + 1);
-        onProgress?.({ percent: p, phase: "saving" });
-        if (p >= 96) stopSaveTick();
-      }, 220);
+        if (settled) {
+          stopSaveTick();
+          return;
+        }
+        p = Math.min(99, p + 1);
+        report(p, "saving");
+      }, 280);
+    };
+
+    const fail = (err) => {
+      if (settled) return;
+      settled = true;
+      stopSaveTick();
+      reject(err);
     };
 
     xhr.upload.onprogress = (e) => {
-      if (!e.lengthComputable) return;
-      const pct = Math.max(4, Math.round((e.loaded / e.total) * 80));
-      onProgress?.({ percent: pct, phase: "upload" });
+      if (settled) return;
+      if (!e.lengthComputable) {
+        startSaving();
+        return;
+      }
+      const pct = Math.max(4, Math.min(80, Math.round((e.loaded / e.total) * 80)));
+      report(pct, "upload");
+      if (e.total > 0 && e.loaded >= e.total) startSaving();
     };
     xhr.upload.onload = startSaving;
+    xhr.upload.onloadend = startSaving;
 
     xhr.onerror = () => {
-      stopSaveTick();
       const err = new Error(USER_MESSAGES.network);
       err.status = 0;
-      reject(err);
+      fail(err);
     };
     xhr.onabort = () => {
-      stopSaveTick();
       const err = new Error(USER_MESSAGES.network);
       err.status = 0;
-      reject(err);
+      fail(err);
     };
+
     xhr.onload = () => {
       stopSaveTick();
       const ct = xhr.getResponseHeader("content-type") || "";
@@ -138,6 +163,7 @@ export function apiUpload(path, { formData, method = "POST", auth = true, onProg
         data = xhr.responseText;
       }
       if (xhr.status < 200 || xhr.status >= 300) {
+        settled = true;
         try {
           throwApiError(xhr.status, data, { auth });
         } catch (e) {
@@ -145,12 +171,17 @@ export function apiUpload(path, { formData, method = "POST", auth = true, onProg
         }
         return;
       }
-      onProgress?.({ percent: 100, phase: "done" });
+      settled = true;
+      report(100, "done");
       resolve(data);
     };
 
-    onProgress?.({ percent: 4, phase: "upload" });
+    report(4, "upload");
     xhr.send(formData);
+    // Tiny files often skip upload progress events — still show in-progress until 200.
+    setTimeout(() => {
+      if (!settled && lastPercent <= 4) startSaving();
+    }, 400);
   });
 }
 

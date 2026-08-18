@@ -13,6 +13,7 @@ import {
   FileText,
   Clock,
   Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { getSession } from "@/lib/authSession";
 import {
@@ -67,12 +68,35 @@ function normalizeAadhaar(value) {
     .slice(0, 12);
 }
 
-function Field({ label, hint, children }) {
+function kycTargetId(id) {
+  return `kyc-${id}`;
+}
+
+function focusKycTarget(id) {
+  const el = document.getElementById(kycTargetId(id));
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  const focusable = el.matches("input, textarea, select, button")
+    ? el
+    : el.querySelector("input, textarea, select, button");
+  focusable?.focus?.({ preventScroll: true });
+}
+
+function Field({ label, hint, required, invalid, children }) {
   return (
     <label className="block">
-      <span className="text-xs uppercase tracking-[0.18em] text-white/45">{label}</span>
+      <span className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.18em] text-white/45">
+        {label}
+        {required ? (
+          <span className={`normal-case tracking-normal ${invalid ? "text-amber-200" : "text-white/30"}`}>
+            {invalid ? "needed" : "required"}
+          </span>
+        ) : null}
+      </span>
       <div className="mt-2">{children}</div>
-      {hint && <span className="mt-1 block text-[11px] text-white/35">{hint}</span>}
+      {hint && (
+        <span className={`mt-1 block text-[11px] ${invalid ? "text-amber-200/90" : "text-white/35"}`}>{hint}</span>
+      )}
     </label>
   );
 }
@@ -80,7 +104,12 @@ function Field({ label, hint, children }) {
 const inputCls =
   "w-full rounded-xl bg-white/5 border border-white/10 focus:border-[var(--gold)]/60 focus:bg-white/[0.07] outline-none px-3.5 py-2.5 text-sm placeholder:text-white/30 transition";
 
+function fieldInputCls(invalid) {
+  return invalid ? `${inputCls} border-amber-400/45 bg-amber-400/[0.04]` : inputCls;
+}
+
 function DocDrop({
+  id,
   title,
   desc,
   fileMeta,
@@ -88,6 +117,7 @@ function DocDrop({
   onClear,
   error,
   needsAction,
+  missing,
   reviewNote,
   uploading,
   progress = 0,
@@ -105,12 +135,15 @@ function DocDrop({
 
   return (
     <div
+      id={id}
       className={`rounded-2xl border border-dashed p-4 ${
         rejected
           ? "border-rose-400/40 bg-rose-400/[0.06]"
-          : approved
-            ? "border-emerald-400/25 bg-emerald-400/[0.04]"
-            : "border-white/15 bg-white/[0.03]"
+          : missing
+            ? "border-amber-400/40 bg-amber-400/[0.05]"
+            : approved
+              ? "border-emerald-400/25 bg-emerald-400/[0.04]"
+              : "border-white/15 bg-white/[0.03]"
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -120,6 +153,11 @@ function DocDrop({
             {rejected && (
               <span className="rounded-md bg-rose-400/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-rose-200">
                 Needs update
+              </span>
+            )}
+            {missing && !rejected && (
+              <span className="rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-amber-200">
+                Still needed
               </span>
             )}
             {approved && (
@@ -214,7 +252,7 @@ export default function KycWizardPage() {
   const [submitError, setSubmitError] = useState("");
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [fileErrors, setFileErrors] = useState({});
-  const [uploadBusy, setUploadBusy] = useState(null);
+  const [uploadBusy, setUploadBusy] = useState({});
   const [uploadProgress, setUploadProgress] = useState({});
 
   useEffect(() => {
@@ -256,34 +294,75 @@ export default function KycWizardPage() {
   const requiredOnly = useMemo(() => required.filter((d) => d.required !== false), [required]);
   const actionDocs = useMemo(() => getKycActionDocs(c, required), [c, required]);
   const actionDocIds = useMemo(() => new Set(actionDocs.map((d) => d.id)), [actionDocs]);
-  const allRequiredUploaded = requiredOnly.every((d) => {
-    const up = c?.kycUploads?.[d.id];
-    if (!up) return false;
-    // Rejected files must be replaced (local status becomes pending after re-pick)
-    if (up.reviewStatus === "rejected") return false;
-    return true;
-  });
-  const actionDocsReady = actionDocs.every((d) => {
-    const up = c?.kycUploads?.[d.id];
-    return up && up.reviewStatus !== "rejected";
-  });
-  const canSubmitDocs = allRequiredUploaded && actionDocsReady;
 
-  const businessOk =
-    profile.legalName.trim() &&
-    profile.registeredAddress.trim() &&
-    profile.operatingCity.trim();
   const panNormalized = normalizePan(profile.panNumber);
   const aadhaarNormalized = normalizeAadhaar(profile.aadhaarNumber);
   const panValid = PAN_RE.test(panNormalized);
   const aadhaarValid = AADHAAR_RE.test(aadhaarNormalized);
-  const identityOk =
-    profile.signatoryName.trim() &&
-    profile.designation.trim() &&
-    panValid &&
-    aadhaarValid;
+
+  const uploading = Object.keys(uploadBusy).length > 0;
+  const blockers = useMemo(() => {
+    const items = [];
+    if (!String(profile.legalName || "").trim()) {
+      items.push({ targetId: "legalName", step: 0, label: "Legal entity name" });
+    }
+    if (!String(profile.registeredAddress || "").trim()) {
+      items.push({ targetId: "registeredAddress", step: 0, label: "Registered address" });
+    }
+    if (!String(profile.operatingCity || "").trim()) {
+      items.push({ targetId: "operatingCity", step: 0, label: "Operating city" });
+    }
+    if (!String(profile.signatoryName || "").trim()) {
+      items.push({ targetId: "signatoryName", step: 1, label: "Signatory full name" });
+    }
+    if (!String(profile.designation || "").trim()) {
+      items.push({ targetId: "designation", step: 1, label: "Designation" });
+    }
+    if (!panNormalized) items.push({ targetId: "panNumber", step: 1, label: "PAN" });
+    else if (!panValid) items.push({ targetId: "panNumber", step: 1, label: "Valid PAN (e.g. AAACR1234F)" });
+    if (!aadhaarNormalized) items.push({ targetId: "aadhaarNumber", step: 1, label: "Aadhaar number" });
+    else if (!aadhaarValid) items.push({ targetId: "aadhaarNumber", step: 1, label: "12-digit Aadhaar" });
+    for (const d of requiredOnly) {
+      const up = c?.kycUploads?.[d.id];
+      if (!up) {
+        items.push({ targetId: `doc-${d.id}`, step: 1, label: `Upload ${d.label}` });
+      } else if (up.reviewStatus === "rejected" || actionDocIds.has(d.id)) {
+        items.push({ targetId: `doc-${d.id}`, step: 1, label: `Replace ${d.label}` });
+      }
+    }
+    if (uploading) {
+      items.push({ targetId: null, step: 1, label: "Wait for uploads to finish", wait: true });
+    }
+    return items;
+  }, [
+    profile.legalName,
+    profile.registeredAddress,
+    profile.operatingCity,
+    profile.signatoryName,
+    profile.designation,
+    panNormalized,
+    panValid,
+    aadhaarNormalized,
+    aadhaarValid,
+    requiredOnly,
+    c?.kycUploads,
+    actionDocIds,
+    uploading,
+  ]);
+  const stepBlockers = blockers.filter((b) => (step === 2 ? true : b.step === step));
+  const missingKeys = useMemo(() => new Set(blockers.map((b) => b.targetId).filter(Boolean)), [blockers]);
 
   const goto = (i) => setStep(Math.max(0, Math.min(STEPS.length - 1, i)));
+
+  const goToBlocker = (b) => {
+    if (!b || b.wait || !b.targetId) return;
+    if (b.step !== step) {
+      goto(b.step);
+      window.setTimeout(() => focusKycTarget(b.targetId), 320);
+    } else {
+      focusKycTarget(b.targetId);
+    }
+  };
 
   /** Draft-safe payload: invalid PAN/Aadhaar become '' so tab clicks don't 400. */
   const buildProfilePayload = ({ requireIdentity = false } = {}) => {
@@ -336,7 +415,7 @@ export default function KycWizardPage() {
       delete next[docId];
       return next;
     });
-    setUploadBusy(docId);
+    setUploadBusy((m) => ({ ...m, [docId]: true }));
     setUploadProgress((p) => ({ ...p, [docId]: { percent: 4, name: file.name, phase: "upload" } }));
     try {
       await setKycUpload(session.email, docId, file, {
@@ -344,7 +423,7 @@ export default function KycWizardPage() {
           setUploadProgress((p) => ({
             ...p,
             [docId]: {
-              percent: Number(info?.percent) || 0,
+              percent: Math.max(0, Math.min(100, Number(info?.percent) || 0)),
               name: file.name,
               phase: info?.phase || "upload",
             },
@@ -354,7 +433,11 @@ export default function KycWizardPage() {
     } catch (err) {
       setFileErrors((e) => ({ ...e, [docId]: toUserMessage(err, USER_MESSAGES.upload) }));
     } finally {
-      setUploadBusy(null);
+      setUploadBusy((m) => {
+        const next = { ...m };
+        delete next[docId];
+        return next;
+      });
       setUploadProgress((p) => {
         const next = { ...p };
         delete next[docId];
@@ -365,13 +448,17 @@ export default function KycWizardPage() {
 
   const onClearFile = async (docId) => {
     if (!session?.email) return;
-    setUploadBusy(docId);
+    setUploadBusy((m) => ({ ...m, [docId]: true }));
     try {
       await clearKycUpload(session.email, docId);
     } catch (err) {
       setFileErrors((e) => ({ ...e, [docId]: toUserMessage(err, "We couldn't remove that file. Please try again.") }));
     } finally {
-      setUploadBusy(null);
+      setUploadBusy((m) => {
+        const next = { ...m };
+        delete next[docId];
+        return next;
+      });
     }
     setFileErrors((e) => {
       const next = { ...e };
@@ -381,15 +468,23 @@ export default function KycWizardPage() {
   };
 
   const onNext = async () => {
-    if (step === 0 && !businessOk) return;
-    if (step === 1 && (!identityOk || !canSubmitDocs)) return;
+    if (uploading) return;
+    const current = blockers.filter((b) => b.step === step);
+    if (current.length) {
+      goToBlocker(current[0]);
+      return;
+    }
     const saved = await persistProfile({ requireIdentity: step >= 1 });
     if (!saved) return;
     goto(step + 1);
   };
 
   const onSubmit = async () => {
-    if (!session?.email || !businessOk || !identityOk || !canSubmitDocs) return;
+    if (!session?.email) return;
+    if (blockers.length) {
+      goToBlocker(blockers[0]);
+      return;
+    }
     setSubmitting(true);
     setSubmitError("");
     try {
@@ -511,8 +606,12 @@ export default function KycWizardPage() {
       <div className="glass-card p-5">
         <ol className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {STEPS.map((s, i) => {
-            const done = i < step;
             const active = i === step;
+            const leftover =
+              i === 2
+                ? blockers.filter((b) => !b.wait).length
+                : blockers.filter((b) => b.step === i && !b.wait).length;
+            const complete = leftover === 0;
             return (
               <li key={s.id}>
                 <button
@@ -522,25 +621,30 @@ export default function KycWizardPage() {
                     goto(i);
                   }}
                   className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
-                    active ? "bg-white/10" : done ? "bg-emerald-400/5" : "bg-white/[0.03]"
+                    active ? "bg-white/10" : complete && i < step ? "bg-emerald-400/5" : "bg-white/[0.03]"
                   }`}
                 >
                   <span
                     className={`flex h-7 w-7 items-center justify-center rounded-lg ${
                       active
                         ? "bg-[var(--grad-gold)] text-black"
-                        : done
+                        : complete
                           ? "bg-emerald-400/15 text-emerald-300"
-                          : "bg-white/5 text-white/40"
+                          : "bg-amber-400/15 text-amber-200"
                     }`}
                   >
-                    {done ? <CheckCircle2 size={14} /> : <s.icon size={14} />}
+                    {complete ? <CheckCircle2 size={14} /> : leftover ? leftover : <s.icon size={14} />}
                   </span>
                   <div className="leading-tight">
                     <div className="text-[10px] uppercase tracking-[0.18em] text-white/40">Step {i + 1}</div>
-                    <div className={`text-sm ${active ? "text-white" : done ? "text-emerald-200" : "text-white/60"}`}>
+                    <div className={`text-sm ${active ? "text-white" : complete ? "text-emerald-200" : "text-amber-100"}`}>
                       {s.label}
                     </div>
+                    {!complete && (
+                      <div className="text-[11px] text-amber-200/80">
+                        {leftover} {leftover === 1 ? "item" : "items"} left
+                      </div>
+                    )}
                   </div>
                 </button>
               </li>
@@ -570,9 +674,10 @@ export default function KycWizardPage() {
               <>
                 <h2 className="text-lg font-semibold">Business details</h2>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Legal entity name">
+                  <Field label="Legal entity name" required invalid={missingKeys.has("legalName")}>
                     <input
-                      className={inputCls}
+                      id={kycTargetId("legalName")}
+                      className={fieldInputCls(missingKeys.has("legalName"))}
                       placeholder="Mehta Spices Pvt Ltd"
                       value={profile.legalName}
                       onChange={setField("legalName")}
@@ -602,17 +707,24 @@ export default function KycWizardPage() {
                       <option>₹50 Cr+</option>
                     </select>
                   </Field>
-                  <Field label="Registered address" hint="As per ROC records">
+                  <Field
+                    label="Registered address"
+                    hint="As per ROC records"
+                    required
+                    invalid={missingKeys.has("registeredAddress")}
+                  >
                     <textarea
+                      id={kycTargetId("registeredAddress")}
                       rows={2}
-                      className={inputCls}
+                      className={fieldInputCls(missingKeys.has("registeredAddress"))}
                       value={profile.registeredAddress}
                       onChange={setField("registeredAddress")}
                     />
                   </Field>
-                  <Field label="Operating city">
+                  <Field label="Operating city" required invalid={missingKeys.has("operatingCity")}>
                     <input
-                      className={inputCls}
+                      id={kycTargetId("operatingCity")}
+                      className={fieldInputCls(missingKeys.has("operatingCity"))}
                       placeholder="Nagpur"
                       value={profile.operatingCity}
                       onChange={setField("operatingCity")}
@@ -626,17 +738,19 @@ export default function KycWizardPage() {
               <>
                 <h2 className="text-lg font-semibold">Authorized signatory &amp; documents</h2>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Full name">
+                  <Field label="Full name" required invalid={missingKeys.has("signatoryName")}>
                     <input
-                      className={inputCls}
+                      id={kycTargetId("signatoryName")}
+                      className={fieldInputCls(missingKeys.has("signatoryName"))}
                       placeholder="Priya Mehta"
                       value={profile.signatoryName}
                       onChange={setField("signatoryName")}
                     />
                   </Field>
-                  <Field label="Designation">
+                  <Field label="Designation" required invalid={missingKeys.has("designation")}>
                     <input
-                      className={inputCls}
+                      id={kycTargetId("designation")}
+                      className={fieldInputCls(missingKeys.has("designation"))}
                       placeholder="Director"
                       value={profile.designation}
                       onChange={setField("designation")}
@@ -644,14 +758,19 @@ export default function KycWizardPage() {
                   </Field>
                   <Field
                     label="PAN"
+                    required
+                    invalid={missingKeys.has("panNumber")}
                     hint={
-                      profile.panNumber && !panValid
-                        ? "Must be 5 letters + 4 digits + 1 letter (e.g. AAACR1234F)"
+                      missingKeys.has("panNumber")
+                        ? profile.panNumber
+                          ? "Must be 5 letters + 4 digits + 1 letter (e.g. AAACR1234F)"
+                          : "Enter your PAN to continue"
                         : "Format: 5 letters + 4 digits + 1 letter (e.g. AAACR1234F)"
                     }
                   >
                     <input
-                      className={`${inputCls}${profile.panNumber && !panValid ? " border-rose-400/50" : ""}`}
+                      id={kycTargetId("panNumber")}
+                      className={fieldInputCls(missingKeys.has("panNumber"))}
                       placeholder="AAACR1234F"
                       maxLength={10}
                       autoComplete="off"
@@ -662,14 +781,19 @@ export default function KycWizardPage() {
                   </Field>
                   <Field
                     label="Aadhaar number"
+                    required
+                    invalid={missingKeys.has("aadhaarNumber")}
                     hint={
-                      profile.aadhaarNumber && !aadhaarValid
-                        ? "Must be exactly 12 digits"
+                      missingKeys.has("aadhaarNumber")
+                        ? profile.aadhaarNumber
+                          ? "Must be exactly 12 digits"
+                          : "Enter your 12-digit Aadhaar to continue"
                         : "12-digit Aadhaar as on your card"
                     }
                   >
                     <input
-                      className={`${inputCls}${profile.aadhaarNumber && !aadhaarValid ? " border-rose-400/50" : ""}`}
+                      id={kycTargetId("aadhaarNumber")}
+                      className={fieldInputCls(missingKeys.has("aadhaarNumber"))}
                       placeholder="1234 5678 9012"
                       inputMode="numeric"
                       maxLength={12}
@@ -685,10 +809,13 @@ export default function KycWizardPage() {
                     const needsAction =
                       actionDocIds.has(doc.id) || up?.reviewStatus === "rejected";
                     const uploadState = uploadProgress[doc.id];
-                    const isUploading = uploadBusy === doc.id;
+                    const isUploading = Boolean(uploadBusy[doc.id]);
+                    const missing =
+                      doc.required !== false && !isUploading && (!up || needsAction);
                     return (
                       <DocDrop
                         key={doc.id}
+                        id={kycTargetId(`doc-${doc.id}`)}
                         title={`${doc.label}${doc.required === false ? " (optional)" : ""}`}
                         desc={
                           needsAction
@@ -699,6 +826,7 @@ export default function KycWizardPage() {
                         }
                         fileMeta={up}
                         needsAction={needsAction}
+                        missing={missing}
                         reviewNote={up?.reviewNote || (needsAction ? actionDocs.find((a) => a.id === doc.id)?.note : "")}
                         error={fileErrors[doc.id]}
                         uploading={isUploading}
@@ -747,10 +875,24 @@ export default function KycWizardPage() {
                     </div>
                   ))}
                 </div>
-                {(!businessOk || !identityOk || !canSubmitDocs) && (
-                  <p className="text-xs text-amber-200/90">
-                    Complete business details, signatory fields, and all required documents before submitting.
-                  </p>
+                {stepBlockers.length > 0 && (
+                  <div className="rounded-xl border border-amber-400/25 bg-amber-400/[0.06] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200/90">
+                      Finish these to submit
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {stepBlockers.filter((b) => !b.wait).map((b) => (
+                        <button
+                          key={b.targetId || b.label}
+                          type="button"
+                          onClick={() => goToBlocker(b)}
+                          className="rounded-lg bg-amber-400/10 px-2.5 py-1.5 text-xs text-amber-100 hover:bg-amber-400/20"
+                        >
+                          {STEPS[b.step]?.label}: {b.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 {submitError ? <p className="text-xs text-rose-300">{submitError}</p> : null}
               </>
@@ -758,7 +900,42 @@ export default function KycWizardPage() {
           </motion.div>
         </AnimatePresence>
 
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
+        {stepBlockers.length > 0 && (
+          <div className="mt-6 rounded-xl border border-amber-400/25 bg-amber-400/[0.06] p-4">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle size={16} className="mt-0.5 shrink-0 text-amber-200" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-amber-50">
+                  {uploading && step === 1
+                    ? "Uploads are still in progress."
+                    : `To ${step === 2 ? "submit" : "continue"}, complete ${stepBlockers.filter((b) => !b.wait).length} ${
+                        stepBlockers.filter((b) => !b.wait).length === 1 ? "item" : "items"
+                      }:`}
+                </p>
+                <ul className="mt-2 flex flex-wrap gap-2">
+                  {stepBlockers.map((b) => (
+                    <li key={b.targetId || b.label}>
+                      {b.wait || !b.targetId ? (
+                        <span className="inline-block rounded-lg bg-white/5 px-2.5 py-1.5 text-xs text-white/70">
+                          {b.label}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => goToBlocker(b)}
+                          className="rounded-lg bg-amber-400/10 px-2.5 py-1.5 text-left text-xs text-amber-100 hover:bg-amber-400/20"
+                        >
+                          {b.label}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
           <button
             type="button"
             disabled={step === 0}
@@ -774,7 +951,7 @@ export default function KycWizardPage() {
             <button
               type="button"
               onClick={onNext}
-              disabled={(step === 0 && !businessOk) || (step === 1 && (!identityOk || !canSubmitDocs || Boolean(uploadBusy)))}
+              disabled={uploading}
               className="btn-gold inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-black disabled:opacity-40"
             >
               Continue <ArrowRight size={16} />
@@ -783,7 +960,7 @@ export default function KycWizardPage() {
             <button
               type="button"
               onClick={onSubmit}
-              disabled={submitting || !businessOk || !identityOk || !canSubmitDocs}
+              disabled={submitting || uploading}
               className="btn-gold inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-black disabled:opacity-40"
             >
               {submitting ? "Submitting…" : "Submit for review"}
