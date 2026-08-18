@@ -495,7 +495,7 @@ export default function KycWizardPage() {
       {required.length > 0 && c?.kycStatus !== KYC_STATUS.NEEDS_MORE && (
         <div className="rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-4 sm:p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-200/90">
-            {(c?.previousPlanIds || []).length ? "Remaining documents for upgrade" : "Documents for this plan"}
+            {(c?.previousPlanIds || []).length ? "Documents for your upgraded plan" : "Documents for this plan"}
           </p>
           <ul className="mt-3 grid list-inside list-disc gap-1.5 text-sm text-white/70 sm:grid-cols-2 sm:gap-x-8">
             {required.map((d) => (

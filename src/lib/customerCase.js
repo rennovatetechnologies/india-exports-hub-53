@@ -5,11 +5,7 @@
  * Workflow stages live on the case document (server snapshot), not plan localStorage.
  */
 import { normalizeEmail, markKycComplete, clearKycComplete, getSession, ROLES } from "@/lib/authSession";
-import {
-  getPlanById,
-  mergeWorkflowStages,
-  remainingKycDocs,
-} from "@/lib/planCatalog";
+import { getPlanById, mergeWorkflowStages } from "@/lib/planCatalog";
 import { api, apiUpload } from "@/lib/api";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 
@@ -81,6 +77,8 @@ let opsCaseList = null;
 let opsRoster = null;
 /** @type {Promise<object|null> | null} */
 let myCaseInflight = null;
+/** Bumped on each new GET so a slower in-flight snapshot cannot clobber a newer one. */
+let myCaseGeneration = 0;
 /** @type {Promise<object[]> | null} */
 let casesQueueInflight = null;
 
@@ -159,22 +157,31 @@ export async function fetchMyCase({ force = false } = {}) {
   if (!force && caseByEmail[key]) {
     return { ...caseByEmail[key], kycUploads: { ...(caseByEmail[key].kycUploads || {}) } };
   }
-  // Coalesce concurrent callers (including multiple force:true at boot).
-  if (myCaseInflight) return myCaseInflight;
-  myCaseInflight = (async () => {
+  if (!force && myCaseInflight) return myCaseInflight;
+  const generation = ++myCaseGeneration;
+  const request = (async () => {
     try {
       const data = await api("/api/me/case");
+      if (generation !== myCaseGeneration) {
+        const cached = caseByEmail[key];
+        return cached ? { ...cached, kycUploads: { ...(cached.kycUploads || {}) } } : null;
+      }
       const doc = unwrapCase(data);
       if (doc?.customerEmail || doc?.id) return mirrorCase(doc);
       return null;
     } catch (e) {
+      if (generation !== myCaseGeneration) {
+        const cached = caseByEmail[key];
+        if (cached) return { ...cached, kycUploads: { ...(cached.kycUploads || {}) } };
+      }
       console.warn("[case] fetchMyCase failed", e.message);
       throw e;
     } finally {
-      myCaseInflight = null;
+      if (myCaseInflight === request) myCaseInflight = null;
     }
   })();
-  return myCaseInflight;
+  myCaseInflight = request;
+  return request;
 }
 
 /**
@@ -287,6 +294,25 @@ export async function setKycProfile(_email, profile) {
   return fetchMyCase({ force: true });
 }
 
+function kycUploadMetaFromResponse(docId, payload, fallbackName) {
+  const raw = payload?.data && typeof payload.data === "object" ? payload.data : payload;
+  if (!raw || typeof raw !== "object") return null;
+  const name = raw.name || raw.filename || fallbackName;
+  if (!name && !raw.fileId && !raw.driveFileId) return null;
+  return {
+    fileId: raw.fileId || null,
+    driveFileId: raw.driveFileId || null,
+    name: name || String(docId),
+    size: raw.size,
+    mimeType: raw.mimeType,
+    uploadedAt: raw.uploadedAt || new Date().toISOString(),
+    reviewStatus: raw.reviewStatus || "pending",
+    reviewNote: raw.reviewNote || null,
+    reviewedAt: raw.reviewedAt || null,
+    reviewedBy: raw.reviewedBy || null,
+  };
+}
+
 /** Upload a KYC file straight to Mongo/Drive. `onProgress({ percent, phase })` is optional. */
 export async function setKycUpload(_email, docId, fileOrMeta, { onProgress } = {}) {
   if (!docId) throw new Error("Document id required");
@@ -298,11 +324,20 @@ export async function setKycUpload(_email, docId, fileOrMeta, { onProgress } = {
     file.name ||
     `${docId}.pdf`;
   fd.append("file", file, name);
-  await apiUpload(`/api/kyc/me/documents/${encodeURIComponent(docId)}`, {
+  const uploaded = await apiUpload(`/api/kyc/me/documents/${encodeURIComponent(docId)}`, {
     formData: fd,
     onProgress: (info) => onProgress?.({ ...info, percent: Math.min(96, Number(info?.percent) || 0) }),
   });
   onProgress?.({ percent: 97, phase: "saving" });
+  const session = getSession();
+  const current = session?.email ? getCustomerCase(session.email) : null;
+  const meta = kycUploadMetaFromResponse(docId, uploaded, name);
+  if (current && meta) {
+    mirrorCase({
+      ...current,
+      kycUploads: { ...(current.kycUploads || {}), [docId]: meta },
+    });
+  }
   const updated = await fetchMyCase({ force: true });
   onProgress?.({ percent: 100, phase: "done" });
   return updated;
@@ -578,16 +613,11 @@ export function isWorkspaceUnlocked(status) {
 
 export function getRequiredKycDocs(customerCase) {
   const plan = getPlanById(customerCase?.paidPlanId || customerCase?.planId);
-  const docs = Array.isArray(plan?.kycDocs) ? plan.kycDocs : [];
+  const fromCase = Array.isArray(customerCase?.kycDocs) ? customerCase.kycDocs : [];
+  const fromPlan = Array.isArray(plan?.kycDocs) ? plan.kycDocs : [];
+  const docs = fromPlan.length ? fromPlan : fromCase;
   if (!docs.length) return [];
-  if (customerCase?.paymentStatus !== "paid" || !isPlanEntitlementActive(customerCase)) {
-    return docs.map((d) => ({ ...d }));
-  }
-  const uploaded = Object.keys(customerCase.kycUploads || {});
-  if (customerCase.kycStatus === KYC_STATUS.APPROVED) return [];
-  if ((customerCase.previousPlanIds || []).length) {
-    return remainingKycDocs(plan, uploaded);
-  }
+  if (customerCase?.kycStatus === KYC_STATUS.APPROVED) return [];
   return docs.map((d) => ({ ...d }));
 }
 
