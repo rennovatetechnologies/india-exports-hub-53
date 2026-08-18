@@ -5,16 +5,18 @@ import { Users, Briefcase, FileCheck2, CheckCircle2, ChevronRight } from "lucide
 import { getSession, ROLES } from "@/lib/authSession";
 import {
   listAllCases,
-  listCasesForOps,
   journeyStatus,
   CASE_STATUS,
   currentStageLabel,
   fetchCasesQueue,
+  fetchOpsRoster,
+  assignCaseToMe,
+  isAssignedTo,
 } from "@/lib/customerCase";
 import { getPlanById, fetchPlanCatalog } from "@/lib/planCatalog";
 import { adminWorkflowPath } from "@/lib/routes";
 
-const FILTER_IDS = new Set(["all", "pending_kyc", "kyc", "active", "completed"]);
+const FILTER_IDS = new Set(["all", "mine", "unassigned", "pending_kyc", "kyc", "active", "completed", "closed"]);
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -25,9 +27,13 @@ export default function AdminPage() {
   const filter = FILTER_IDS.has(filterFromUrl) ? filterFromUrl : "all";
   const [q, setQ] = useState("");
 
+  const [assigningId, setAssigningId] = useState(null);
+  const [assignError, setAssignError] = useState("");
+
   useEffect(() => {
     fetchPlanCatalog().catch(() => {});
     fetchCasesQueue({ force: true }).catch(() => {});
+    fetchOpsRoster().catch(() => {});
     const h = () => setTick((t) => t + 1);
     window.addEventListener("iehub-case-updated", h);
     window.addEventListener("iehub-plans-updated", h);
@@ -47,18 +53,35 @@ export default function AdminPage() {
   };
 
   const isAdmin = session?.role === ROLES.ADMIN;
+  const myEmail = session?.email;
   const cases = useMemo(() => {
-    const list = isAdmin ? listAllCases() : listCasesForOps(session?.email);
-    return list;
+    return listAllCases();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, session?.email, tick]);
+  }, [tick]);
+
+  const claimCase = async (c, e) => {
+    e.stopPropagation();
+    if (!c?.customerEmail || assigningId) return;
+    setAssignError("");
+    setAssigningId(c.id || c.customerEmail);
+    try {
+      await assignCaseToMe(c.customerEmail);
+    } catch (err) {
+      setAssignError(err?.message || "Could not assign this case.");
+    } finally {
+      setAssigningId(null);
+    }
+  };
 
   const filtered = useMemo(() => {
     return cases.filter((c) => {
       const st = journeyStatus(c);
+      if (filter === "mine" && !isAssignedTo(c, myEmail)) return false;
+      if (filter === "unassigned" && c.opsEmail) return false;
       if (filter === "kyc" && st !== CASE_STATUS.KYC_PENDING && st !== CASE_STATUS.KYC_INCOMPLETE) return false;
       if (filter === "active" && st !== CASE_STATUS.ACTIVE) return false;
       if (filter === "completed" && st !== CASE_STATUS.COMPLETED) return false;
+      if (filter === "closed" && st !== CASE_STATUS.CLOSED) return false;
       if (filter === "pending_kyc" && st !== CASE_STATUS.KYC_PENDING) return false;
       if (q.trim()) {
         const hay = `${c.customerEmail} ${c.id} ${c.opsName || ""} ${c.planId || ""}`.toLowerCase();
@@ -66,10 +89,13 @@ export default function AdminPage() {
       }
       return true;
     });
-  }, [cases, filter, q]);
+  }, [cases, filter, q, myEmail]);
+
+  const mineCount = cases.filter((c) => isAssignedTo(c, myEmail)).length;
+  const unassignedCount = cases.filter((c) => !c.opsEmail).length;
 
   const stats = [
-    { id: "all", label: isAdmin ? "All cases" : "My cases", value: String(cases.length), icon: Briefcase },
+    { id: "all", label: "All cases", value: String(cases.length), icon: Briefcase },
     {
       id: "pending_kyc",
       label: "KYC to review",
@@ -95,11 +121,13 @@ export default function AdminPage() {
       <header>
         <span className="inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-white/70">
           <span className="h-1.5 w-1.5 rounded-full bg-[var(--gold)]" />
-          {isAdmin ? "Admin · all cases" : "Operations · my assignments"}
+          {isAdmin ? "Admin · all cases" : "Operations · full queue"}
         </span>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight">Case queue</h1>
         <p className="mt-1 text-sm text-white/55">
-          Review KYC, advance documentation stages, upload deliverables, and chat with customers.
+          {isAdmin
+            ? "Review KYC, advance documentation stages, upload deliverables, and assign operators."
+            : "See every pending and closed case. Assign one to yourself to take ownership."}
         </p>
       </header>
 
@@ -124,10 +152,13 @@ export default function AdminPage() {
       <div className="flex flex-wrap gap-2">
         {[
           { id: "all", label: "All" },
+          { id: "mine", label: `Mine (${mineCount})` },
+          { id: "unassigned", label: `Unassigned (${unassignedCount})` },
           { id: "pending_kyc", label: "KYC review" },
           { id: "kyc", label: "Needs KYC" },
           { id: "active", label: "Active" },
           { id: "completed", label: "Completed" },
+          { id: "closed", label: "Closed" },
         ].map((f) => (
           <button
             key={f.id}
@@ -146,6 +177,8 @@ export default function AdminPage() {
         />
       </div>
 
+      {assignError ? <p className="text-sm text-rose-300">{assignError}</p> : null}
+
       <div className="overflow-hidden rounded-2xl border border-white/10">
         <table className="w-full text-left text-sm">
           <thead className="bg-white/5 text-[11px] uppercase tracking-wider text-white/45">
@@ -156,6 +189,7 @@ export default function AdminPage() {
               <th className="px-4 py-3">Stage</th>
               <th className="px-4 py-3">Ops</th>
               <th className="px-4 py-3" />
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
@@ -163,6 +197,8 @@ export default function AdminPage() {
               const plan = getPlanById(c.paidPlanId || c.planId);
               const st = journeyStatus(c);
               const stageLabel = currentStageLabel(c);
+              const mine = isAssignedTo(c, myEmail);
+              const busy = assigningId === (c.id || c.customerEmail);
               return (
                 <tr
                   key={c.customerEmail}
@@ -178,7 +214,21 @@ export default function AdminPage() {
                     <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11px]">{st.replace(/_/g, " ")}</span>
                   </td>
                   <td className="px-4 py-3 text-white/60">{stageLabel}</td>
-                  <td className="px-4 py-3 text-white/60">{c.opsName || "—"}</td>
+                  <td className="px-4 py-3 text-white/60">{c.opsName || "Unassigned"}</td>
+                  <td className="px-4 py-3">
+                    {mine ? (
+                      <span className="text-[11px] text-emerald-300">Yours</span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={(e) => claimCase(c, e)}
+                        className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/80 hover:bg-white/10 disabled:opacity-50"
+                      >
+                        {busy ? "Assigning…" : "Assign to me"}
+                      </button>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <ChevronRight size={16} className="inline text-white/30" />
                   </td>

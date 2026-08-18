@@ -3,7 +3,6 @@ import { Loader2, Send } from "lucide-react";
 import { getSession, ROLES } from "@/lib/authSession";
 import {
   listAllCases,
-  listCasesForOps,
   getCustomerCase,
 } from "@/lib/customerCase";
 import { fetchMessagesForCase, getMessagesForCase, sendMessage } from "@/lib/caseMessages";
@@ -38,12 +37,7 @@ export default function MessagesPage() {
   }, [session?.role, session?.email]);
 
   const isCustomer = session?.role === ROLES.CUSTOMER;
-  const staffCases =
-    session?.role === ROLES.ADMIN
-      ? listAllCases()
-      : session?.role === ROLES.OPERATIONS
-        ? listCasesForOps(session.email)
-        : [];
+  const staffCases = session?.role === ROLES.ADMIN || session?.role === ROLES.OPERATIONS ? listAllCases() : [];
 
   useEffect(() => {
     if (isCustomer && session?.email) setActiveEmail(session.email);

@@ -6,7 +6,7 @@ import { fetchPublicConfig } from "@/lib/appConfig";
 import { fetchPlanCatalog } from "@/lib/planCatalog";
 import { fetchEventsCatalog } from "@/lib/eventsCatalog";
 import { fetchBrochuresCatalog } from "@/lib/brochuresCatalog";
-import { fetchMyCase, fetchCasesQueue } from "@/lib/customerCase";
+import { fetchMyCase, fetchCasesQueue, fetchOpsRoster } from "@/lib/customerCase";
 import { getSession, ROLES, subscribeAuth } from "@/lib/authSession";
 
 let started = false;
@@ -18,7 +18,7 @@ async function loadSessionData() {
   if (session.role === ROLES.CUSTOMER) {
     await fetchMyCase();
   } else if (session.role === ROLES.ADMIN || session.role === ROLES.OPERATIONS) {
-    await fetchCasesQueue();
+    await Promise.all([fetchCasesQueue(), fetchOpsRoster()]);
   }
 }
 

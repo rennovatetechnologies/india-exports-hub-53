@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Phone, Mail, MapPin, Send } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { getSupportEmail } from "@/lib/appConfig";
+import { getSupportEmail, getSupportWhatsAppDisplay, getSupportWhatsAppUrl } from "@/lib/appConfig";
 
 const inputCls =
   "rounded-xl border border-white/10 bg-white/[0.04] text-white placeholder:text-white/35 px-4 py-3 focus:ring-2 focus:ring-[var(--gold)]/40 outline-none transition";
@@ -30,8 +30,7 @@ export default function ContactPage() {
     const plan = searchParams.get("plan");
     const planLine = plan ? `\nPlan interest: ${plan}` : "";
     const whatsappMessage = `Hello, my name is ${name}.\nEmail: ${email}${planLine}\n\nMessage:\n${message}`;
-    const encodedMessage = encodeURIComponent(whatsappMessage);
-    window.open(`https://wa.me/919028894149?text=${encodedMessage}`, "_blank");
+    window.open(getSupportWhatsAppUrl(whatsappMessage), "_blank");
   };
 
   return (
@@ -90,9 +89,14 @@ export default function ContactPage() {
                 <Phone className="text-[var(--gold)] w-6 h-6 shrink-0" />
                 <p className="text-lg">
                   <span className="font-semibold text-white">Phone:</span>{" "}
-                  <span className="text-[var(--gold)] font-medium">
-                    +91 90288 94149
-                  </span>
+                  <a
+                    href={getSupportWhatsAppUrl()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[var(--gold)] font-medium"
+                  >
+                    {getSupportWhatsAppDisplay()}
+                  </a>
                 </p>
               </div>
             </div>

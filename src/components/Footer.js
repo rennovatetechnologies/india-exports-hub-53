@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import { PRODUCT_CATEGORIES } from "@/lib/siteNav";
 import { PATHS } from "@/lib/routes";
-import { getSupportEmail } from "@/lib/appConfig";
+import { getSupportEmail, getSupportWhatsAppDisplay, getSupportWhatsAppUrl } from "@/lib/appConfig";
 
 export default function Footer() {
   const pathname = useLocation().pathname;
@@ -47,7 +47,14 @@ export default function Footer() {
 
               <div className="mt-6 space-y-2 text-sm text-white/65">
                 <div className="flex items-start gap-2"><MapPin size={15} className="mt-0.5 text-[var(--gold)]" /> Shop No M02, Premium Plaza Commercial Complex, Dharampeth, Nagpur 440010</div>
-                <div className="flex items-center gap-2"><Phone size={15} className="text-[var(--gold)]" /> 90288 94149</div>
+                <a
+                  href={getSupportWhatsAppUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 hover:text-white"
+                >
+                  <Phone size={15} className="text-[var(--gold)]" /> {getSupportWhatsAppDisplay()}
+                </a>
                 <div className="flex items-center gap-2"><Mail size={15} className="text-[var(--gold)]" /> {getSupportEmail()}</div>
               </div>
             </div>
@@ -76,7 +83,7 @@ export default function Footer() {
             <div suppressHydrationWarning>© {new Date().getFullYear()} VIRASTRA INTERNATIONAL EXPORT. All rights reserved.</div>
             <div className="flex items-center gap-3">
               <a
-                href="https://wa.me/919028894149"
+                href={getSupportWhatsAppUrl()}
                 target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-full glass px-3 py-1.5 hover:text-white"
               >
@@ -89,7 +96,7 @@ export default function Footer() {
 
       {/* Floating WhatsApp */}
       <a
-        href="https://wa.me/919028894149"
+        href={getSupportWhatsAppUrl()}
         target="_blank" rel="noopener noreferrer"
         aria-label="WhatsApp"
         className="fixed bottom-24 right-6 z-40 rounded-full border border-emerald-400/30 bg-emerald-500/90 p-3.5 text-black shadow-[0_10px_30px_-10px_rgba(52,211,153,0.6)] hover:bg-emerald-400 transition"

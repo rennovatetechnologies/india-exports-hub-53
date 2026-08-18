@@ -8,8 +8,6 @@ import {
   getCaseWorkflowStages,
   currentStageLabel,
   listAllCases,
-  listCasesForOps,
-  getCustomerCase,
 } from "@/lib/customerCase";
 import { getPlanById } from "@/lib/planCatalog";
 import { adminWorkflowPath } from "@/lib/routes";
@@ -110,9 +108,7 @@ function CustomerWorkflow() {
 }
 
 function StaffWorkflowBoard() {
-  const session = getSession();
-  const cases =
-    session?.role === ROLES.ADMIN ? listAllCases() : listCasesForOps(session?.email);
+  const cases = listAllCases();
 
   return (
     <div className="space-y-6">

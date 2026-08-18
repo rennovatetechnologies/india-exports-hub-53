@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquare, Mail, Phone, ChevronDown, BookOpen, Sparkles } from "lucide-react";
-import { getSupportEmail } from "@/lib/appConfig";
+import { getSupportEmail, getSupportWhatsAppDisplay, getSupportWhatsAppUrl } from "@/lib/appConfig";
 
 const CHANNELS = [
   {
@@ -13,7 +13,7 @@ const CHANNELS = [
     to: "/dashboard/workflow#workflow-activity",
   },
   { icon: Mail, label: "Email support", desc: "", cta: "Compose email" },
-  { icon: Phone, label: "Hotline", desc: "+91 80 4567 1200 · Mon–Sat", cta: "Call now" },
+  { icon: Phone, label: "WhatsApp", desc: "", cta: "Message us" },
 ];
 
 const FAQS = [
@@ -32,11 +32,19 @@ const ARTICLES = [
 export default function SupportPage() {
   const [open, setOpen] = useState(0);
   const supportEmail = getSupportEmail();
-  const channels = CHANNELS.map((ch) =>
-    ch.label === "Email support"
-      ? { ...ch, desc: `${supportEmail} · 4h SLA`, href: `mailto:${supportEmail}` }
-      : ch
-  );
+  const channels = CHANNELS.map((ch) => {
+    if (ch.label === "Email support") {
+      return { ...ch, desc: `${supportEmail} · 4h SLA`, href: `mailto:${supportEmail}` };
+    }
+    if (ch.label === "WhatsApp") {
+      return {
+        ...ch,
+        desc: `${getSupportWhatsAppDisplay()} · Mon–Sat`,
+        href: getSupportWhatsAppUrl(),
+      };
+    }
+    return ch;
+  });
   return (
     <div className="space-y-8">
       <header>
@@ -102,7 +110,14 @@ export default function SupportPage() {
           <div className="glass-card p-6">
             <div className="inline-flex items-center gap-2 text-[var(--gold)]"><Sparkles size={16} /><span className="text-sm font-semibold">Concierge desk</span></div>
             <p className="mt-2 text-xs text-white/55">Premium includes expert reviews and practical export guidance. Book a 30-min strategy call.</p>
-            <button className="btn-gold mt-4 w-full rounded-xl px-4 py-2 text-xs font-semibold">Book a call</button>
+            <a
+              href={getSupportWhatsAppUrl("Hello, I would like to book a 30-min strategy call.")}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-gold mt-4 flex w-full items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold"
+            >
+              Book a call
+            </a>
           </div>
         </div>
       </section>

@@ -5,10 +5,13 @@ import { api } from "@/lib/api";
 let cached = null;
 let inflight = null;
 
+const FALLBACK_WHATSAPP = "9967084149";
+
 const FALLBACK = {
   razorpayKeyId: import.meta.env.VITE_RAZORPAY_KEY_ID || "",
   appName: "VIRASTRA",
   supportEmail: "support@virastrainternationalexport.com",
+  supportWhatsApp: FALLBACK_WHATSAPP,
   gstRate: 0.18,
   seller: {
     legalName: "New India Export",
@@ -32,6 +35,7 @@ function normalize(raw) {
     razorpayKeyId: String(d.razorpayKeyId || FALLBACK.razorpayKeyId || ""),
     appName: String(d.appName || FALLBACK.appName),
     supportEmail: String(d.supportEmail || FALLBACK.supportEmail),
+    supportWhatsApp: normalizeWhatsAppDigits(d.supportWhatsApp || FALLBACK.supportWhatsApp),
     gstRate: Number.isFinite(gstRate) && gstRate >= 0 ? gstRate : FALLBACK.gstRate,
     seller: {
       legalName: d.seller?.legalName || FALLBACK.seller.legalName,
@@ -54,6 +58,35 @@ export function getCachedPublicConfig() {
 
 export function getSupportEmail() {
   return getCachedPublicConfig().supportEmail || FALLBACK.supportEmail;
+}
+
+function normalizeWhatsAppDigits(raw) {
+  const d = String(raw || "").replace(/\D/g, "");
+  if (d.length === 12 && d.startsWith("91")) return d.slice(2);
+  if (d.length >= 10) return d.slice(-10);
+  return FALLBACK_WHATSAPP;
+}
+
+/** 10-digit India mobile used for public WhatsApp / phone. */
+export function getSupportWhatsAppDigits() {
+  return normalizeWhatsAppDigits(getCachedPublicConfig().supportWhatsApp);
+}
+
+/** wa.me / E.164 without plus: 91XXXXXXXXXX */
+export function getSupportWhatsAppE164() {
+  return `91${getSupportWhatsAppDigits()}`;
+}
+
+/** Display: +91 99670 84149 */
+export function getSupportWhatsAppDisplay() {
+  const d = getSupportWhatsAppDigits();
+  return `+91 ${d.slice(0, 5)} ${d.slice(5)}`;
+}
+
+export function getSupportWhatsAppUrl(text) {
+  const base = `https://wa.me/${getSupportWhatsAppE164()}`;
+  if (!text) return base;
+  return `${base}?text=${encodeURIComponent(text)}`;
 }
 
 export function getGstRate() {

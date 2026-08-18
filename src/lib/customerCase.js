@@ -17,6 +17,7 @@ export const CASE_STATUS = {
   ACTIVE: "active",
   COMPLETED: "completed",
   EXPIRED: "expired",
+  CLOSED: "closed",
 };
 
 /** Paid plans are valid for one calendar year from purchase or upgrade. */
@@ -237,6 +238,7 @@ export async function fetchOpsRoster() {
         email: normalizeEmail(o.email),
         name: String(o.name || "").trim() || normalizeEmail(o.email),
       }));
+      emit();
       return opsRoster.map((x) => ({ ...x }));
     }
   } catch (e) {
@@ -526,6 +528,24 @@ export async function reassignOps(email, opsEmail, opsName) {
   return getCustomerCase(email);
 }
 
+/** Newly approved ops can claim any case in the queue, including ones already assigned. */
+export async function assignCaseToMe(email) {
+  const session = getSession();
+  if (!session?.email) throw new Error("Not signed in");
+  return reassignOps(email, session.email, session.name || session.email);
+}
+
+/** Roster plus the signed-in staff user so they can always pick themselves. */
+export function rosterWithSession() {
+  const list = loadOpsRoster();
+  const session = getSession();
+  if (!session?.email) return list;
+  if (session.role !== ROLES.OPERATIONS && session.role !== ROLES.ADMIN) return list;
+  const key = normalizeEmail(session.email);
+  if (list.some((o) => normalizeEmail(o.email) === key)) return list;
+  return [{ email: key, name: session.name || key }, ...list];
+}
+
 /** Ops/admin upload a deliverable for the customer (multipart → Drive/Mongo). */
 export async function addOpsDocument(email, { file, stageId, label, note }) {
   const c = getCustomerCase(email);
@@ -623,6 +643,7 @@ export function getRequiredKycDocs(customerCase) {
 
 export function journeyStatus(customerCase) {
   if (!customerCase) return CASE_STATUS.NO_PLAN;
+  if (customerCase.status === CASE_STATUS.CLOSED) return CASE_STATUS.CLOSED;
   if (customerCase.paymentStatus !== "paid" || !customerCase.paidPlanId) {
     return customerCase.planId ? CASE_STATUS.UNPAID : CASE_STATUS.NO_PLAN;
   }
@@ -691,9 +712,15 @@ export function listAllCases() {
   );
 }
 
+/** Unassigned cases plus this operator's assignments. */
 export function listCasesForOps(opsEmail) {
   const key = normalizeEmail(opsEmail);
   return listAllCases().filter((c) => !c.opsEmail || normalizeEmail(c.opsEmail) === key);
+}
+
+export function isAssignedTo(customerCase, opsEmail) {
+  if (!customerCase?.opsEmail || !opsEmail) return false;
+  return normalizeEmail(customerCase.opsEmail) === normalizeEmail(opsEmail);
 }
 
 export function ensureCaseForSession() {

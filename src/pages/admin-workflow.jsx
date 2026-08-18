@@ -25,7 +25,10 @@ import {
   addOpsDocument,
   requestDocument,
   reassignOps,
-  loadOpsRoster,
+  assignCaseToMe,
+  rosterWithSession,
+  fetchOpsRoster,
+  isAssignedTo,
   getCaseWorkflowStages,
   currentStageLabel,
   journeyStatus,
@@ -74,11 +77,14 @@ export default function AdminWorkflowPage() {
   const [fileBusy, setFileBusy] = useState(null);
   const [kycError, setKycError] = useState("");
   const [filePreview, setFilePreview] = useState(null); // { url, name, type }
+  const [assignBusy, setAssignBusy] = useState(false);
+  const [assignError, setAssignError] = useState("");
   const [stageBusy, setStageBusy] = useState(false);
   const [stageError, setStageError] = useState("");
 
   useEffect(() => {
     setQueueReady(true);
+    fetchOpsRoster().catch(() => {});
     const h = () => setTick((t) => t + 1);
     window.addEventListener("iehub-case-updated", h);
     window.addEventListener("iehub-messages-updated", h);
@@ -144,7 +150,8 @@ export default function AdminWorkflowPage() {
   const status = journeyStatus(c);
   const kycDocs = plan?.kycDocs || [];
   const msgs = getMessagesForCase(c || customerEmail);
-  const roster = loadOpsRoster();
+  const roster = rosterWithSession();
+  const assignedToMe = isAssignedTo(c, session?.email);
   const canReviewKyc = c.kycStatus === KYC_STATUS.SUBMITTED;
 
   let kycApproved = 0;
@@ -316,6 +323,28 @@ export default function AdminWorkflowPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {assignedToMe ? (
+            <span className="rounded-lg bg-emerald-400/15 px-2 py-1.5 text-[11px] text-emerald-200">Assigned to you</span>
+          ) : (
+            <button
+              type="button"
+              disabled={assignBusy}
+              onClick={async () => {
+                setAssignError("");
+                setAssignBusy(true);
+                try {
+                  await assignCaseToMe(customerEmail);
+                } catch (err) {
+                  setAssignError(err?.message || "Could not assign this case.");
+                } finally {
+                  setAssignBusy(false);
+                }
+              }}
+              className="rounded-lg border border-[var(--gold)]/40 bg-[var(--gold)]/10 px-3 py-1.5 text-xs font-medium text-[var(--gold)] hover:bg-[var(--gold)]/20 disabled:opacity-50"
+            >
+              {assignBusy ? "Assigning…" : "Assign to me"}
+            </button>
+          )}
           <label className="flex items-center gap-2 text-xs text-white/50">
             <UserPlus size={14} />
             <select
@@ -334,6 +363,7 @@ export default function AdminWorkflowPage() {
               ))}
             </select>
           </label>
+          {assignError ? <span className="text-[11px] text-rose-300">{assignError}</span> : null}
         </div>
       </div>
 
