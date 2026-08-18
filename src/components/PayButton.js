@@ -2,8 +2,17 @@ import { useState } from "react";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 
 /**
- * Razorpay checkout — amount in INR (rupees). Backend: /api/create-order, /api/verify-payment.
+ * Key that created the order must open Checkout. Backend wins over a stale Vite bake.
  */
+export function razorpayCheckoutKey(cfg = {}) {
+  const fromApi = String(cfg.razorpayKeyId || cfg.data?.razorpayKeyId || "").trim();
+  const fromEnv = String(import.meta.env.VITE_RAZORPAY_KEY_ID || "").trim();
+  if (fromApi && fromEnv && fromApi !== fromEnv && typeof console !== "undefined") {
+    console.warn("Razorpay key mismatch: using /api/config/public key so Checkout matches the order.");
+  }
+  return fromApi || fromEnv;
+}
+
 export async function loadRazorpayScript() {
   if (typeof window === "undefined") return false;
   if (window.Razorpay) return true;
@@ -56,7 +65,7 @@ export async function startRazorpayCheckout(opts) {
     }
 
     const cfg = await fetch("/api/config/public").then((r) => r.json()).catch(() => ({}));
-    const key = import.meta.env.VITE_RAZORPAY_KEY_ID || cfg.razorpayKeyId;
+    const key = razorpayCheckoutKey(cfg);
     if (!key) throw new Error(USER_MESSAGES.payment);
 
     const resolvedPurpose = purpose || (eventId ? "event" : "plan");

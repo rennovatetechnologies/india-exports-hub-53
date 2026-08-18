@@ -6,6 +6,7 @@ import { getSession, isAuthenticated } from "@/lib/authSession";
 import { issueInvoiceForPayment } from "@/lib/invoice";
 import InvoiceModal from "@/components/InvoiceModal";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
+import { razorpayCheckoutKey } from "@/components/PayButton";
 
 export default function BookingModal({ open, setOpen }) {
   const [step, setStep] = useState(0);
@@ -110,7 +111,7 @@ export default function BookingModal({ open, setOpen }) {
       if (!order.id) throw new Error(toUserMessage({ message: order.message || order.detail || order.error }, USER_MESSAGES.payment));
 
       const cfg = await fetch("/api/config/public").then((r) => r.json()).catch(() => ({}));
-      const rzKey = import.meta.env.VITE_RAZORPAY_KEY_ID || cfg.razorpayKeyId;
+      const rzKey = razorpayCheckoutKey(cfg);
       if (!rzKey) throw new Error(USER_MESSAGES.payment);
 
       // 2. Open Razorpay Checkout
