@@ -43,6 +43,7 @@ export const PATHS = {
   dashboardDocuments: "/dashboard/documents",
   dashboardMessages: "/dashboard/messages",
   dashboardWorkflow: "/dashboard/workflow",
+  dashboardSettings: "/dashboard/settings",
   /** Legacy vault URLs redirect here */
   dashboardVault: "/dashboard/documents",
 

@@ -528,11 +528,9 @@ export async function startEmailOtp(email, purpose, profile = {}) {
   if (!normalized) return { ok: false };
   try {
     const body = { email: normalized, purpose };
-    if (purpose === OTP_PURPOSE.CUSTOMER_SIGNUP) {
-      if (profile.name != null) body.name = String(profile.name).trim();
-      if (profile.company != null) body.company = String(profile.company).trim();
-      if (profile.phone != null) body.phone = String(profile.phone).trim();
-    }
+    if (profile.name != null) body.name = String(profile.name).trim();
+    if (profile.company != null) body.company = String(profile.company).trim();
+    if (profile.phone != null) body.phone = String(profile.phone).trim();
     const res = await fetch("/api/auth/otp/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -541,6 +539,7 @@ export async function startEmailOtp(email, purpose, profile = {}) {
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok !== false) {
       const expiresInMs = (Number(data.expiresInSec) || 600) * 1000;
+      const sentVia = Array.isArray(data.sentVia) ? data.sentVia : [];
       sessionStorage.setItem(
         OTP_PENDING_KEY,
         JSON.stringify({
@@ -548,9 +547,12 @@ export async function startEmailOtp(email, purpose, profile = {}) {
           purpose,
           expiresAt: Date.now() + expiresInMs,
           viaApi: true,
+          sentVia,
+          masked: data.masked || null,
+          channels: data.channels || null,
         })
       );
-      return { ok: true };
+      return { ok: true, sentVia, masked: data.masked, channels: data.channels };
     }
     if (!allowAuthMock()) {
       return {
@@ -596,7 +598,13 @@ export function getPendingOtpInfo() {
     const p = JSON.parse(raw);
     if (!p?.email || !p?.purpose) return null;
     if (Date.now() > (p.expiresAt || 0)) return null;
-    return { email: p.email, purpose: p.purpose };
+    return {
+      email: p.email,
+      purpose: p.purpose,
+      sentVia: Array.isArray(p.sentVia) ? p.sentVia : [],
+      masked: p.masked || null,
+      channels: p.channels || null,
+    };
   } catch {
     return null;
   }

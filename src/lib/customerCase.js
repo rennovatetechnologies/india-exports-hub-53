@@ -10,7 +10,7 @@ import {
   mergeWorkflowStages,
   remainingKycDocs,
 } from "@/lib/planCatalog";
-import { api } from "@/lib/api";
+import { api, apiUpload } from "@/lib/api";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 
 export const CASE_STATUS = {
@@ -287,8 +287,8 @@ export async function setKycProfile(_email, profile) {
   return fetchMyCase({ force: true });
 }
 
-/** Upload a KYC file straight to Mongo/Drive. */
-export async function setKycUpload(_email, docId, fileOrMeta) {
+/** Upload a KYC file straight to Mongo/Drive. `onProgress({ percent, phase })` is optional. */
+export async function setKycUpload(_email, docId, fileOrMeta, { onProgress } = {}) {
   if (!docId) throw new Error("Document id required");
   const file = fileOrMeta instanceof File || fileOrMeta instanceof Blob ? fileOrMeta : fileOrMeta?.file;
   if (!file) throw new Error("File required — upload to the server, not local cache");
@@ -298,8 +298,14 @@ export async function setKycUpload(_email, docId, fileOrMeta) {
     file.name ||
     `${docId}.pdf`;
   fd.append("file", file, name);
-  await api(`/api/kyc/me/documents/${encodeURIComponent(docId)}`, { method: "POST", formData: fd });
-  return fetchMyCase({ force: true });
+  await apiUpload(`/api/kyc/me/documents/${encodeURIComponent(docId)}`, {
+    formData: fd,
+    onProgress: (info) => onProgress?.({ ...info, percent: Math.min(96, Number(info?.percent) || 0) }),
+  });
+  onProgress?.({ percent: 97, phase: "saving" });
+  const updated = await fetchMyCase({ force: true });
+  onProgress?.({ percent: 100, phase: "done" });
+  return updated;
 }
 
 export async function clearKycUpload(_email, docId) {
@@ -631,6 +637,7 @@ export function isPathAllowedDuringGate(pathname, customerCase) {
     "/dashboard/contact",
     "/dashboard/products",
     "/dashboard/booking",
+    "/dashboard/settings",
   ];
   if (always.some((p) => path === p || path.startsWith(`${p}/`))) return true;
   if (s === CASE_STATUS.NO_PLAN || s === CASE_STATUS.UNPAID || s === CASE_STATUS.EXPIRED) {

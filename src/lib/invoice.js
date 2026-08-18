@@ -4,7 +4,7 @@
  */
 import { GST_RATE, formatInr, priceWithGst } from "@/lib/planCatalog";
 import { normalizeEmail } from "@/lib/authSession";
-import { api } from "@/lib/api";
+import { api, apiGetBlob, triggerBlobDownload } from "@/lib/api";
 import { getCachedPublicConfig } from "@/lib/appConfig";
 
 const INVOICES_KEY = "vistara_invoices_v1";
@@ -230,6 +230,40 @@ export async function fetchInvoicesForEmail(email) {
   } catch (e) {
     console.warn("[invoices] fetch failed", e.message);
     return listInvoicesForEmail(key);
+  }
+}
+
+async function resolveInvoiceId({ invoiceId, paymentId } = {}) {
+  const direct = String(invoiceId || "").trim();
+  if (direct) return direct;
+  if (!paymentId) return "";
+  const data = await api(`/api/invoices?paymentId=${encodeURIComponent(paymentId)}&limit=1`);
+  const items = data?.items || data?.data?.items || [];
+  return Array.isArray(items) && items[0]?.id ? String(items[0].id) : "";
+}
+
+/**
+ * Download a tax-invoice PDF with the session token (plain <a href> cannot send Bearer auth).
+ */
+export async function downloadPaymentInvoicePdf({ invoiceId, paymentId } = {}) {
+  const id = await resolveInvoiceId({ invoiceId, paymentId });
+  if (!id) {
+    const err = new Error("No invoice for this payment yet");
+    err.status = 404;
+    throw err;
+  }
+  try {
+    const { blob, fileName } = await apiGetBlob(`/api/invoices/${encodeURIComponent(id)}/pdf`);
+    triggerBlobDownload(blob, fileName || `${id}.pdf`);
+    return;
+  } catch (e) {
+    const data = await api(`/api/invoices/${encodeURIComponent(id)}`).catch(() => {
+      throw e;
+    });
+    const invoice = data?.data || data;
+    if (!invoice?.id && !invoice?.invoiceNumber) throw e;
+    const { downloadInvoicePdf } = await import("@/lib/downloadInvoicePdf");
+    await downloadInvoicePdf(invoice);
   }
 }
 

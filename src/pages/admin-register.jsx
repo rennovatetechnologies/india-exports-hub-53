@@ -44,7 +44,10 @@ export default function AdminRegisterPage() {
     setOtpError("");
     const em = form.email.trim();
     if (!em) return;
-    const { ok, message } = await startEmailOtp(em, OTP_PURPOSE.STAFF_REGISTER);
+    const { ok, message } = await startEmailOtp(em, OTP_PURPOSE.STAFF_REGISTER, {
+      name: form.name,
+      phone: form.phone,
+    });
     if (!ok) {
       setOtpError(toUserMessage(message, USER_MESSAGES.otp));
       return;

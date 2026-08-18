@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Phone, Mail, MapPin, Send } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import { getSupportEmail } from "@/lib/appConfig";
 
 const inputCls =
   "rounded-xl border border-white/10 bg-white/[0.04] text-white placeholder:text-white/35 px-4 py-3 focus:ring-2 focus:ring-[var(--gold)]/40 outline-none transition";
@@ -80,7 +81,9 @@ export default function ContactPage() {
                 <Mail className="text-[var(--gold)] w-6 h-6 shrink-0" />
                 <p className="text-lg select-none">
                   <span className="font-semibold text-white">Email:</span>{" "}
-                  Newindexport@gmail.com
+                  <a href={`mailto:${getSupportEmail()}`} className="text-[var(--gold)] font-medium">
+                    {getSupportEmail()}
+                  </a>
                 </p>
               </div>
               <div className="flex items-center gap-4">

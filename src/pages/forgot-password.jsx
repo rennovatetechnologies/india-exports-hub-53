@@ -5,6 +5,7 @@ import AuthShell from "@/components/auth/AuthShell";
 import { startEmailOtp, OTP_PURPOSE, safeNextPath } from "@/lib/authSession";
 import { toUserMessage } from "@/lib/friendlyError";
 import { InlineNotice } from "@/components/FallbackScreen";
+import { otpSendHint, otpButtonLabel } from "@/lib/appConfig";
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthShell
       title="Sign in with email"
-      subtitle="We use one-time codes only — no passwords. Enter your work email and we’ll send a sign-in code."
+      subtitle={otpSendHint()}
       footer={
         <>
           <Link to="/login" className="text-[var(--gold)] hover:underline">Back to sign in</Link>
@@ -63,7 +64,7 @@ export default function ForgotPasswordPage() {
           disabled={loading}
           className="btn-gold w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold disabled:opacity-60"
         >
-          {loading ? "Sending…" : "Email me a sign-in code"} <ArrowRight size={15} />
+          {loading ? "Sending…" : otpButtonLabel(false)} <ArrowRight size={15} />
         </button>
       </form>
     </AuthShell>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSession, isAuthenticated } from "@/lib/authSession";
+import { getSupportEmail } from "@/lib/appConfig";
 
 export default function BookingPage() {
   const navigate = useNavigate();
@@ -32,7 +33,7 @@ Email (form): ${email}
 Address: ${address}
 Country: ${country}`;
 
-    window.location.href = `mailto:Newindexport@gmail.com?subject=Booking Request&body=${encodeURIComponent(message)}`;
+    window.location.href = `mailto:${getSupportEmail()}?subject=Booking Request&body=${encodeURIComponent(message)}`;
   };
 
   const Popup = ({ children }) => (

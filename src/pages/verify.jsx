@@ -240,11 +240,29 @@ export default function VerifyPage() {
 
   return (
     <AuthShell
-      title="Verify your email"
+      title="Enter your code"
       subtitle={
-        <>
-          Enter the 6-digit code we sent to <span className="text-white">{pending.email}</span>
-        </>
+        pending.sentVia?.includes("whatsapp") && pending.sentVia?.includes("email") ? (
+          <>
+            Enter the 6-digit code we sent to <span className="text-white">{pending.email}</span>
+            {pending.masked?.phone ? (
+              <> and WhatsApp <span className="text-white">{pending.masked.phone}</span></>
+            ) : (
+              " and WhatsApp"
+            )}
+          </>
+        ) : pending.sentVia?.includes("whatsapp") ? (
+          <>
+            Enter the 6-digit code we sent on WhatsApp
+            {pending.masked?.phone ? (
+              <> to <span className="text-white">{pending.masked.phone}</span></>
+            ) : null}
+          </>
+        ) : (
+          <>
+            Enter the 6-digit code we sent to <span className="text-white">{pending.email}</span>
+          </>
+        )
       }
       footer={
         <>

@@ -25,6 +25,7 @@ import {
   CalendarDays,
   CreditCard,
   LifeBuoy,
+  Settings2,
   Bell,
   Menu,
   LogOut,
@@ -74,6 +75,7 @@ const ADMIN_NAV = [
 ];
 
 const FOOTER_NAV = [
+  { href: PATHS.dashboardSettings, label: "Notifications", icon: Settings2 },
   { href: PATHS.dashboardSupport, label: "Support", icon: LifeBuoy },
 ];
 
@@ -329,15 +331,20 @@ export default function DashboardChrome({ children }) {
       )}
 
       <div className="space-y-1">
-        {FOOTER_NAV.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            to={href}
-            className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-white/60 hover:bg-white/5 hover:text-white"
-          >
-            <Icon size={15} /> {label}
-          </Link>
-        ))}
+        {FOOTER_NAV.map(({ href, label, icon: Icon }) => {
+          const active = pathname === href || pathname.startsWith(`${href}/`);
+          return (
+            <Link
+              key={href}
+              to={href}
+              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm ${
+                active ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              <Icon size={15} className={active ? "text-[var(--gold)]" : ""} /> {label}
+            </Link>
+          );
+        })}
         <button
           type="button"
           onClick={signOut}

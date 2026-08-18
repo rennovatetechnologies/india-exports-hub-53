@@ -12,6 +12,7 @@ import {
   X,
   FileText,
   Clock,
+  Loader2,
 } from "lucide-react";
 import { getSession } from "@/lib/authSession";
 import {
@@ -79,12 +80,28 @@ function Field({ label, hint, children }) {
 const inputCls =
   "w-full rounded-xl bg-white/5 border border-white/10 focus:border-[var(--gold)]/60 focus:bg-white/[0.07] outline-none px-3.5 py-2.5 text-sm placeholder:text-white/30 transition";
 
-function DocDrop({ title, desc, fileMeta, onPick, onClear, error, needsAction, reviewNote }) {
+function DocDrop({
+  title,
+  desc,
+  fileMeta,
+  onPick,
+  onClear,
+  error,
+  needsAction,
+  reviewNote,
+  uploading,
+  progress = 0,
+  uploadName,
+  uploadPhase,
+}) {
   const inputRef = useRef(null);
   const label = fileMeta?.name;
   const sizeLabel = fileMeta?.size ? formatFileSize(fileMeta.size) : "";
   const rejected = fileMeta?.reviewStatus === "rejected" || needsAction;
   const approved = fileMeta?.reviewStatus === "approved" && !needsAction;
+  const pct = Math.max(0, Math.min(100, Math.round(Number(progress) || 0)));
+  const progressLabel =
+    uploadPhase === "saving" ? "Saving on server…" : uploadPhase === "done" ? "Uploaded" : "Uploading…";
 
   return (
     <div
@@ -115,7 +132,12 @@ function DocDrop({ title, desc, fileMeta, onPick, onClear, error, needsAction, r
           {reviewNote && <div className="mt-1 text-[11px] text-rose-200">Ops note: {reviewNote}</div>}
           {error && <div className="mt-1 text-[11px] text-rose-300">{error}</div>}
         </div>
-        {label && !rejected ? (
+        {uploading ? (
+          <span className="inline-flex items-center gap-2 rounded-lg bg-[var(--gold)]/10 px-3 py-1.5 text-xs text-[var(--gold)]">
+            <Loader2 size={13} className="animate-spin" />
+            {pct}%
+          </span>
+        ) : label && !rejected ? (
           <span
             className={`flex max-w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs ${
               approved ? "bg-emerald-400/10 text-emerald-300" : "bg-emerald-400/10 text-emerald-300"
@@ -139,6 +161,7 @@ function DocDrop({ title, desc, fileMeta, onPick, onClear, error, needsAction, r
               type="file"
               accept={KYC_FILE_ACCEPT}
               className="sr-only"
+              disabled={uploading}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 e.target.value = "";
@@ -147,15 +170,35 @@ function DocDrop({ title, desc, fileMeta, onPick, onClear, error, needsAction, r
             />
             <button
               type="button"
+              disabled={uploading}
               onClick={() => inputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-lg glass px-3 py-1.5 text-xs hover:bg-white/10"
+              className="inline-flex items-center gap-2 rounded-lg glass px-3 py-1.5 text-xs hover:bg-white/10 disabled:opacity-50"
             >
               <Upload size={13} /> {rejected && label ? "Replace file" : "Choose file"}
             </button>
           </>
         )}
       </div>
-      {rejected && label && (
+      {uploading && (
+        <div className="mt-3" aria-live="polite">
+          <div className="flex items-center justify-between gap-3 text-[11px] text-white/55">
+            <span className="min-w-0 truncate">
+              {progressLabel}
+              {uploadName ? ` · ${uploadName}` : ""}
+            </span>
+            <span className="shrink-0 tabular-nums text-[var(--gold)]">{pct}%</span>
+          </div>
+          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+            <motion.div
+              className="h-full rounded-full bg-[var(--grad-gold)]"
+              initial={false}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+            />
+          </div>
+        </div>
+      )}
+      {rejected && label && !uploading && (
         <p className="mt-2 truncate text-[11px] text-white/40">Current file: {label} — replace it to continue</p>
       )}
     </div>
@@ -172,6 +215,7 @@ export default function KycWizardPage() {
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [fileErrors, setFileErrors] = useState({});
   const [uploadBusy, setUploadBusy] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState({});
 
   useEffect(() => {
     const h = () => setTick((t) => t + 1);
@@ -293,12 +337,29 @@ export default function KycWizardPage() {
       return next;
     });
     setUploadBusy(docId);
+    setUploadProgress((p) => ({ ...p, [docId]: { percent: 4, name: file.name, phase: "upload" } }));
     try {
-      await setKycUpload(session.email, docId, file);
+      await setKycUpload(session.email, docId, file, {
+        onProgress: (info) => {
+          setUploadProgress((p) => ({
+            ...p,
+            [docId]: {
+              percent: Number(info?.percent) || 0,
+              name: file.name,
+              phase: info?.phase || "upload",
+            },
+          }));
+        },
+      });
     } catch (err) {
       setFileErrors((e) => ({ ...e, [docId]: toUserMessage(err, USER_MESSAGES.upload) }));
     } finally {
       setUploadBusy(null);
+      setUploadProgress((p) => {
+        const next = { ...p };
+        delete next[docId];
+        return next;
+      });
     }
   };
 
@@ -623,6 +684,8 @@ export default function KycWizardPage() {
                     const up = c?.kycUploads?.[doc.id] || null;
                     const needsAction =
                       actionDocIds.has(doc.id) || up?.reviewStatus === "rejected";
+                    const uploadState = uploadProgress[doc.id];
+                    const isUploading = uploadBusy === doc.id;
                     return (
                       <DocDrop
                         key={doc.id}
@@ -637,7 +700,11 @@ export default function KycWizardPage() {
                         fileMeta={up}
                         needsAction={needsAction}
                         reviewNote={up?.reviewNote || (needsAction ? actionDocs.find((a) => a.id === doc.id)?.note : "")}
-                        error={uploadBusy === doc.id ? "Uploading to server…" : fileErrors[doc.id]}
+                        error={fileErrors[doc.id]}
+                        uploading={isUploading}
+                        progress={uploadState?.percent || 0}
+                        uploadName={uploadState?.name || ""}
+                        uploadPhase={uploadState?.phase || "upload"}
                         onPick={(file) => onPickFile(doc.id, file)}
                         onClear={() => onClearFile(doc.id)}
                       />
@@ -707,7 +774,7 @@ export default function KycWizardPage() {
             <button
               type="button"
               onClick={onNext}
-              disabled={(step === 0 && !businessOk) || (step === 1 && (!identityOk || !canSubmitDocs))}
+              disabled={(step === 0 && !businessOk) || (step === 1 && (!identityOk || !canSubmitDocs || Boolean(uploadBusy)))}
               className="btn-gold inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-black disabled:opacity-40"
             >
               Continue <ArrowRight size={16} />

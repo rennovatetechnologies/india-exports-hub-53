@@ -37,6 +37,7 @@ import DashSupport from "@/pages/dashboard__support.jsx";
 import DashDocuments from "@/pages/dashboard__documents.jsx";
 import DashMessages from "@/pages/dashboard__messages.jsx";
 import DashWorkflow from "@/pages/dashboard__workflow.jsx";
+import DashSettings from "@/pages/dashboard__settings.jsx";
 
 import Admin from "@/pages/admin.jsx";
 import AdminWorkflow from "@/pages/admin-workflow.jsx";
@@ -161,6 +162,7 @@ export default function App() {
           <Route path="messages" element={<DashMessages />} />
           <Route path="vault/:caseId?" element={<Navigate to={PATHS.dashboardDocuments} replace />} />
           <Route path="workflow" element={<DashWorkflow />} />
+          <Route path="settings" element={<DashSettings />} />
           <Route path="*" element={<NotFound compact />} />
         </Route>
 

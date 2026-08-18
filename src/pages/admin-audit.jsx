@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  CreditCard, Search, Filter, CalendarRange,
+  CreditCard, Search, Filter, CalendarRange, Download, Loader2,
 } from "lucide-react";
 import { getSession, ROLES } from "@/lib/authSession";
 import { api } from "@/lib/api";
 import { PATHS, adminWorkflowPath } from "@/lib/routes";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
+import { downloadPaymentInvoicePdf } from "@/lib/invoice";
 import FallbackScreen from "@/components/FallbackScreen";
 
 const PERIODS = [
@@ -65,6 +66,8 @@ export default function AdminAuditPage() {
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
   const [active, setActive] = useState(null);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  const [invoiceError, setInvoiceError] = useState("");
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedQ(query.trim()), 300);
@@ -198,7 +201,10 @@ export default function AdminAuditPage() {
             key={item.id}
             type="button"
             whileHover={{ y: -1 }}
-            onClick={() => setActive(item)}
+            onClick={() => {
+              setInvoiceError("");
+              setActive(item);
+            }}
             className="glass-card w-full p-4 text-left transition hover:border-white/20"
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -282,17 +288,32 @@ export default function AdminAuditPage() {
                   Open case
                 </Link>
               )}
-              {active.invoiceId && (
-                <a
-                  href={`/api/invoices/${encodeURIComponent(active.invoiceId)}/pdf`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-ghost inline-flex rounded-xl px-3 py-2 text-xs font-semibold"
+              {(active.invoiceId || active.status === "paid") && (
+                <button
+                  type="button"
+                  disabled={downloadingInvoice}
+                  onClick={async () => {
+                    setInvoiceError("");
+                    setDownloadingInvoice(true);
+                    try {
+                      await downloadPaymentInvoicePdf({
+                        invoiceId: active.invoiceId,
+                        paymentId: active.id,
+                      });
+                    } catch (e) {
+                      setInvoiceError(toUserMessage(e, USER_MESSAGES.download));
+                    } finally {
+                      setDownloadingInvoice(false);
+                    }
+                  }}
+                  className="btn-ghost inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold disabled:opacity-50"
                 >
-                  Invoice PDF
-                </a>
+                  {downloadingInvoice ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                  {downloadingInvoice ? "Preparing PDF…" : "Invoice PDF"}
+                </button>
               )}
             </div>
+            {invoiceError ? <p className="mt-3 text-xs text-rose-300">{invoiceError}</p> : null}
           </aside>
         </>
       )}

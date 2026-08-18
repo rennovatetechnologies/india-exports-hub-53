@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import { PRODUCT_CATEGORIES } from "@/lib/siteNav";
 import { PATHS } from "@/lib/routes";
+import { getSupportEmail } from "@/lib/appConfig";
 
 export default function Footer() {
   const pathname = useLocation().pathname;
@@ -47,7 +48,7 @@ export default function Footer() {
               <div className="mt-6 space-y-2 text-sm text-white/65">
                 <div className="flex items-start gap-2"><MapPin size={15} className="mt-0.5 text-[var(--gold)]" /> Shop No M02, Premium Plaza Commercial Complex, Dharampeth, Nagpur 440010</div>
                 <div className="flex items-center gap-2"><Phone size={15} className="text-[var(--gold)]" /> 90288 94149</div>
-                <div className="flex items-center gap-2"><Mail size={15} className="text-[var(--gold)]" /> Newindexport@gmail.com</div>
+                <div className="flex items-center gap-2"><Mail size={15} className="text-[var(--gold)]" /> {getSupportEmail()}</div>
               </div>
             </div>
 

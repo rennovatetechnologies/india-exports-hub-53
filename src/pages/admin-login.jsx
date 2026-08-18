@@ -13,6 +13,7 @@ import {
   workspaceFor,
 } from "@/lib/authSession";
 import { toUserMessage } from "@/lib/friendlyError";
+import { otpSendHint, otpButtonLabel } from "@/lib/appConfig";
 
 export default function AdminLoginPage() {
   const navigate = useNavigate();
@@ -49,7 +50,7 @@ export default function AdminLoginPage() {
   return (
     <AdminAuthShell
       title="Sign in to operations"
-      subtitle="Official email + one-time code — no password"
+      subtitle={otpSendHint()}
       footer={
         <>
           New team member?{" "}
@@ -64,7 +65,7 @@ export default function AdminLoginPage() {
           disabled={loading}
           className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-300 to-cyan-300 px-5 py-3 text-sm font-semibold text-black hover:opacity-90 disabled:opacity-60"
         >
-          {loading ? "Sending code…" : (<>Email me a sign-in code <ArrowRight size={15} /></>)}
+          {loading ? "Sending code…" : (<>{otpButtonLabel(false)} <ArrowRight size={15} /></>)}
         </button>
         <p className="text-center text-[11px] text-white/40">
           Your role (operations or admin) comes from your <span className="text-white/70">approved</span> access request.

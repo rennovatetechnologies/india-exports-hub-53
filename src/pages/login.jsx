@@ -14,6 +14,7 @@ import {
   workspaceFor,
 } from "@/lib/authSession";
 import { toUserMessage } from "@/lib/friendlyError";
+import { getOtpChannels, otpSendHint, otpButtonLabel } from "@/lib/appConfig";
 
 export default function LoginPage() {
   const router = useNavigate();
@@ -56,7 +57,7 @@ export default function LoginPage() {
   return (
     <AuthShell
       title="Welcome back"
-      subtitle="We’ll email you a one-time code — no password"
+      subtitle={otpSendHint()}
       footer={
         <>
           New to VIRASTRA INTERNATIONAL EXPORT?{" "}
@@ -79,7 +80,11 @@ export default function LoginPage() {
         />
 
         <div className="flex items-center justify-between text-xs">
-          <span className="text-white/50">Sign-in is always email + OTP.</span>
+          <span className="text-white/50">
+            {getOtpChannels().whatsappOtp
+              ? "Sign-in uses a one-time code — no password."
+              : "Sign-in is always email + OTP."}
+          </span>
           <Link to="/forgot-password" className="text-white/60 hover:text-white">Didn’t get a code?</Link>
         </div>
 
@@ -89,7 +94,7 @@ export default function LoginPage() {
           disabled={loading}
           className="btn-gold w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold disabled:opacity-60"
         >
-          {loading ? "Sending code…" : "Email me a sign-in code"}
+          {loading ? "Sending code…" : otpButtonLabel(false)}
           <ArrowRight size={15} />
         </button>
       </form>
