@@ -13,7 +13,7 @@ const OUTBOX_KEY = "vistara_email_outbox_v1";
 /** Seller details for GST tax invoices (New India Export). */
 export const INVOICE_SELLER = {
   legalName: "New India Export",
-  brandName: "VIRASTRA INTERNATIONAL EXPORT",
+  brandName: "VIRASTRA by New India Export",
   gstin: "27AXGPY3435Q1ZK",
   addressLines: [
     "1ST FLOOR SHOP NO M-02",

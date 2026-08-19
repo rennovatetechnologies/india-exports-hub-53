@@ -119,7 +119,7 @@ export default function BookingModal({ open, setOpen }) {
         key: rzKey,
         amount: order.amount,
         currency: order.currency,
-        name: "VIRASTRA INTERNATIONAL EXPORT",
+        name: "VIRASTRA by New India Export",
         description: `Booking for ${form.category}`,
         order_id: order.id,
         handler: async function (response) {

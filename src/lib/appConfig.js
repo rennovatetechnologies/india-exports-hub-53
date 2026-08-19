@@ -9,7 +9,7 @@ const FALLBACK_WHATSAPP = "9967084149";
 
 const FALLBACK = {
   razorpayKeyId: import.meta.env.VITE_RAZORPAY_KEY_ID || "",
-  appName: "VIRASTRA",
+  appName: "VIRASTRA by New India Export",
   supportEmail: "support@virastrainternationalexport.com",
   supportWhatsApp: FALLBACK_WHATSAPP,
   gstRate: 0.18,

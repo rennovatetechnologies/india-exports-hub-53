@@ -17,7 +17,7 @@ export default function AboutUsSection() {
         <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
           <div className="lg:col-span-5">
             <span className="inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white/70">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--gold)]" /> About VIRASTRA INTERNATIONAL EXPORT
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--gold)]" /> About VIRASTRA by New India Export
             </span>
             <motion.h2
               initial={{ opacity: 0, y: 12 }}
@@ -28,7 +28,7 @@ export default function AboutUsSection() {
               India's products. <span className="text-gold-gradient">The world's shelves.</span>
             </motion.h2>
             <p className="mt-5 text-white/65 leading-relaxed max-w-lg">
-              VIRASTRA INTERNATIONAL EXPORT builds the modern operating system for global trade —
+              VIRASTRA by New India Export builds the modern operating system for global trade —
               quality sourcing, compliance, documentation, and shipment, packaged into
               consultancy plans that get you exporting in weeks, not quarters.
             </p>

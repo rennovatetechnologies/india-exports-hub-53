@@ -54,7 +54,7 @@ export default function AboutPage() {
             </h2>
             <p className="text-lg text-white/75 leading-relaxed text-justify">
               <span className="font-semibold text-[var(--gold)]">
-                VIRASTRA INTERNATIONAL EXPORT
+                VIRASTRA by New India Export
               </span>{" "}
               focuses on exporting premium Indian products to customers all over
               the world. We have built a strong, passionate team that works with

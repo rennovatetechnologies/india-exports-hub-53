@@ -1,4 +1,4 @@
-/** API client for VIRASTRA INTERNATIONAL EXPORT backend (proxied via Vite /api). */
+/** API client for VIRASTRA by New India Export backend (proxied via Vite /api). */
 
 import { clearSession } from "@/lib/authSession";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";

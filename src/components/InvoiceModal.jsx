@@ -126,7 +126,7 @@ export default function InvoiceModal({ invoice, open, onClose, emailNotice = fal
                   <p className="text-[10px] uppercase tracking-[0.2em] text-black/45">Tax Invoice</p>
                   <img
                     src={BRAND_LOGO_SRC}
-                    alt="VIRASTRA INTERNATIONAL EXPORT"
+                    alt="VIRASTRA by New India Export"
                     className="mt-2 h-14 w-auto max-w-[220px] object-contain object-left sm:h-16"
                   />
                   <h2 id="invoice-title" className="mt-3 text-base font-semibold tracking-tight sm:text-lg">

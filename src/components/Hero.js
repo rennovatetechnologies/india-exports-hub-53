@@ -83,7 +83,7 @@ export default function Hero() {
                 className="inline-flex items-center gap-2 rounded-full glass px-3.5 py-1.5 text-xs uppercase tracking-[0.18em] text-white/80"
               >
                 <Sparkles size={14} className="text-[var(--gold)]" />
-                <span>VIRASTRA INTERNATIONAL EXPORT · where trust travels</span>
+                <span>VIRASTRA by New India Export</span>
               </motion.div>
 
               <motion.h1

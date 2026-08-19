@@ -60,7 +60,7 @@ export default function LoginPage() {
       subtitle={otpSendHint()}
       footer={
         <>
-          New to VIRASTRA INTERNATIONAL EXPORT?{" "}
+          New to VIRASTRA by New India Export?{" "}
           <Link to="/signup" className="text-[var(--gold)] hover:underline">Create an account</Link>
           <div className="mt-3 text-[11px] text-white/45">
             Internal team?{" "}

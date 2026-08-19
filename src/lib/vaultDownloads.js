@@ -94,7 +94,7 @@ export function placeholderBlobForVaultDoc(filename, caseId) {
   const lower = String(filename || "").toLowerCase();
   if (lower.endsWith(".pdf")) return minimalPdfBlob();
   if (/\.(png|jpe?g|webp)$/.test(lower)) return tinyPngBlob();
-  const text = `VIRASTRA INTERNATIONAL EXPORT — demo vault file\n\nDocument: ${filename}\nCase: ${caseId}\n\nCustomer uploads are stored in this browser. Seed rows use this placeholder until the API is connected.`;
+  const text = `VIRASTRA by New India Export — demo vault file\n\nDocument: ${filename}\nCase: ${caseId}\n\nCustomer uploads are stored in this browser. Seed rows use this placeholder until the API is connected.`;
   return new Blob([text], { type: "text/plain;charset=utf-8" });
 }
 

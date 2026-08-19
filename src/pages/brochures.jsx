@@ -62,7 +62,7 @@ export default function BrochuresPage() {
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
         <img
           src="/Hero.jpg"
-          alt="VIRASTRA INTERNATIONAL EXPORT Brochures"
+          alt="VIRASTRA by New India Export Brochures"
           loading="eager"
           decoding="async"
           className="absolute inset-0 h-full w-full object-cover brightness-75 blur-[2px]"

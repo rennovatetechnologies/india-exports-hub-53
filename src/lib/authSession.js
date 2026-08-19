@@ -585,7 +585,7 @@ export async function startEmailOtp(email, purpose, profile = {}) {
     })
   );
   if (import.meta.env?.DEV) {
-    console.info(`[VIRASTRA INTERNATIONAL EXPORT demo OTP] ${normalized}: ${code}`);
+    console.info(`[VIRASTRA by New India Export demo OTP] ${normalized}: ${code}`);
   }
   return { ok: true, mock: true };
 }

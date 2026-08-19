@@ -19,7 +19,7 @@ export default function AdminAuthShell({ title, subtitle, badge = "Internal port
             <ShieldCheck size={12} className="text-emerald-300" /> {badge}
           </div>
           <h2 className="mt-6 text-5xl font-semibold leading-[1.05] tracking-tight">
-            Operations console for the <span className="text-aurora">VIRASTRA INTERNATIONAL EXPORT desk.</span>
+            Operations console for the <span className="text-aurora">VIRASTRA by New India Export desk.</span>
           </h2>
           <p className="mt-5 max-w-md text-white/55 leading-relaxed">
             Secure, role-based workspace for the operations and leadership teams that

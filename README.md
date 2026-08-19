@@ -1,6 +1,6 @@
-# VIRASTRA INTERNATIONAL EXPORT — frontend
+# VIRASTRA by New India Export — frontend
 
-Vite + React SPA for the VIRASTRA INTERNATIONAL EXPORT customer and ops dashboards.
+Vite + React SPA for the VIRASTRA by New India Export customer and ops dashboards.
 
 Lives under **`INDIA EXPORTS/`** next to `new-india-exports` (backend) and `shared` (API contract).
 

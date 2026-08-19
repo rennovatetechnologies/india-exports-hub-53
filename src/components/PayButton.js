@@ -110,7 +110,7 @@ export async function startRazorpayCheckout(opts) {
         key,
         amount: order.amount,
         currency: order.currency || "INR",
-        name: "VIRASTRA INTERNATIONAL EXPORT",
+        name: "VIRASTRA by New India Export",
         description,
         order_id: order.id,
         prefill: {

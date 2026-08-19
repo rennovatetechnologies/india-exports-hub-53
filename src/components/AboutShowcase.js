@@ -103,11 +103,11 @@ export default function AboutShowcase() {
   className="w-full md:w-1/2 bg-white/90 rounded-2xl shadow-xl p-6 md:p-10 backdrop-blur-md border border-white/30"
 >
   <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-800 mb-4 tracking-tight">
-    The Visionary Behind VIRASTRA INTERNATIONAL EXPORT
+    The Visionary Behind VIRASTRA by New India Export
   </h2>
 
   <p className="text-gray-700 text-base sm:text-lg md:text-xl leading-relaxed mb-4">
-    <span className="font-semibold text-gray-800">Mr. Saurabh Nathuram Yadav</span> is the driving force behind VIRASTRA INTERNATIONAL EXPORT.  
+    <span className="font-semibold text-gray-800">Mr. Saurabh Nathuram Yadav</span> is the driving force behind VIRASTRA by New India Export.  
     With a bold vision to empower Indian farmers and elevate the global agricultural trade, he combines deep expertise, innovation, and a strong commitment to fairness.  
   </p>
 

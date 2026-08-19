@@ -74,7 +74,7 @@ export default function EventBookingModal({ open, setOpen }) {
         key: rzKey,
         amount: order.amount,
         currency: order.currency,
-        name: "VIRASTRA INTERNATIONAL EXPORT",
+        name: "VIRASTRA by New India Export",
         description: "Virtual Shipment Workshop (5 Days)",
         order_id: order.id,
         handler: async function (response) {
@@ -183,7 +183,7 @@ export default function EventBookingModal({ open, setOpen }) {
             {!isAuthenticated() ? (
               <div className="space-y-5">
                 <p className="text-sm text-neutral-300 leading-relaxed">
-                  Sign in to your VIRASTRA INTERNATIONAL EXPORT account to reserve a seat. Your work email and profile will be used for
+                  Sign in to your VIRASTRA by New India Export account to reserve a seat. Your work email and profile will be used for
                   confirmation and payment.
                 </p>
                 <Link

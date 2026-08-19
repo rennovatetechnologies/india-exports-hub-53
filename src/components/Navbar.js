@@ -188,15 +188,10 @@ export default function Navbar() {
             <Link
               to={PATHS.home}
               className="flex shrink-0 items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md"
-              aria-label="VIRASTRA INTERNATIONAL EXPORT Home"
+              aria-label="VIRASTRA by New India Export Home"
             >
-              <span className="flex flex-col leading-tight">
-                <span className="text-sm sm:text-base md:text-lg font-semibold tracking-tight text-gold-gradient">
-                  VIRASTRA INTERNATIONAL EXPORT
-                </span>
-                <span className="hidden sm:block text-[9px] uppercase tracking-[0.18em] text-white/45">
-                  where trust travels
-                </span>
+              <span className="text-xs sm:text-sm md:text-base font-semibold tracking-tight text-gold-gradient leading-tight">
+                VIRASTRA by New India Export
               </span>
             </Link>
 

@@ -107,7 +107,7 @@ export default function DashboardSettings() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
         <p className="mt-1 text-sm text-white/55">
-          Choose how VIRASTRA reaches you. Sign-in codes always use the channels we currently have live.
+          Choose how VIRASTRA by New India Export reaches you. Sign-in codes always use the channels we currently have live.
         </p>
       </header>
 
@@ -141,13 +141,13 @@ export default function DashboardSettings() {
             <Bell size={16} className="text-[var(--gold)]" /> Channels
           </div>
           <p className="mt-1 text-xs text-white/50">
-            Turn a channel off to stop case and billing alerts there. OTP sign-in is controlled separately by VIRASTRA.
+            Turn a channel off to stop case and billing alerts there. OTP sign-in is controlled separately by VIRASTRA by New India Export.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <ChannelToggle
               icon={Mail}
               label="Email"
-              desc={channels.emailNotifications ? "On for receipts, KYC, and desk updates" : "Email alerts are paused by VIRASTRA"}
+              desc={channels.emailNotifications ? "On for receipts, KYC, and desk updates" : "Email alerts are paused by VIRASTRA by New India Export"}
               checked={prefs.email}
               onChange={toggle("email")}
               live={channels.emailNotifications}

@@ -255,8 +255,7 @@ export default function DashboardChrome({ children }) {
           V
         </span>
         <div className="leading-tight">
-          <div className="text-sm font-semibold">VIRASTRA INTERNATIONAL EXPORT</div>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">where trust travels</div>
+          <div className="text-sm font-semibold">VIRASTRA by New India Export</div>
         </div>
       </Link>
 

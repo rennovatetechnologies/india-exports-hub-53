@@ -34,12 +34,9 @@ export default function Footer() {
             <div className="lg:col-span-5">
               <Link to={PATHS.home} className="inline-flex items-center gap-2">
                 <span className="text-2xl font-semibold tracking-tight">
-                  VIRASTRA INTERNATIONAL EXPORT
+                  VIRASTRA by New India Export
                 </span>
               </Link>
-              <p className="mt-2 text-xs uppercase tracking-[0.2em] text-[var(--gold)]/90">
-                where trust travels
-              </p>
               <p className="mt-4 max-w-md text-sm text-white/55 leading-relaxed">
                 Export products from anywhere to everywhere. The premium consultancy
                 & workflow platform for modern global trade.
@@ -80,7 +77,7 @@ export default function Footer() {
           </div>
 
           <div className="mt-14 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/5 pt-6 text-xs text-white/40">
-            <div suppressHydrationWarning>© {new Date().getFullYear()} VIRASTRA INTERNATIONAL EXPORT. All rights reserved.</div>
+            <div suppressHydrationWarning>© {new Date().getFullYear()} VIRASTRA by New India Export. All rights reserved.</div>
             <div className="flex items-center gap-3">
               <a
                 href={getSupportWhatsAppUrl()}

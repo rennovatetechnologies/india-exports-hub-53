@@ -85,7 +85,7 @@ export default function SignupPage() {
           </div>
         </div>
         {error && <InlineNotice>{error}</InlineNotice>}
-        <p className="text-[11px] text-white/45">By continuing you agree to VIRASTRA INTERNATIONAL EXPORT&apos;s Terms and Privacy.</p>
+        <p className="text-[11px] text-white/45">By continuing you agree to VIRASTRA by New India Export Terms and Privacy.</p>
         <button disabled={loading} className="btn-gold w-full inline-flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-black disabled:opacity-60">
           {loading ? "Sending code…" : (<>Continue with a one-time code <ArrowRight size={15} /></>)}
         </button>
