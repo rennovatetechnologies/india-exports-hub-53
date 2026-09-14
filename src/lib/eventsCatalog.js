@@ -19,6 +19,14 @@ export const EVENT_IMAGE_OPTIONS = [
   { value: "/gallery/ODOP.jpg", label: "ODOP" },
 ];
 
+export const EVENT_KINDS = [
+  { value: "webinar", label: "Webinar" },
+  { value: "tour", label: "Business tour" },
+  { value: "workshop", label: "Workshop" },
+  { value: "summit", label: "Summit" },
+  { value: "delegation", label: "Delegation" },
+];
+
 const ALLOWED_EVENT_IMAGES = new Set(EVENT_IMAGE_OPTIONS.map((o) => o.value));
 
 export function resolveEventImage(raw) {
@@ -92,6 +100,100 @@ export function formatEventDateRange(startRaw, endRaw) {
   return `${formatEventDate(startIso)} – ${formatEventDate(endIso)}`;
 }
 
+export function eventPublicPath(event) {
+  const key = String(event?.slug || event?.id || "").trim();
+  if (!key) return "/events";
+  return `/events/${encodeURIComponent(key)}`;
+}
+
+export function findEventByParam(events, param) {
+  const key = decodeURIComponent(String(param || "").trim());
+  if (!key) return null;
+  return (Array.isArray(events) ? events : []).find((e) => e.id === key || e.slug === key) || null;
+}
+
+export function eventKindLabel(event) {
+  const badge = String(event?.badge || "").trim();
+  if (badge) return badge;
+  const kind = String(event?.kind || "").toLowerCase();
+  const found = EVENT_KINDS.find((k) => k.value === kind);
+  return found ? found.label : "Upcoming event";
+}
+
+export function eventModeLabel(event) {
+  const mode = String(event?.mode || "").trim();
+  if (mode) return mode;
+  const hay = `${event?.city || ""} ${event?.kind || ""} ${event?.badge || ""}`;
+  if (/online|webinar|virtual/i.test(hay)) return "Online Webinar";
+  return String(event?.city || "").trim();
+}
+
+export function eventBrochureLabel(event, which = "event") {
+  if (which === "tour") return "Tour brochure";
+  if (event?.kind === "webinar" || /webinar/i.test(`${event?.badge || ""} ${event?.mode || ""}`)) {
+    return "Webinar brochure";
+  }
+  return "Event brochure";
+}
+
+export function eventWhatsAppText(event) {
+  if (!event?.title) return "Hello, I would like to know more about your upcoming event.";
+  const when = formatEventDateRange(event.startDate || event.date, event.endDate);
+  const whenBit = when && when !== "Date TBA" ? ` on ${when}` : "";
+  return `Hello, I would like to register for ${event.title}${whenBit}.`;
+}
+
+function cleanStringList(raw, maxItems = 24) {
+  const arr = Array.isArray(raw) ? raw : String(raw || "").split("\n");
+  return arr.map((s) => String(s || "").trim()).filter(Boolean).slice(0, maxItems);
+}
+
+function cleanNamedList(raw, maxItems = 16) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const date = String(item.date || "").trim();
+      const title = String(item.title || "").trim();
+      const desc = String(item.desc || "").trim();
+      if (!date && !title && !desc) return null;
+      return { date, title, desc };
+    })
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function landingFieldsFrom(e) {
+  const kindRaw = String(e?.kind || "").trim().toLowerCase();
+  const kind = EVENT_KINDS.some((k) => k.value === kindRaw) ? kindRaw : "";
+  return {
+    slug: String(e?.slug || "").trim(),
+    badge: String(e?.badge || "").trim(),
+    subtitle: String(e?.subtitle || "").trim(),
+    tagline: String(e?.tagline || "").trim(),
+    time: String(e?.time || "").trim(),
+    timeNote: String(e?.timeNote || "").trim(),
+    mode: String(e?.mode || "").trim(),
+    modeNote: String(e?.modeNote || "").trim(),
+    kind,
+    brochureId: String(e?.brochureId || "").trim(),
+    tourBrochureId: String(e?.tourBrochureId || "").trim(),
+    brochureFileName: String(e?.brochureFileName || "").trim(),
+    tourBrochureFileName: String(e?.tourBrochureFileName || "").trim(),
+    overview: String(e?.overview || "").trim(),
+    learnings: cleanStringList(e?.learnings),
+    inclusions: cleanStringList(e?.inclusions),
+    sectors: cleanNamedList(e?.sectors, 12),
+    timeline: cleanNamedList(e?.timeline, 16),
+    tourTitle: String(e?.tourTitle || "").trim(),
+    tourDates: String(e?.tourDates || "").trim(),
+    tourDestination: String(e?.tourDestination || "").trim(),
+    tourStatus: String(e?.tourStatus || "").trim(),
+    tourNotice: String(e?.tourNotice || "").trim(),
+    featured: Boolean(e?.featured),
+  };
+}
+
 function normalizeDiscountPercent(raw) {
   const n = Number(raw);
   if (!Number.isFinite(n) || n <= 0) return 0;
@@ -162,6 +264,7 @@ function normalizeEvent(e) {
       date,
       expired: e.expired,
     }),
+    ...landingFieldsFrom(e),
   };
 }
 
@@ -207,11 +310,13 @@ export function loadEventsCatalog() {
   return [];
 }
 
-/** Next upcoming event by start date. Never returns an expired event. */
+/** Next upcoming event by start date. Pinned (`featured`) events win. Never returns an expired event. */
 export function pickFeaturedEvent(events) {
   const list = filterActiveEvents(events);
   if (!list.length) return null;
-  const upcoming = [...list].sort((a, b) =>
+  const pinned = list.filter((e) => e.featured);
+  const pool = pinned.length ? pinned : list;
+  const upcoming = [...pool].sort((a, b) =>
     String(a.startDate || a.date || "").localeCompare(String(b.startDate || b.date || ""))
   );
   return upcoming[0] || null;
@@ -236,10 +341,26 @@ export async function fetchEventsCatalog({ force = false } = {}) {
   }
 }
 
+export async function fetchEvent(param) {
+  const key = String(param || "").trim();
+  if (!key) return null;
+  try {
+    const data = await api(`/api/events/${encodeURIComponent(key)}`, { auth: false });
+    return normalizeEvent(data?.data || data);
+  } catch (e) {
+    if (e?.status === 410 && e?.data?.data) {
+      return normalizeEvent(e.data.data);
+    }
+    const list = memoryEvents?.length ? loadEventsCatalog() : await fetchEventsCatalog();
+    return findEventByParam(list, key);
+  }
+}
+
 function eventPayload(e) {
   const startDate = toDateInputValue(e.startDate || e.date);
   const endDate = toDateInputValue(e.endDate) || startDate;
   const capacity = Math.max(1, Number(e.capacity) || 1);
+  const landing = landingFieldsFrom(e);
   return {
     title: e.title,
     date: startDate,
@@ -252,6 +373,7 @@ function eventPayload(e) {
     desc: e.desc || "",
     priceInr: Math.max(0, Math.round(Number(e.priceInr) || 0)),
     discountPercent: normalizeDiscountPercent(e.discountPercent),
+    ...landing,
   };
 }
 
@@ -275,6 +397,41 @@ export async function saveEventsCatalog(events, { onlyIds, create } = {}) {
   }
   setMemory(next);
   return next;
+}
+
+export async function uploadEventBrochure(eventId, slot, file) {
+  const id = String(eventId || "").trim();
+  if (!id || !file) throw new Error("Event and file are required");
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("slot", slot === "tour" ? "tour" : "event");
+  const data = await api(`/api/events/${encodeURIComponent(id)}/brochure`, {
+    method: "POST",
+    formData: fd,
+  });
+  const normalized = normalizeEvent(data?.data || data);
+  if (normalized) {
+    const current = loadEventsCatalog();
+    const next = current.some((e) => e.id === normalized.id)
+      ? current.map((e) => (e.id === normalized.id ? normalized : e))
+      : [...current, normalized];
+    setMemory(next);
+  }
+  return normalized;
+}
+
+export async function removeEventBrochure(eventId, slot) {
+  const id = String(eventId || "").trim();
+  if (!id) return null;
+  const data = await api(
+    `/api/events/${encodeURIComponent(id)}/brochure?slot=${slot === "tour" ? "tour" : "event"}`,
+    { method: "DELETE" }
+  );
+  const normalized = normalizeEvent(data?.data || data);
+  if (normalized) {
+    setMemory(loadEventsCatalog().map((e) => (e.id === normalized.id ? normalized : e)));
+  }
+  return normalized;
 }
 
 export async function deleteEventFromCatalog(eventId) {
@@ -521,6 +678,9 @@ export async function registerForEvent(eventId, {
     if (msg.includes("full")) return { ok: false, reason: "full" };
     if (e.status === 410 || e.data?.code === "EVENT_EXPIRED" || msg.includes("ended")) {
       return { ok: false, reason: "This event has ended." };
+    }
+    if (e.status === 402 || e.data?.code === "COMMUNITY_ACCESS_REQUIRED") {
+      return { ok: false, reason: "Community access is required to register for events." };
     }
     return { ok: false, reason: toUserMessage(e, "We couldn't complete that reservation. Please try again.") };
   }

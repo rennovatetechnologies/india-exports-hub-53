@@ -49,6 +49,7 @@ function normalize(raw) {
       whatsappOtp: Boolean(d.channels?.whatsappOtp),
       whatsappReady: Boolean(d.channels?.whatsappReady),
     },
+    communityAccess: d.communityAccess && typeof d.communityAccess === "object" ? d.communityAccess : null,
   };
 }
 

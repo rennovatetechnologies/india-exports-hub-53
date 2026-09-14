@@ -8,6 +8,7 @@ import { normalizeEmail, markKycComplete, clearKycComplete, getSession, ROLES } 
 import { getPlanById, mergeWorkflowStages } from "@/lib/planCatalog";
 import { api, apiUpload } from "@/lib/api";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
+import { getCachedCommunityAccess } from "@/lib/communityAccess";
 
 export const CASE_STATUS = {
   NO_PLAN: "no_plan",
@@ -626,6 +627,15 @@ export function currentStageLabel(customerCase) {
   return stages[idx]?.label || "—";
 }
 
+export function isCommunityEntitled(customerCase) {
+  if (customerCase?.communityAccessActive) return true;
+  if (isPlanEntitlementActive(customerCase)) return true;
+  const access = getCachedCommunityAccess();
+  if (access?.active) return true;
+  if (access?.settings && access.settings.required === false) return true;
+  return false;
+}
+
 /** Paid + KYC approved: customer keeps full dashboard access (in progress or finished). */
 export function isWorkspaceUnlocked(status) {
   return status === CASE_STATUS.ACTIVE || status === CASE_STATUS.COMPLETED;
@@ -665,13 +675,30 @@ export function journeyStatus(customerCase) {
   return CASE_STATUS.KYC_INCOMPLETE;
 }
 
-export function gatePathForCase(customerCase) {
-  if (!customerCase) return "/dashboard/billing";
+export function gatePathForCase(customerCase, pathname = "") {
+  const path = pathname || "";
+  if (!customerCase) return "/dashboard";
   const s = journeyStatus(customerCase);
-  if (s === CASE_STATUS.NO_PLAN) return "/dashboard/billing";
-  if (s === CASE_STATUS.UNPAID || s === CASE_STATUS.EXPIRED) return "/dashboard/billing";
+  if (isPlanWorkspacePath(path)) {
+    if (s === CASE_STATUS.KYC_INCOMPLETE || s === CASE_STATUS.KYC_PENDING) return "/dashboard/kyc";
+    if (s === CASE_STATUS.NO_PLAN || s === CASE_STATUS.UNPAID || s === CASE_STATUS.EXPIRED) {
+      return "/dashboard/billing";
+    }
+  }
   if (s === CASE_STATUS.KYC_INCOMPLETE || s === CASE_STATUS.KYC_PENDING) return "/dashboard/kyc";
   return "/dashboard";
+}
+
+function isPlanWorkspacePath(pathname) {
+  const path = pathname || "";
+  return (
+    path === "/dashboard/workflow" ||
+    path.startsWith("/dashboard/workflow/") ||
+    path === "/dashboard/documents" ||
+    path.startsWith("/dashboard/documents/") ||
+    path === "/dashboard/kyc" ||
+    path.startsWith("/dashboard/kyc/")
+  );
 }
 
 export function isPathAllowedDuringGate(pathname, customerCase) {
@@ -679,7 +706,9 @@ export function isPathAllowedDuringGate(pathname, customerCase) {
   if (isWorkspaceUnlocked(s)) return true;
   const path = pathname || "";
   const always = [
+    "/dashboard/billing",
     "/dashboard/messages",
+    "/dashboard/updates",
     "/dashboard/events",
     "/dashboard/support",
     "/dashboard/brochures",
@@ -691,8 +720,8 @@ export function isPathAllowedDuringGate(pathname, customerCase) {
     "/dashboard/settings",
   ];
   if (always.some((p) => path === p || path.startsWith(`${p}/`))) return true;
-  if (s === CASE_STATUS.NO_PLAN || s === CASE_STATUS.UNPAID || s === CASE_STATUS.EXPIRED) {
-    return path === "/dashboard/billing" || path.startsWith("/dashboard/billing/");
+  if (path === "/dashboard" || path === "/dashboard/") {
+    return s !== CASE_STATUS.KYC_INCOMPLETE && s !== CASE_STATUS.KYC_PENDING;
   }
   if (s === CASE_STATUS.KYC_INCOMPLETE || s === CASE_STATUS.KYC_PENDING) {
     return (
@@ -702,7 +731,7 @@ export function isPathAllowedDuringGate(pathname, customerCase) {
       path.startsWith("/dashboard/billing/")
     );
   }
-  return true;
+  return false;
 }
 
 export function listAllCases() {

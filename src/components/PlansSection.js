@@ -6,9 +6,6 @@ import { isAuthenticated } from "@/lib/authSession";
 import {
   loadPlanCatalog,
   fetchPlanCatalog,
-  formatInr,
-  planEffectivePrice,
-  planHasDiscount,
   planMarketingGroups,
 } from "@/lib/planCatalog";
 
@@ -38,9 +35,9 @@ export default function PlansSection() {
             Pick a plan. <span className="text-gold-gradient">Start exporting.</span>
           </h2>
           <p className="mt-4 text-white/60">
-            Transparent pricing with optional admin discounts. Choose Basic documentation, Standard
-            compliance integrations, or Premium end-to-end export setup. Every plan is valid for one
-            year — renew if you need another year. Event tickets are billed separately on every plan.
+            Choose Basic documentation, Standard compliance integrations, or Premium end-to-end
+            export setup. Every plan is valid for one year — renew if you need another year. Event
+            tickets are billed separately on every plan.
           </p>
         </div>
 
@@ -50,8 +47,6 @@ export default function PlansSection() {
               ? "/dashboard/billing"
               : `/login?next=${encodeURIComponent("/dashboard/billing")}`;
             const groups = planMarketingGroups(p);
-            const effective = planEffectivePrice(p);
-            const discounted = planHasDiscount(p);
             const glow = p.featured ? "rgba(244,196,106,0.35)" : "rgba(255,255,255,0.12)";
             return (
               <motion.div
@@ -78,18 +73,11 @@ export default function PlansSection() {
                     <span className="text-xs uppercase tracking-[0.2em] text-white/55">
                       {p.name} plan
                     </span>
-                    <div className="flex flex-col items-end gap-1">
-                      {p.featured && (
-                        <span className="rounded-full bg-[var(--gold)]/15 border border-[var(--gold)]/40 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--gold)]">
-                          Popular
-                        </span>
-                      )}
-                      {discounted && (
-                        <span className="rounded-full bg-emerald-400/15 border border-emerald-400/30 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
-                          {p.discountPercent}% off
-                        </span>
-                      )}
-                    </div>
+                    {p.featured && (
+                      <span className="rounded-full bg-[var(--gold)]/15 border border-[var(--gold)]/40 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--gold)]">
+                        Popular
+                      </span>
+                    )}
                   </div>
 
                   <h3 className={`mt-3 text-2xl font-semibold ${p.featured ? "text-gold-gradient" : "text-white"}`}>
@@ -97,14 +85,7 @@ export default function PlansSection() {
                   </h3>
                   {p.tagline ? <p className="mt-1 text-sm text-white/55">{p.tagline}</p> : null}
 
-                  <div className="mt-4 flex flex-wrap items-baseline gap-2">
-                    <span className="text-4xl font-semibold tracking-tight">{formatInr(effective)}</span>
-                    {discounted && (
-                      <span className="text-lg text-white/40 line-through">{formatInr(p.price)}</span>
-                    )}
-                    <span className="text-sm text-white/50">+ GST</span>
-                  </div>
-                  <div className="text-xs text-white/50 mt-1">{p.timeline || "Liaisoning"}</div>
+                  <div className="text-xs text-white/50 mt-3">{p.timeline || "Liaisoning"}</div>
                   {p.description ? (
                     <p className="mt-3 text-sm leading-relaxed text-white/55">{p.description}</p>
                   ) : null}

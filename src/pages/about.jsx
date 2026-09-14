@@ -20,7 +20,7 @@ export default function AboutPage() {
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
         <img
           src="/Hero.jpg"
-          alt="About Header"
+          alt="About Virastra International Export and New India Export, founded by Saurabh Yadav"
           className="absolute inset-0 h-full w-full object-cover brightness-75 blur-[2px]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/30 to-transparent" />
@@ -29,12 +29,12 @@ export default function AboutPage() {
           <div className="inline-block mb-4">
             <div className="w-20 h-1 bg-[var(--gold)] mx-auto mb-3" />
             <h1 className="text-4xl sm:text-6xl font-bold mb-3 tracking-tight text-white">
-              About Us
+              About Virastra
             </h1>
             <div className="w-20 h-1 bg-[var(--gold)] mx-auto" />
           </div>
           <p className="max-w-2xl mx-auto text-base sm:text-lg font-light tracking-wide text-white/85">
-            Committed to delivering India's quality worldwide
+            New India Export — founded by Saurabh Yadav, delivering India’s quality worldwide
           </p>
         </div>
       </section>
@@ -56,6 +56,7 @@ export default function AboutPage() {
               <span className="font-semibold text-[var(--gold)]">
                 VIRASTRA by New India Export
               </span>{" "}
+              (also known as Virastra, Virastra International, and New India Export)
               focuses on exporting premium Indian products to customers all over
               the world. We have built a strong, passionate team that works with
               dedication and courage to fulfill the goals of our company.
@@ -72,6 +73,29 @@ export default function AboutPage() {
             <p className="text-lg text-white/75 mt-4 leading-relaxed text-justify">
               We aim to spread India’s diverse culture, taste, and quality
               across the globe — building trust through every shipment we make.
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7 }}
+            className="glass-card p-8 sm:p-10"
+          >
+            <h2 className="text-3xl sm:text-4xl font-semibold text-white mb-6 text-center">
+              Founder — Saurabh Nathuram Yadav
+            </h2>
+            <p className="text-lg text-white/75 leading-relaxed text-justify">
+              <span className="font-semibold text-white">Mr. Saurabh Nathuram Yadav</span>{" "}
+              (Saurabh Yadav) is the founder of Virastra International Export and
+              New India Export. With a vision to empower Indian farmers and grow
+              global agricultural trade, Saurabh leads Virastra’s export consultancy
+              from Nagpur — bridging local producers with international buyers.
+            </p>
+            <p className="text-lg text-white/75 mt-4 leading-relaxed text-justify">
+              Under his leadership, Virastra and New India Export help clients export
+              spices, organic food, cereals, and farm products worldwide — with
+              quality, documentation, and long-term trust at the centre of every shipment.
             </p>
           </motion.div>
 

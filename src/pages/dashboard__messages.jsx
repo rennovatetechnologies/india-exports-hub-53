@@ -8,6 +8,13 @@ import {
 import { fetchMessagesForCase, getMessagesForCase, sendMessage } from "@/lib/caseMessages";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 import FallbackScreen, { InlineNotice } from "@/components/FallbackScreen";
+import CommunityPaywall from "@/components/CommunityPaywall";
+import {
+  fetchCommunityAccess,
+  getCachedCommunityAccess,
+  isCommunityAccessActive,
+} from "@/lib/communityAccess";
+import { isCommunityEntitled } from "@/lib/customerCase";
 
 export default function MessagesPage() {
   const session = getSession();
@@ -19,15 +26,20 @@ export default function MessagesPage() {
   const [error, setError] = useState("");
   const [retryKey, setRetryKey] = useState(0);
   const [queueReady, setQueueReady] = useState(false);
+  const [communityTick, setCommunityTick] = useState(0);
   const bottomRef = useRef(null);
 
   useEffect(() => {
+    fetchCommunityAccess().catch(() => {});
     const h = () => setTick((t) => t + 1);
+    const hc = () => setCommunityTick((t) => t + 1);
     window.addEventListener("iehub-messages-updated", h);
     window.addEventListener("iehub-case-updated", h);
+    window.addEventListener("iehub-community-updated", hc);
     return () => {
       window.removeEventListener("iehub-messages-updated", h);
       window.removeEventListener("iehub-case-updated", h);
+      window.removeEventListener("iehub-community-updated", hc);
     };
   }, []);
 
@@ -46,17 +58,29 @@ export default function MessagesPage() {
 
   const customerEmail = isCustomer ? session?.email : activeEmail;
   const caseInfo = customerEmail ? getCustomerCase(customerEmail) : null;
+  const communityOn =
+    !isCustomer ||
+    isCommunityEntitled(caseInfo) ||
+    isCommunityAccessActive(caseInfo, getCachedCommunityAccess());
   void tick;
+  void communityTick;
   const msgs = customerEmail ? getMessagesForCase(caseInfo || customerEmail) : [];
 
   useEffect(() => {
     if (!customerEmail || !queueReady) return;
+    if (isCustomer && !communityOn) {
+      setLoadingThread(false);
+      return;
+    }
     let cancelled = false;
     setLoadingThread(true);
     setError("");
     fetchMessagesForCase(caseInfo || customerEmail, { force: true })
       .catch((e) => {
-        if (!cancelled) setError(toUserMessage(e, USER_MESSAGES.load));
+        if (!cancelled) {
+          if (e.status === 402 || e.data?.code === "COMMUNITY_ACCESS_REQUIRED") return;
+          setError(toUserMessage(e, USER_MESSAGES.load));
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingThread(false);
@@ -66,7 +90,7 @@ export default function MessagesPage() {
     };
     // caseInfo.id changes when queue loads
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerEmail, caseInfo?.id, queueReady, retryKey]);
+  }, [customerEmail, caseInfo?.id, queueReady, retryKey, communityOn, isCustomer]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -75,6 +99,7 @@ export default function MessagesPage() {
   const onSend = async (e) => {
     e.preventDefault();
     if (!customerEmail || !body.trim() || sending) return;
+    if (!communityOn) return;
     setSending(true);
     setError("");
     try {
@@ -93,6 +118,21 @@ export default function MessagesPage() {
       setSending(false);
     }
   };
+
+  if (isCustomer && !communityOn) {
+    return (
+      <div className="space-y-6">
+        <header>
+          <h1 className="text-2xl font-semibold tracking-tight">Messages</h1>
+          <p className="mt-1 text-sm text-white/55">Chat with the VIRASTRA desk after community access.</p>
+        </header>
+        <CommunityPaywall
+          title="Unlock desk chat"
+          description="Community access lets you message operations without buying a documentation plan."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[calc(100svh-8rem)] flex-col gap-4 lg:flex-row">

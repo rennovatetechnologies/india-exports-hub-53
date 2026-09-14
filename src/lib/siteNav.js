@@ -47,6 +47,7 @@ export const EXPLORE_LINKS = [
 /** Same explore destinations, kept inside /dashboard after login. */
 export const DASHBOARD_EXPLORE_LINKS = [
   { name: "Plans", path: PATHS.dashboardBilling },
+  { name: "Updates", path: PATHS.dashboardUpdates },
   { name: "Products", path: PATHS.dashboardProducts },
   { name: "Brochures", path: PATHS.dashboardBrochures },
   { name: "Gallery", path: PATHS.dashboardGallery },
@@ -94,6 +95,8 @@ export function dashboardPathForPublicUrl(pathnameWithSearchHash = "", session) 
   if (pathname.startsWith("/dashboard") || pathname.startsWith("/admin") || pathname.startsWith("/ops")) {
     return null;
   }
+  // Public event landings stay on the marketing layout (WhatsApp + brochures).
+  if (/^\/events\/[^/]+$/.test(pathname)) return null;
 
   if (isStaffSession(session)) {
     if (pathname === PATHS.events || pathname === PATHS.brochures || pathname === PATHS.booking) {

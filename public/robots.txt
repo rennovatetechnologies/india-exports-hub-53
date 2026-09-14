@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /ops
+
+Sitemap: https://www.virastrainternationalexport.com/sitemap.xml

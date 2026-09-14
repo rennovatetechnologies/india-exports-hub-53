@@ -6,6 +6,7 @@ import DashboardChrome from "@/components/dashboard/DashboardChrome";
 import AuthGuard from "@/components/AuthGuard";
 import RedirectIfAuthenticated from "@/components/RedirectIfAuthenticated";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import SeoHead from "@/components/SeoHead";
 import { startAppDataBootstrap } from "@/lib/appBootstrap";
 import { initSessionExpiryWatch } from "@/lib/authSession";
 import { PATHS, adminWorkflowPath } from "@/lib/routes";
@@ -17,6 +18,7 @@ import Brochures from "@/pages/brochures.jsx";
 import Cereals from "@/pages/cerealsandpulses.jsx";
 import Contact from "@/pages/contact.jsx";
 import Events from "@/pages/events.jsx";
+import EventDetail from "@/pages/event-detail.jsx";
 import Forgot from "@/pages/forgot-password.jsx";
 import Fruits from "@/pages/fruitsandvegetables.jsx";
 import Gallery from "@/pages/gallery.jsx";
@@ -36,6 +38,7 @@ import DashKyc from "@/pages/dashboard__kyc.jsx";
 import DashSupport from "@/pages/dashboard__support.jsx";
 import DashDocuments from "@/pages/dashboard__documents.jsx";
 import DashMessages from "@/pages/dashboard__messages.jsx";
+import DashUpdates from "@/pages/dashboard__updates.jsx";
 import DashWorkflow from "@/pages/dashboard__workflow.jsx";
 import DashSettings from "@/pages/dashboard__settings.jsx";
 
@@ -111,6 +114,7 @@ export default function App() {
 
   return (
     <>
+      <SeoHead />
       <ScrollToTop />
       <Routes>
         <Route element={<PublicLayout />}>
@@ -121,6 +125,7 @@ export default function App() {
           <Route path={PATHS.cereals} element={<Cereals />} />
           <Route path={PATHS.contact} element={<Contact />} />
           <Route path={PATHS.events} element={<Events />} />
+          <Route path={PATHS.eventDetail} element={<EventDetail />} />
           <Route path={PATHS.forgotPassword} element={<Forgot />} />
           <Route path={PATHS.fruits} element={<Fruits />} />
           <Route path={PATHS.gallery} element={<Gallery />} />
@@ -160,6 +165,7 @@ export default function App() {
           <Route path="support" element={<DashSupport />} />
           <Route path="documents" element={<DashDocuments />} />
           <Route path="messages" element={<DashMessages />} />
+          <Route path="updates" element={<DashUpdates />} />
           <Route path="vault/:caseId?" element={<Navigate to={PATHS.dashboardDocuments} replace />} />
           <Route path="workflow" element={<DashWorkflow />} />
           <Route path="settings" element={<DashSettings />} />

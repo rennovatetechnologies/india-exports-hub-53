@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Calendar, MapPin, Users, Check, Save, Plus, Trash2, Pencil, ArrowLeft, AlertCircle,
-  Mail, Send, CreditCard, X,
+  Mail, Send, CreditCard, X, Upload, FileText,
 } from "lucide-react";
 import { getSession, ROLES } from "@/lib/authSession";
 import {
@@ -12,6 +12,7 @@ import {
   saveEventsCatalog,
   deleteEventFromCatalog,
   EVENT_IMAGE_OPTIONS,
+  EVENT_KINDS,
   resolveEventImage,
   formatEventDateRange,
   toDateInputValue,
@@ -35,12 +36,26 @@ import {
   fetchEventCommunications,
   filterActiveEvents,
   isEventExpired,
+  eventPublicPath,
+  uploadEventBrochure,
+  removeEventBrochure,
 } from "@/lib/eventsCatalog";
+import {
+  fetchBrochuresCatalog,
+  validateBrochureFile,
+  BROCHURE_FILE_ACCEPT,
+} from "@/lib/brochuresCatalog";
 import { formatInr } from "@/lib/planCatalog";
-import { getCustomerCase } from "@/lib/customerCase";
+import { getCustomerCase, isCommunityEntitled } from "@/lib/customerCase";
 import { PATHS } from "@/lib/routes";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 import { InlineNotice } from "@/components/FallbackScreen";
+import CommunityPaywall from "@/components/CommunityPaywall";
+import {
+  fetchCommunityAccess,
+  getCachedCommunityAccess,
+  isCommunityAccessActive,
+} from "@/lib/communityAccess";
 
 const emptyDraft = () => ({
   title: "New event",
@@ -53,6 +68,30 @@ const emptyDraft = () => ({
   desc: "",
   priceInr: 0,
   discountPercent: 0,
+  slug: "",
+  badge: "",
+  subtitle: "",
+  tagline: "",
+  time: "",
+  timeNote: "",
+  mode: "",
+  modeNote: "",
+  kind: "webinar",
+  brochureId: "",
+  tourBrochureId: "",
+  brochureFileName: "",
+  tourBrochureFileName: "",
+  overview: "",
+  learnings: [],
+  inclusions: [],
+  sectors: [],
+  timeline: [],
+  tourTitle: "",
+  tourDates: "",
+  tourDestination: "",
+  tourStatus: "",
+  tourNotice: "",
+  featured: false,
 });
 
 const NOTIFY_KINDS = [
@@ -60,6 +99,88 @@ const NOTIFY_KINDS = [
   { value: "followup", label: "Follow-up" },
   { value: "update", label: "General update" },
 ];
+
+function linesOf(list) {
+  return (Array.isArray(list) ? list : []).join("\n");
+}
+
+function namedLinesOf(list, withDate = false) {
+  return (Array.isArray(list) ? list : [])
+    .map((item) => {
+      if (withDate) return [item.date || "", item.title || "", item.desc || ""].join(" | ");
+      return [item.title || "", item.desc || ""].join(" | ");
+    })
+    .join("\n");
+}
+
+function parseLines(text) {
+  return String(text || "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function parseNamedLines(text, withDate = false) {
+  return String(text || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split("|").map((s) => s.trim());
+      if (withDate) return { date: parts[0] || "", title: parts[1] || "", desc: parts[2] || "" };
+      return { title: parts[0] || "", desc: parts[1] || "", date: "" };
+    });
+}
+
+const fieldCls =
+  "mt-1.5 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white outline-none focus:border-[var(--gold)]/40";
+
+function EventPdfField({ label, currentName, pendingFile, onPick, onClear }) {
+  const pick = (file) => {
+    if (!file) return;
+    const check = validateBrochureFile(file, "pdf");
+    if (!check.ok) {
+      window.alert(check.message);
+      return;
+    }
+    onPick(file);
+  };
+  return (
+    <label className="block text-xs uppercase tracking-wider text-white/45">
+      {label} <span className="normal-case tracking-normal text-white/35">(optional)</span>
+      <input
+        type="file"
+        accept={BROCHURE_FILE_ACCEPT}
+        className="mt-1.5 block w-full text-sm text-white/70 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-white/15"
+        onChange={(e) => {
+          pick(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      {pendingFile ? (
+        <p className="mt-2 flex items-center gap-2 text-[11px] normal-case tracking-normal text-emerald-200/90">
+          <Upload size={12} /> Ready to upload: {pendingFile.name}
+        </p>
+      ) : currentName ? (
+        <p className="mt-2 flex items-center justify-between gap-2 text-[11px] normal-case tracking-normal text-white/55">
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <FileText size={12} className="shrink-0" />
+            <span className="truncate">{currentName}</span>
+          </span>
+          <button
+            type="button"
+            onClick={onClear}
+            className="shrink-0 text-rose-300/80 hover:text-rose-200"
+          >
+            Remove
+          </button>
+        </p>
+      ) : (
+        <p className="mt-2 text-[11px] normal-case tracking-normal text-white/35">No PDF attached.</p>
+      )}
+    </label>
+  );
+}
 
 function AdminEventsEditor() {
   const [events, setEvents] = useState(() => loadEventsCatalog());
@@ -90,6 +211,7 @@ function AdminEventsEditor() {
         setRegTick((t) => t + 1);
       })
       .catch(() => {});
+    fetchBrochuresCatalog().catch(() => {});
     seedEventRegistrationsIfNeeded();
     const h = () => setEvents(loadEventsCatalog());
     const hr = () => setRegTick((t) => t + 1);
@@ -128,6 +250,7 @@ function AdminEventsEditor() {
     const ev = events.find((e) => e.id === id);
     if (!ev) return;
     setDraft({
+      ...emptyDraft(),
       ...ev,
       startDate: toDateInputValue(ev.startDate || ev.date),
       endDate: toDateInputValue(ev.endDate || ev.startDate || ev.date),
@@ -135,6 +258,11 @@ function AdminEventsEditor() {
       capacity: Number(ev.capacity) || 50,
       priceInr: Math.max(0, Math.round(Number(ev.priceInr) || 0)),
       discountPercent: Math.max(0, Number(ev.discountPercent) || 0),
+      featured: Boolean(ev.featured),
+      _brochureFile: null,
+      _tourBrochureFile: null,
+      _clearBrochure: false,
+      _clearTourBrochure: false,
     });
     setEditKey(id);
     setDetailId(null);
@@ -185,12 +313,30 @@ function AdminEventsEditor() {
     setSaveError("");
     setSaving(true);
     try {
+      const beforeIds = new Set(events.map((e) => e.id));
+      let savedId = editKey === "new" ? "" : editKey;
       if (editKey === "new") {
-        await saveEventsCatalog([payload], { create: true });
+        const list = await saveEventsCatalog([payload], { create: true });
+        const created = list.find((e) => !beforeIds.has(e.id));
+        savedId = created?.id || "";
       } else {
         const next = events.map((e) => (e.id === editKey ? { ...payload, id: editKey } : e));
         await saveEventsCatalog(next, { onlyIds: [editKey] });
       }
+      if (!savedId) throw new Error(USER_MESSAGES.save);
+      if (draft._clearBrochure && !draft._brochureFile) {
+        await removeEventBrochure(savedId, "event");
+      }
+      if (draft._clearTourBrochure && !draft._tourBrochureFile) {
+        await removeEventBrochure(savedId, "tour");
+      }
+      if (draft._brochureFile) {
+        await uploadEventBrochure(savedId, "event", draft._brochureFile);
+      }
+      if (draft._tourBrochureFile) {
+        await uploadEventBrochure(savedId, "tour", draft._tourBrochureFile);
+      }
+      await fetchBrochuresCatalog({ force: true }).catch(() => {});
       const list = await fetchEventsCatalog({ force: true }).catch(() => loadEventsCatalog());
       setEvents(list);
       setSavedAt(new Date());
@@ -265,7 +411,7 @@ function AdminEventsEditor() {
           <h1 className="text-2xl font-semibold tracking-tight">Events catalog</h1>
           <p className="mt-1 text-sm text-white/55">
             {isEditing
-              ? "Set dates, price, discount, image, and seat capacity. Saved events appear for users immediately."
+              ? "Set dates, landing copy, and seat capacity. Brochures are optional. Saved events appear on the public site immediately."
               : "See who registered, email them for reschedules or follow-ups, and track seat fill."}
           </p>
         </div>
@@ -418,7 +564,7 @@ function AdminEventsEditor() {
               </span>
             </div>
             <label className="block text-xs uppercase tracking-wider text-white/45 sm:col-span-2">
-              Description
+              Short description (hero)
               <textarea
                 value={draft.desc}
                 onChange={(e) => updateDraft({ desc: e.target.value })}
@@ -426,6 +572,206 @@ function AdminEventsEditor() {
                 className="mt-1.5 w-full resize-y rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white outline-none focus:border-[var(--gold)]/40"
               />
             </label>
+          </div>
+
+          <div className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+            <div>
+              <div className="text-xs uppercase tracking-wider text-white/45">Public landing page</div>
+              <p className="mt-1 text-[11px] text-white/40">
+                Matches the webinar-style layout: badge, date/time/mode cards, WhatsApp, and optional PDF downloads.
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-white/75">
+              <input
+                type="checkbox"
+                checked={Boolean(draft.featured)}
+                onChange={(e) => updateDraft({ featured: e.target.checked })}
+              />
+              Pin this event on the homepage
+            </label>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block text-xs uppercase tracking-wider text-white/45">
+                Type
+                <select
+                  value={draft.kind || "webinar"}
+                  onChange={(e) => updateDraft({ kind: e.target.value })}
+                  className={fieldCls}
+                >
+                  {EVENT_KINDS.map((k) => (
+                    <option key={k.value} value={k.value}>
+                      {k.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45">
+                Badge
+                <input
+                  value={draft.badge || ""}
+                  onChange={(e) => updateDraft({ badge: e.target.value })}
+                  placeholder="ONLINE BUSINESS WEBINAR"
+                  className={fieldCls}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45">
+                Subtitle
+                <input
+                  value={draft.subtitle || ""}
+                  onChange={(e) => updateDraft({ subtitle: e.target.value })}
+                  placeholder="Online Business Webinar"
+                  className={fieldCls}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45">
+                Tagline
+                <input
+                  value={draft.tagline || ""}
+                  onChange={(e) => updateDraft({ tagline: e.target.value })}
+                  placeholder="India–China Business & Sourcing Delegation"
+                  className={fieldCls}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45">
+                Time
+                <input
+                  value={draft.time || ""}
+                  onChange={(e) => updateDraft({ time: e.target.value })}
+                  placeholder="2:00 PM onwards"
+                  className={fieldCls}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45">
+                Time note
+                <input
+                  value={draft.timeNote || ""}
+                  onChange={(e) => updateDraft({ timeNote: e.target.value })}
+                  placeholder="Indian Standard Time (IST)"
+                  className={fieldCls}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45">
+                Mode
+                <input
+                  value={draft.mode || ""}
+                  onChange={(e) => updateDraft({ mode: e.target.value })}
+                  placeholder="Online Webinar"
+                  className={fieldCls}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45">
+                Mode note
+                <input
+                  value={draft.modeNote || ""}
+                  onChange={(e) => updateDraft({ modeNote: e.target.value })}
+                  placeholder="Access link via WhatsApp"
+                  className={fieldCls}
+                />
+              </label>
+              <EventPdfField
+                label="Event brochure"
+                currentName={!draft._clearBrochure ? (draft.brochureFileName || (draft.brochureId ? "PDF attached" : "")) : ""}
+                pendingFile={draft._brochureFile || null}
+                onPick={(file) => updateDraft({ _brochureFile: file, _clearBrochure: false })}
+                onClear={() => updateDraft({ _brochureFile: null, brochureId: "", brochureFileName: "", _clearBrochure: true })}
+              />
+              <EventPdfField
+                label="Tour brochure"
+                currentName={!draft._clearTourBrochure ? (draft.tourBrochureFileName || (draft.tourBrochureId ? "PDF attached" : "")) : ""}
+                pendingFile={draft._tourBrochureFile || null}
+                onPick={(file) => updateDraft({ _tourBrochureFile: file, _clearTourBrochure: false })}
+                onClear={() => updateDraft({ _tourBrochureFile: null, tourBrochureId: "", tourBrochureFileName: "", _clearTourBrochure: true })}
+              />
+              <label className="block text-xs uppercase tracking-wider text-white/45 sm:col-span-2">
+                Overview (longer about copy)
+                <textarea
+                  value={draft.overview || ""}
+                  onChange={(e) => updateDraft({ overview: e.target.value })}
+                  rows={3}
+                  className={`${fieldCls} resize-y`}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45 sm:col-span-2">
+                What you will learn (one per line)
+                <textarea
+                  value={linesOf(draft.learnings)}
+                  onChange={(e) => updateDraft({ learnings: parseLines(e.target.value) })}
+                  rows={4}
+                  className={`${fieldCls} resize-y`}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45 sm:col-span-2">
+                Tour / delegation title
+                <input
+                  value={draft.tourTitle || ""}
+                  onChange={(e) => updateDraft({ tourTitle: e.target.value })}
+                  placeholder="Canton Fair Phase 3 Business Delegation"
+                  className={fieldCls}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45">
+                Tour dates
+                <input
+                  value={draft.tourDates || ""}
+                  onChange={(e) => updateDraft({ tourDates: e.target.value })}
+                  placeholder="31 Oct – 4 Nov 2026"
+                  className={fieldCls}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45">
+                Destination
+                <input
+                  value={draft.tourDestination || ""}
+                  onChange={(e) => updateDraft({ tourDestination: e.target.value })}
+                  placeholder="Guangzhou & China"
+                  className={fieldCls}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45">
+                Tour status
+                <input
+                  value={draft.tourStatus || ""}
+                  onChange={(e) => updateDraft({ tourStatus: e.target.value })}
+                  placeholder="Limited seats"
+                  className={fieldCls}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45 sm:col-span-2">
+                Tour notice
+                <input
+                  value={draft.tourNotice || ""}
+                  onChange={(e) => updateDraft({ tourNotice: e.target.value })}
+                  placeholder="Customized itinerary, visa assistance & travel packages available."
+                  className={fieldCls}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45 sm:col-span-2">
+                Inclusions (one per line)
+                <textarea
+                  value={linesOf(draft.inclusions)}
+                  onChange={(e) => updateDraft({ inclusions: parseLines(e.target.value) })}
+                  rows={4}
+                  className={`${fieldCls} resize-y`}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45 sm:col-span-2">
+                Sectors (Title | Description)
+                <textarea
+                  value={namedLinesOf(draft.sectors)}
+                  onChange={(e) => updateDraft({ sectors: parseNamedLines(e.target.value) })}
+                  rows={4}
+                  className={`${fieldCls} resize-y`}
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-white/45 sm:col-span-2">
+                Timeline (Date | Title | Description)
+                <textarea
+                  value={namedLinesOf(draft.timeline, true)}
+                  onChange={(e) => updateDraft({ timeline: parseNamedLines(e.target.value, true) })}
+                  rows={5}
+                  className={`${fieldCls} resize-y`}
+                />
+              </label>
+            </div>
           </div>
 
           <div>
@@ -538,7 +884,13 @@ function AdminEventsEditor() {
                       />
                     </div>
                   </div>
-                  <div className="mt-5 flex gap-2">
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <Link
+                      to={eventPublicPath(ev)}
+                      className="btn-ghost inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+                    >
+                      View landing
+                    </Link>
                     <button
                       type="button"
                       onClick={() => setDetailId(ev.id)}
@@ -780,7 +1132,11 @@ function CustomerEvents() {
   const [plans, setPlans] = useState([]);
   const [choiceEvent, setChoiceEvent] = useState(null);
   const [paying, setPaying] = useState(false);
+  const [communityTick, setCommunityTick] = useState(0);
   const c = session?.email ? getCustomerCase(session.email) : null;
+  const communityOn =
+    isCommunityEntitled(c) || isCommunityAccessActive(c, getCachedCommunityAccess());
+  void communityTick;
 
   const reloadPlans = async () => {
     const list = await fetchMyInstallmentPlans();
@@ -792,14 +1148,18 @@ function CustomerEvents() {
     fetchEventsCatalog({ force: true }).then((list) => setEvents(filterActiveEvents(list))).catch(() => {});
     fetchMyEventRegistrations().then(() => setRegTick((t) => t + 1)).catch(() => {});
     fetchMyInstallmentPlans().then(setPlans).catch(() => {});
+    fetchCommunityAccess().catch(() => {});
     seedEventRegistrationsIfNeeded();
     const h = () => setEvents(filterActiveEvents(loadEventsCatalog()));
     const hr = () => setRegTick((t) => t + 1);
+    const hc = () => setCommunityTick((t) => t + 1);
     window.addEventListener("iehub-events-updated", h);
     window.addEventListener("iehub-event-regs-updated", hr);
+    window.addEventListener("iehub-community-updated", hc);
     return () => {
       window.removeEventListener("iehub-events-updated", h);
       window.removeEventListener("iehub-event-regs-updated", hr);
+      window.removeEventListener("iehub-community-updated", hc);
     };
   }, []);
 
@@ -858,6 +1218,12 @@ function CustomerEvents() {
       setMsg("Sign in to reserve a seat.");
       return;
     }
+    if (!communityOn) {
+      setMsgTone("info");
+      setMsg("Community access is required to register. You can still browse events below.");
+      document.getElementById("community-events-gate")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
     void regTick;
     const mine = getMyRegistration(ev.id, session.email);
     const plan = plans.find((p) => p.eventId === ev.id);
@@ -894,8 +1260,8 @@ function CustomerEvents() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Events &amp; summits</h1>
         <p className="mt-1 text-sm text-white/55">
-          Reserve your seat at curated trade events. Event fees apply to every plan, including Premium.
-          Fees of ₹1,00,000 or more can be split into 3 payments over 30 days.
+          Browse the calendar freely. Registering — including free events — needs community access.
+          Paid events still charge their own fee.
         </p>
         {msg && (
           <InlineNotice className="mt-3" tone={msgTone === "error" ? "error" : msgTone === "success" ? "success" : "info"}>
@@ -903,6 +1269,16 @@ function CustomerEvents() {
           </InlineNotice>
         )}
       </header>
+
+      {!communityOn && (
+        <div id="community-events-gate">
+          <CommunityPaywall
+            compact
+            title="Register for events with community access"
+            description="Browse everything below. To reserve a free or paid seat, join with the admin-set community fee (or a documentation plan)."
+          />
+        </div>
+      )}
 
       {plans.length > 0 && (
         <section className="space-y-3">
@@ -1022,6 +1398,12 @@ function CustomerEvents() {
                     Seat held · {plan.paidCount}/{plan.installmentCount} paid · next due {formatDue(plan.next.dueAt)}
                   </p>
                 )}
+                <Link
+                  to={eventPublicPath(ev)}
+                  className="btn-ghost mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold"
+                >
+                  View event page
+                </Link>
                 <button
                   type="button"
                   disabled={full || paying}

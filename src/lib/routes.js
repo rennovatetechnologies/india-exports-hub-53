@@ -11,6 +11,7 @@ export const PATHS = {
   cereals: "/cerealsandpulses",
   contact: "/contact",
   events: "/events",
+  eventDetail: "/events/:eventId",
   forgotPassword: "/forgot-password",
   fruits: "/fruitsandvegetables",
   gallery: "/gallery",
@@ -42,6 +43,7 @@ export const PATHS = {
   dashboardSupport: "/dashboard/support",
   dashboardDocuments: "/dashboard/documents",
   dashboardMessages: "/dashboard/messages",
+  dashboardUpdates: "/dashboard/updates",
   dashboardWorkflow: "/dashboard/workflow",
   dashboardSettings: "/dashboard/settings",
   /** Legacy vault URLs redirect here */

@@ -38,8 +38,9 @@ export default function Footer() {
                 </span>
               </Link>
               <p className="mt-4 max-w-md text-sm text-white/55 leading-relaxed">
-                Export products from anywhere to everywhere. The premium consultancy
-                & workflow platform for modern global trade.
+                Virastra International Export (New India Export), founded by Saurabh
+                Nathuram Yadav. Export products from India to everywhere — the premium
+                consultancy and workflow platform for modern global trade.
               </p>
 
               <div className="mt-6 space-y-2 text-sm text-white/65">

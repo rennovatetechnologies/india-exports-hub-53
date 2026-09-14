@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Check, CreditCard, Save, Pencil, ArrowLeft, Sparkles, FileText, Download } from "lucide-react";
+import { Check, CreditCard, Save, Pencil, ArrowLeft, Sparkles, FileText, Download, MessageSquare, CalendarDays, Megaphone } from "lucide-react";
 import { getSession, ROLES } from "@/lib/authSession";
 import {
   loadPlanCatalog,
@@ -33,6 +33,13 @@ import InvoiceModal from "@/components/InvoiceModal";
 import PlanPackLists from "@/components/PlanPackLists";
 import { fetchMyInstallmentPlans } from "@/lib/eventsCatalog";
 import { PATHS } from "@/lib/routes";
+import CommunityAccessEditor from "@/components/admin/CommunityAccessEditor";
+import {
+  fetchCommunityAccess,
+  getCachedCommunitySettings,
+  formatCommunityExpiry,
+  isCommunityAccessActive,
+} from "@/lib/communityAccess";
 
 function singleFeatured(plans) {
   const idx = plans.findIndex((p) => p.featured);
@@ -433,12 +440,13 @@ function AdminPlanEditor() {
       <header>
         <h1 className="text-2xl font-semibold">Plan catalog</h1>
         <p className="mt-1 text-sm text-white/55">
-          Prices, home-page checklist, billing bullets, KYC documents, and workflow stages. Events are always charged separately.
+          Community access is separate from documentation plans. Events are always charged separately.
         </p>
         {savedAt && (
           <p className="mt-2 text-xs text-emerald-300/90">Saved {savedAt.toLocaleTimeString("en-IN")}</p>
         )}
       </header>
+      <CommunityAccessEditor />
       <div className="grid gap-4 md:grid-cols-3">
         {plans.map((p) => (
           <div key={p.id} className={`glass-card relative p-5 ${p.featured ? "ring-1 ring-[var(--gold)]/40" : ""}`}>
@@ -484,10 +492,13 @@ function AdminPlanEditor() {
 
 function CustomerBilling() {
   const navigate = useNavigate();
+  const location = useLocation();
   const session = getSession();
   const [plans, setPlans] = useState([]);
   const [tick, setTick] = useState(0);
   const [paying, setPaying] = useState(false);
+  const [communityPaying, setCommunityPaying] = useState(false);
+  const [communityAccess, setCommunityAccess] = useState(null);
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [activeInvoice, setActiveInvoice] = useState(null);
@@ -500,6 +511,7 @@ function CustomerBilling() {
 
   useEffect(() => {
     fetchPlanCatalog({ force: true }).then(setPlans).catch(() => setPlans([]));
+    fetchCommunityAccess({ force: true }).then(setCommunityAccess).catch(() => {});
     if (session?.email) {
       fetchInvoicesForEmail(session.email).then(setInvoices).catch(() => {});
       fetchMyInstallmentPlans().then(setInstallmentPlans).catch(() => {});
@@ -509,15 +521,24 @@ function CustomerBilling() {
       setTick((t) => t + 1);
       if (session?.email) setInvoices(listInvoicesForEmail(session.email));
     };
+    const hc = () => fetchCommunityAccess().then(setCommunityAccess).catch(() => {});
     window.addEventListener("iehub-plans-updated", h);
     window.addEventListener("iehub-case-updated", h);
     window.addEventListener("iehub-invoices-updated", h);
+    window.addEventListener("iehub-community-updated", hc);
     return () => {
       window.removeEventListener("iehub-plans-updated", h);
       window.removeEventListener("iehub-case-updated", h);
       window.removeEventListener("iehub-invoices-updated", h);
+      window.removeEventListener("iehub-community-updated", hc);
     };
   }, [session?.email]);
+
+  useEffect(() => {
+    if (location.hash === "#community") {
+      document.getElementById("community")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [location.hash]);
 
   const c = session?.email ? getCustomerCase(session.email) : null;
   const status = c ? journeyStatus(c) : CASE_STATUS.NO_PLAN;
@@ -558,6 +579,35 @@ function CustomerBilling() {
   }, [selected, isUpgrade, paidPlan, needsRepurchase, isRenewal]);
 
   const showCheckout = Boolean(selected && pricing && (needsRepurchase || isRenewal || isUpgrade));
+  const communitySettings = communityAccess?.settings || getCachedCommunitySettings();
+  const communityOn = isCommunityAccessActive(c, communityAccess);
+  const communityExpiry = formatCommunityExpiry(c?.communityAccessExpiresAt || communityAccess?.expiresAt);
+  const communityTotal =
+    Number(communitySettings.totalInr) ||
+    Math.round((Number(communitySettings.priceInr) || 0) * (1 + GST_RATE));
+
+  const payCommunity = async () => {
+    if (!session?.email) return;
+    setCommunityPaying(true);
+    setError("");
+    try {
+      await startRazorpayCheckout({
+        amountInr: communityTotal,
+        purpose: "community",
+        planId: "community",
+        description: communitySettings.title || "Community access",
+        customer: { name: session.name, email: session.email, phone: session.phone },
+      });
+      await refreshCaseAfterPayment();
+      const next = await fetchCommunityAccess({ force: true });
+      setCommunityAccess(next);
+      await fetchInvoicesForEmail(session.email).then(setInvoices).catch(() => {});
+    } catch (e) {
+      setError(toUserMessage(e, USER_MESSAGES.payment));
+    } finally {
+      setCommunityPaying(false);
+    }
+  };
 
   useEffect(() => {
     // Default to purchased plan once; don't reset while browsing upgrades.
@@ -697,18 +747,75 @@ function CustomerBilling() {
             ? "Renew your plan"
             : entitlementActive
               ? "Billing & upgrades"
-              : "Choose your plan"}
+              : "Access & plans"}
         </h1>
         <p className="mt-1 text-sm text-white/55">
+          Documentation plans are optional. Community access covers chat, free events, updates, and upcoming features.
           {status === CASE_STATUS.EXPIRED
-            ? "Your plan validity ended. Purchase again for another year to restore dashboard access."
+            ? " Your documentation plan validity ended — purchase again for another year if you still need the workflow."
             : entitlementActive
               ? isWorkspaceUnlocked(status)
-                ? "Your purchased plan is marked below (valid 1 year). Upgrade anytime by selecting a higher plan."
-                : "Your purchased plan is marked below (valid 1 year). Complete KYC to unlock workflow."
-              : "Plans are valid for one year. Pay once, then complete KYC. Workflow unlocks after approval."}
+                ? " Your purchased plan is marked below (valid 1 year)."
+                : " Complete KYC to unlock the documentation workflow."
+              : " Buy a plan only if you need company documentation and registrations."}
         </p>
       </header>
+
+      <section id="community" className="scroll-mt-24">
+        <div className="relative overflow-hidden rounded-3xl border border-[var(--gold)]/25 bg-gradient-to-br from-[var(--gold)]/12 via-white/[0.04] to-transparent p-6">
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--gold)]/90">
+            {communitySettings.title || "Community access"}
+          </p>
+          <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold">
+                {communityOn ? "Your community access is active" : "Join without a documentation plan"}
+              </h2>
+              <p className="mt-1 max-w-xl text-sm text-white/55">
+                {communitySettings.tagline}
+                {communityOn && communityExpiry ? ` · valid until ${communityExpiry}` : ""}
+              </p>
+            </div>
+            {communityOn ? (
+              <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs text-emerald-200">Active</span>
+            ) : communitySettings.required ? (
+              <p className="text-2xl font-semibold text-[var(--gold)]">
+                {formatInr(communityTotal)}
+                <span className="ml-2 text-xs font-normal text-white/45">
+                  incl. GST · {communitySettings.validityDays || 365} days
+                </span>
+              </p>
+            ) : (
+              <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs text-emerald-200">Included</span>
+            )}
+          </div>
+          <ul className="mt-5 grid gap-2 sm:grid-cols-2">
+            {(communitySettings.benefits || []).map((b) => (
+              <li key={b} className="flex items-start gap-2 text-sm text-white/70">
+                <Check size={14} className="mt-0.5 shrink-0 text-[var(--gold)]" />
+                {b}
+              </li>
+            ))}
+          </ul>
+          {!communityOn && communitySettings.required ? (
+            <button
+              type="button"
+              disabled={communityPaying || communityTotal < 1}
+              onClick={payCommunity}
+              className="btn-gold mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-50"
+            >
+              <Sparkles size={16} />
+              {communityPaying ? "Opening Razorpay…" : `Pay ${formatInr(communityTotal)}`}
+            </button>
+          ) : (
+            <div className="mt-5 flex flex-wrap gap-3 text-xs text-white/50">
+              <span className="inline-flex items-center gap-1"><MessageSquare size={12} /> Chat</span>
+              <span className="inline-flex items-center gap-1"><CalendarDays size={12} /> Free events</span>
+              <span className="inline-flex items-center gap-1"><Megaphone size={12} /> Updates</span>
+            </div>
+          )}
+        </div>
+      </section>
 
       {installmentPlans.length > 0 && (
         <section className="space-y-3">
@@ -773,6 +880,13 @@ function CustomerBilling() {
           )}
         </div>
       )}
+
+      <div>
+        <h2 className="text-lg font-semibold">Documentation plans (optional)</h2>
+        <p className="mt-1 text-sm text-white/45">
+          Company formation, KYC, and export registrations. Not required for chat, free events, or updates.
+        </p>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         {plans.map((p) => {

@@ -17,27 +17,39 @@ import {
   getCaseWorkflowStages,
   journeyStatus,
   CASE_STATUS,
+  isCommunityEntitled,
 } from "@/lib/customerCase";
 import { getPlanById } from "@/lib/planCatalog";
 import { getMessagesForCase } from "@/lib/caseMessages";
+import {
+  fetchCommunityAccess,
+  getCachedCommunityAccess,
+  isCommunityAccessActive,
+  communityPayHref,
+} from "@/lib/communityAccess";
+import { PATHS } from "@/lib/routes";
 
 export default function DashboardOverview() {
   const session = getSession();
   const [tick, setTick] = useState(0);
   useEffect(() => {
+    fetchCommunityAccess().catch(() => {});
     const h = () => setTick((t) => t + 1);
     window.addEventListener("iehub-case-updated", h);
     window.addEventListener("iehub-messages-updated", h);
     window.addEventListener("iehub-plans-updated", h);
+    window.addEventListener("iehub-community-updated", h);
     return () => {
       window.removeEventListener("iehub-case-updated", h);
       window.removeEventListener("iehub-messages-updated", h);
       window.removeEventListener("iehub-plans-updated", h);
+      window.removeEventListener("iehub-community-updated", h);
     };
   }, []);
 
   const c = ensureCaseForSession();
   const status = c ? journeyStatus(c) : CASE_STATUS.NO_PLAN;
+  const communityOn = isCommunityEntitled(c) || isCommunityAccessActive(c, getCachedCommunityAccess());
   const plan = getPlanById(c?.paidPlanId || c?.planId);
   const stages = c ? getCaseWorkflowStages(c) : [];
   const stageIdx = c?.stageIndex || 0;
@@ -45,12 +57,18 @@ export default function DashboardOverview() {
   const readyDocs = (c?.documents || []).filter((d) => d.from === "ops").slice(0, 3);
   const openReqs = (c?.docRequests || []).filter((r) => r.status === "open");
   const msgs = session?.email ? getMessagesForCase(session.email) : [];
+  void tick;
   const lastMsg = msgs[msgs.length - 1];
 
   const hour = new Date().getHours();
   const hello = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   let primary = { to: "/dashboard/workflow", label: "View workflow", hint: "See where your documentation stands" };
+  if (status === CASE_STATUS.NO_PLAN || status === CASE_STATUS.UNPAID || status === CASE_STATUS.EXPIRED) {
+    primary = communityOn
+      ? { to: PATHS.dashboardUpdates, label: "See updates", hint: "Chat, free events, and product notes are unlocked" }
+      : { to: communityPayHref(), label: "Get community access", hint: "Chat, free events, and updates — no documentation plan required" };
+  }
   if (status === CASE_STATUS.COMPLETED) {
     primary = { to: "/dashboard/documents", label: "View documents", hint: "All documentation stages are complete" };
   }
@@ -80,7 +98,9 @@ export default function DashboardOverview() {
               ? currentStage
                 ? `Current stage: ${currentStage.label}`
                 : "Your documentation workspace is ready."
-              : "Complete onboarding to unlock your workspace."}
+              : communityOn
+                ? "Community access is active. A documentation plan is optional when you need registrations."
+                : "Start with community access, or choose a documentation plan when you need it."}
           </p>
         </div>
         {c?.opsName && (

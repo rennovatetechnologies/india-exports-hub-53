@@ -7,6 +7,7 @@ import { fetchPlanCatalog } from "@/lib/planCatalog";
 import { fetchEventsCatalog } from "@/lib/eventsCatalog";
 import { fetchBrochuresCatalog } from "@/lib/brochuresCatalog";
 import { fetchMyCase, fetchCasesQueue, fetchOpsRoster } from "@/lib/customerCase";
+import { fetchCommunityAccess } from "@/lib/communityAccess";
 import { getSession, ROLES, subscribeAuth } from "@/lib/authSession";
 
 let started = false;
@@ -16,7 +17,7 @@ async function loadSessionData() {
   const session = getSession();
   if (!session) return;
   if (session.role === ROLES.CUSTOMER) {
-    await fetchMyCase();
+    await Promise.all([fetchMyCase(), fetchCommunityAccess({ force: true }).catch(() => {})]);
   } else if (session.role === ROLES.ADMIN || session.role === ROLES.OPERATIONS) {
     await Promise.all([fetchCasesQueue(), fetchOpsRoster()]);
   }

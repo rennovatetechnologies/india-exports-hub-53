@@ -14,6 +14,7 @@ import {
 } from "@/lib/authSession";
 import { api } from "@/lib/api";
 import { USER_MESSAGES } from "@/lib/friendlyError";
+import CommunityAccessEditor from "@/components/admin/CommunityAccessEditor";
 
 function formatInrCompact(n) {
   const v = Number(n) || 0;
@@ -199,6 +200,8 @@ export default function SuperAdminPage() {
           <p className="mt-3 text-xs text-white/45">Overview figures are unavailable right now. You can still review requests below.</p>
         ) : null}
       </header>
+
+      <CommunityAccessEditor />
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {kpiCards.map(({ label, value, delta, icon: Icon, tone }) => (

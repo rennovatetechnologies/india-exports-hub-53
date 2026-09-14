@@ -28,9 +28,10 @@ export default function AboutUsSection() {
               India's products. <span className="text-gold-gradient">The world's shelves.</span>
             </motion.h2>
             <p className="mt-5 text-white/65 leading-relaxed max-w-lg">
-              VIRASTRA by New India Export builds the modern operating system for global trade —
-              quality sourcing, compliance, documentation, and shipment, packaged into
-              consultancy plans that get you exporting in weeks, not quarters.
+              VIRASTRA by New India Export, founded by Saurabh Nathuram Yadav, builds the
+              modern operating system for global trade — quality sourcing, compliance,
+              documentation, and shipment, packaged into consultancy plans that get you
+              exporting in weeks, not quarters.
             </p>
 
             <Link

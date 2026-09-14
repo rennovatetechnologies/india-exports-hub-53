@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Mail, Phone, User, Building2, IdCard, ArrowRight, CheckCircle2 } from "lucide-react";
 import AdminAuthShell from "@/components/auth/AdminAuthShell";
@@ -15,6 +15,7 @@ import {
 } from "@/lib/authSession";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 import { InlineNotice } from "@/components/FallbackScreen";
+import OtpInputs from "@/components/auth/OtpInputs";
 
 const ROLE_OPTIONS = [
   { value: ROLES.OPERATIONS, label: "Operations Admin", desc: "Run customer cases and workflow ops." },
@@ -35,7 +36,6 @@ export default function AdminRegisterPage() {
   const [submitted, setSubmitted] = useState(null);
   const [otpError, setOtpError] = useState("");
   const [code, setCode] = useState(["", "", "", "", "", ""]);
-  const refs = useRef([]);
 
   const update = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
@@ -55,14 +55,6 @@ export default function AdminRegisterPage() {
     setStaffRegisterDraft({ ...form, email: em });
     setCode(["", "", "", "", "", ""]);
     setStep("otp");
-  };
-
-  const setDigit = (i, v) => {
-    const val = String(v).replace(/\D/g, "").slice(-1);
-    const next = [...code];
-    next[i] = val;
-    setCode(next);
-    if (val && i < 5) refs.current[i + 1]?.focus();
   };
 
   const submitVerifiedRequest = async () => {
@@ -169,24 +161,11 @@ export default function AdminRegisterPage() {
       >
         <div className="space-y-4">
           {otpError && <InlineNotice>{otpError}</InlineNotice>}
-          <div className="flex justify-between gap-2">
-            {code.map((d, i) => (
-              <input
-                key={i}
-                ref={(el) => {
-                  refs.current[i] = el;
-                }}
-                value={d}
-                onChange={(e) => setDigit(i, e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Backspace" && !d && i > 0) refs.current[i - 1]?.focus();
-                }}
-                inputMode="numeric"
-                maxLength={1}
-                className="h-12 w-10 rounded-xl border border-white/10 bg-white/[0.03] text-center text-lg font-semibold text-white outline-none focus:border-emerald-300/40 sm:h-14 sm:w-12 sm:text-xl"
-              />
-            ))}
-          </div>
+          <OtpInputs
+            value={code}
+            onChange={setCode}
+            inputClassName="h-12 w-10 rounded-xl border border-white/10 bg-white/[0.03] text-center text-lg font-semibold text-white outline-none focus:border-emerald-300/40 sm:h-14 sm:w-12 sm:text-xl"
+          />
           <button
             type="button"
             disabled={code.some((c) => !c)}

@@ -78,14 +78,14 @@ export async function startRazorpayCheckout(opts) {
     const orderBody = {
       amount: amountPaise,
       currency: "INR",
-      sku: eventId || planId,
+      sku: resolvedPurpose === "community" ? "community" : eventId || planId,
       purpose: resolvedPurpose,
       description,
     };
     if (customer.email) orderBody.email = customer.email;
     if (resolvedPurpose === "event" || eventId) {
       orderBody.eventId = eventId || planId;
-    } else {
+    } else if (resolvedPurpose !== "community") {
       orderBody.planId = planId;
     }
     if (payInInstallments) orderBody.payInInstallments = true;

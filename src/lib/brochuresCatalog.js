@@ -78,6 +78,7 @@ function normalizeBrochure(row) {
     fileSize: Number(row.fileSize) > 0 ? Number(row.fileSize) : undefined,
     showInNav: kind === "pdf" ? row.showInNav !== false : false,
     sortOrder: Number.isFinite(Number(row.sortOrder)) ? Number(row.sortOrder) : 0,
+    eventId: row.eventId ? String(row.eventId) : undefined,
     createdAt: row.createdAt ? String(row.createdAt) : undefined,
   };
 }
@@ -181,7 +182,7 @@ export function subscribeBrochures(onChange) {
 }
 
 export function getPdfBrochures(catalog = loadBrochuresCatalog()) {
-  return catalog.filter((b) => b.kind === "pdf");
+  return catalog.filter((b) => b.kind === "pdf" && !b.eventId);
 }
 
 export function getGalleryBrochures(catalog = loadBrochuresCatalog()) {

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
@@ -23,6 +23,7 @@ import { api } from "@/lib/api";
 import { getCustomerCase, gatePathForCase, fetchMyCase } from "@/lib/customerCase";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 import { InlineNotice } from "@/components/FallbackScreen";
+import OtpInputs from "@/components/auth/OtpInputs";
 
 export default function VerifyPage() {
   const router = useNavigate();
@@ -32,7 +33,6 @@ export default function VerifyPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [resent, setResent] = useState(false);
-  const refs = useRef([]);
 
   const pending = typeof window !== "undefined" ? getPendingOtpInfo() : null;
   const nextParam = searchParams.get("next");
@@ -45,14 +45,6 @@ export default function VerifyPage() {
       router(fallback, { replace: true });
     }
   }, [pending, mode, router]);
-
-  const setDigit = (i, v) => {
-    const val = String(v).replace(/\D/g, "").slice(-1);
-    const next = [...code];
-    next[i] = val;
-    setCode(next);
-    if (val && i < 5) refs.current[i + 1]?.focus();
-  };
 
   const applySession = (session, fallback = {}) => {
     const s = { ...fallback, ...(session || {}) };
@@ -276,24 +268,12 @@ export default function VerifyPage() {
     >
       <form onSubmit={onSubmit} className="space-y-6">
         {error && <InlineNotice>{error}</InlineNotice>}
-        <div className="flex justify-between gap-2">
-          {code.map((d, i) => (
-            <input
-              key={i}
-              ref={(el) => {
-                refs.current[i] = el;
-              }}
-              value={d}
-              onChange={(e) => setDigit(i, e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Backspace" && !d && i > 0) refs.current[i - 1]?.focus();
-              }}
-              inputMode="numeric"
-              maxLength={1}
-              className="h-14 w-12 rounded-xl border border-white/10 bg-white/[0.03] text-center text-xl font-semibold text-white outline-none focus:border-[var(--gold)]/50 focus:bg-white/[0.05] transition"
-            />
-          ))}
-        </div>
+        <OtpInputs
+          value={code}
+          onChange={setCode}
+          disabled={loading}
+          inputClassName="h-14 w-12 rounded-xl border border-white/10 bg-white/[0.03] text-center text-xl font-semibold text-white outline-none focus:border-[var(--gold)]/50 focus:bg-white/[0.05] transition"
+        />
         <button
           disabled={loading || code.some((d) => !d)}
           className="btn-gold w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold disabled:opacity-50"
