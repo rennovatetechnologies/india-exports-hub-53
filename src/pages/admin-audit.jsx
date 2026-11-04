@@ -17,14 +17,6 @@ const PERIODS = [
   { value: "all", label: "All time" },
 ];
 
-const STATUSES = [
-  { value: "all", label: "All statuses" },
-  { value: "paid", label: "Success" },
-  { value: "created", label: "Created" },
-  { value: "failed", label: "Failed" },
-  { value: "refunded", label: "Refunded" },
-];
-
 const STATUS_META = {
   paid: {
     label: "Success",
@@ -235,15 +227,6 @@ export default function AdminAuditPage() {
             className="w-56 bg-transparent text-sm text-white placeholder:text-white/30 outline-none sm:w-72"
           />
         </div>
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold text-white/70 outline-none"
-        >
-          {STATUSES.map((s) => (
-            <option key={s.value} value={s.value}>{s.label}</option>
-          ))}
-        </select>
         <div className="inline-flex items-center gap-1.5 text-[11px] text-white/45">
           <Filter size={12} />
           {headline}
@@ -251,27 +234,44 @@ export default function AdminAuditPage() {
       </div>
 
       {!busy && !error && (
-        <div className="flex flex-wrap gap-2">
-          {statusBreakdown.map(({ key, count }) => {
-            const meta = statusMeta(key);
-            const on = status === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setStatus(on ? "all" : key)}
-                className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                  on
-                    ? `${meta.chip}`
-                    : "border border-white/10 text-white/60 hover:text-white"
-                }`}
-              >
-                <span className={`h-2 w-2 rounded-full ${meta.bar}`} aria-hidden />
-                {meta.label}
-                <span className="tabular-nums text-white/45">{count}</span>
-              </button>
-            );
-          })}
+        <div className="space-y-2">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-white/40">
+            Filter by status — each row also shows its status
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setStatus("all")}
+              className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                status === "all"
+                  ? "bg-white/15 text-white ring-1 ring-white/25"
+                  : "border border-white/10 text-white/60 hover:text-white"
+              }`}
+            >
+              All statuses
+              <span className="tabular-nums text-white/45">{summary.count}</span>
+            </button>
+            {statusBreakdown.map(({ key, count }) => {
+              const meta = statusMeta(key);
+              const on = status === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setStatus(on ? "all" : key)}
+                  className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                    on
+                      ? `${meta.chip}`
+                      : "border border-white/10 text-white/60 hover:text-white"
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${meta.bar}`} aria-hidden />
+                  {meta.label}
+                  <span className="tabular-nums text-white/45">{count}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -284,61 +284,72 @@ export default function AdminAuditPage() {
         />
       )}
 
-      <div className="grid gap-3">
-        {!busy && !error && items.length === 0 && (
-          <div className="glass-card p-8 text-center text-sm text-white/45">
-            No payments for this filter.
+      {!busy && !error && items.length === 0 && (
+        <div className="glass-card p-8 text-center text-sm text-white/45">
+          No payments for this filter.
+        </div>
+      )}
+
+      {items.length > 0 && (
+        <div className="glass-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left">
+              <thead>
+                <tr className="border-b border-white/10 text-[11px] uppercase tracking-[0.16em] text-white/45">
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold">Amount</th>
+                  <th className="px-4 py-3 font-semibold">Customer</th>
+                  <th className="px-4 py-3 font-semibold">Purpose</th>
+                  <th className="px-4 py-3 font-semibold">When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => {
+                  const meta = statusMeta(item.status);
+                  return (
+                    <motion.tr
+                      key={item.id}
+                      whileHover={{ backgroundColor: "rgba(255,255,255,0.03)" }}
+                      onClick={() => {
+                        setInvoiceError("");
+                        setActive(item);
+                      }}
+                      className="cursor-pointer border-b border-white/5 last:border-0"
+                    >
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center gap-2">
+                          <span className={`h-8 w-1 rounded-full ${meta.bar}`} aria-hidden />
+                          <StatusBadge status={item.status} size="md" />
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5 text-sm font-semibold text-white">
+                        {formatInr(item.amounts?.total)}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="text-sm text-white/85">{item.customerEmail || "—"}</div>
+                        <div className="mt-0.5 text-[11px] text-white/40">{item.id}</div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="text-sm text-white/75">
+                          {item.description || item.sku || "—"}
+                        </div>
+                        {item.purpose && (
+                          <div className="mt-0.5 text-[11px] uppercase tracking-wider text-white/40">
+                            {item.purpose}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-[12px] text-white/50 whitespace-nowrap">
+                        {formatWhen(item.at)}
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        )}
-        {items.map((item) => {
-          const meta = statusMeta(item.status);
-          return (
-            <motion.button
-              key={item.id}
-              type="button"
-              whileHover={{ y: -1 }}
-              onClick={() => {
-                setInvoiceError("");
-                setActive(item);
-              }}
-              className="glass-card relative w-full overflow-hidden p-4 text-left transition hover:border-white/20"
-            >
-              <span
-                className={`absolute inset-y-0 left-0 w-1 ${meta.bar}`}
-                aria-hidden
-              />
-              <div className="flex flex-wrap items-start justify-between gap-2 pl-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge status={item.status} />
-                    <span className="text-sm font-semibold text-white">
-                      {formatInr(item.amounts?.total)}
-                    </span>
-                    {item.purpose && (
-                      <span className="text-[11px] uppercase tracking-wider text-white/40">
-                        {item.purpose}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs text-white/50">
-                    {[item.customerEmail, item.description || item.sku, item.id]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <div className="text-[11px] font-medium text-white/55">
-                    {statusMeta(item.status).label}
-                  </div>
-                  <time className="mt-0.5 block text-[11px] text-white/40">
-                    {formatWhen(item.at)}
-                  </time>
-                </div>
-              </div>
-            </motion.button>
-          );
-        })}
-      </div>
+        </div>
+      )}
 
       {active && (
         <>
