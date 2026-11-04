@@ -16,7 +16,7 @@ export default function PlanPackLists({ plan, kycDocs, workflowStages, className
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">
             KYC pack · {docs.length}
           </div>
-          <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto pr-1">
+          <ul className="scrollbar-dark mt-2 max-h-48 space-y-1 overflow-y-auto pr-1">
             {docs.map((d) => (
               <li key={d.id || d.label} className="text-xs leading-relaxed text-white/70">
                 {d.label}
@@ -31,7 +31,7 @@ export default function PlanPackLists({ plan, kycDocs, workflowStages, className
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">
             Documentation flow · {stages.length}
           </div>
-          <ol className="mt-2 max-h-48 space-y-1 overflow-y-auto pr-1">
+          <ol className="scrollbar-dark mt-2 max-h-48 space-y-1 overflow-y-auto pr-1">
             {stages.map((s, i) => (
               <li key={s.id || s.label} className="text-xs leading-relaxed text-white/70">
                 {i + 1}. {s.label}

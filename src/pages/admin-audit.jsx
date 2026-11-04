@@ -19,11 +19,34 @@ const PERIODS = [
 
 const STATUSES = [
   { value: "all", label: "All statuses" },
-  { value: "paid", label: "Paid" },
+  { value: "paid", label: "Success" },
   { value: "created", label: "Created" },
   { value: "failed", label: "Failed" },
   { value: "refunded", label: "Refunded" },
 ];
+
+const STATUS_META = {
+  paid: {
+    label: "Success",
+    chip: "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/40",
+    bar: "bg-emerald-400",
+  },
+  created: {
+    label: "Created",
+    chip: "bg-sky-500/20 text-sky-200 ring-1 ring-sky-400/40",
+    bar: "bg-sky-400",
+  },
+  failed: {
+    label: "Failed",
+    chip: "bg-rose-500/20 text-rose-200 ring-1 ring-rose-400/40",
+    bar: "bg-rose-400",
+  },
+  refunded: {
+    label: "Refunded",
+    chip: "bg-amber-500/20 text-amber-200 ring-1 ring-amber-400/40",
+    bar: "bg-amber-400",
+  },
+};
 
 function formatWhen(raw) {
   if (!raw) return "";
@@ -47,11 +70,25 @@ function formatInr(n) {
   }).format(v);
 }
 
-function statusChip(status) {
-  if (status === "paid") return "bg-emerald-400/10 text-emerald-200";
-  if (status === "failed") return "bg-rose-400/10 text-rose-200";
-  if (status === "refunded") return "bg-amber-400/10 text-amber-200";
-  return "bg-white/10 text-white/65";
+function statusMeta(status) {
+  return STATUS_META[status] || {
+    label: status ? String(status) : "Unknown",
+    chip: "bg-white/10 text-white/70 ring-1 ring-white/15",
+    bar: "bg-white/30",
+  };
+}
+
+function StatusBadge({ status, size = "sm" }) {
+  const meta = statusMeta(status);
+  const pad = size === "md" ? "px-2.5 py-1 text-[11px]" : "px-2 py-0.5 text-[10px]";
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-md font-semibold uppercase tracking-wider ${pad} ${meta.chip}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${meta.bar}`} aria-hidden />
+      {meta.label}
+    </span>
+  );
 }
 
 export default function AdminAuditPage() {
@@ -61,7 +98,12 @@ export default function AdminAuditPage() {
   const [query, setQuery] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [items, setItems] = useState([]);
-  const [summary, setSummary] = useState({ count: 0, paidCount: 0, paidTotal: 0 });
+  const [summary, setSummary] = useState({
+    count: 0,
+    paidCount: 0,
+    paidTotal: 0,
+    byStatus: { paid: 0, created: 0, failed: 0, refunded: 0 },
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
@@ -89,13 +131,30 @@ export default function AdminAuditPage() {
         if (debouncedQ) params.set("q", debouncedQ);
         const res = await api(`/api/admin/payments?${params.toString()}`);
         if (!cancelled) {
-          setItems(res?.items || res?.data || []);
-          setSummary(res?.summary || { count: 0, paidCount: 0, paidTotal: 0 });
+          const nextItems = res?.items || res?.data || [];
+          setItems(nextItems);
+          const byStatus = res?.summary?.byStatus || {
+            paid: nextItems.filter((i) => i.status === "paid").length,
+            created: nextItems.filter((i) => i.status === "created").length,
+            failed: nextItems.filter((i) => i.status === "failed").length,
+            refunded: nextItems.filter((i) => i.status === "refunded").length,
+          };
+          setSummary({
+            count: res?.summary?.count ?? nextItems.length,
+            paidCount: res?.summary?.paidCount ?? byStatus.paid,
+            paidTotal: res?.summary?.paidTotal ?? 0,
+            byStatus,
+          });
         }
       } catch (e) {
         if (!cancelled) {
           setItems([]);
-          setSummary({ count: 0, paidCount: 0, paidTotal: 0 });
+          setSummary({
+            count: 0,
+            paidCount: 0,
+            paidTotal: 0,
+            byStatus: { paid: 0, created: 0, failed: 0, refunded: 0 },
+          });
           setError(toUserMessage(e, USER_MESSAGES.load));
         }
       } finally {
@@ -109,8 +168,18 @@ export default function AdminAuditPage() {
 
   const headline = useMemo(() => {
     if (busy) return "Loading…";
-    return `${summary.count} payment${summary.count === 1 ? "" : "s"} · ${formatInr(summary.paidTotal)} paid`;
+    return `${summary.count} payment${summary.count === 1 ? "" : "s"} · ${formatInr(summary.paidTotal)} success`;
   }, [busy, summary]);
+
+  const statusBreakdown = useMemo(() => {
+    const by = summary.byStatus || {};
+    return [
+      { key: "paid", count: by.paid || 0 },
+      { key: "created", count: by.created || 0 },
+      { key: "failed", count: by.failed || 0 },
+      { key: "refunded", count: by.refunded || 0 },
+    ];
+  }, [summary.byStatus]);
 
   if (session?.role !== ROLES.ADMIN) {
     return <Navigate to={PATHS.admin} replace />;
@@ -181,6 +250,31 @@ export default function AdminAuditPage() {
         </div>
       </div>
 
+      {!busy && !error && (
+        <div className="flex flex-wrap gap-2">
+          {statusBreakdown.map(({ key, count }) => {
+            const meta = statusMeta(key);
+            const on = status === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setStatus(on ? "all" : key)}
+                className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                  on
+                    ? `${meta.chip}`
+                    : "border border-white/10 text-white/60 hover:text-white"
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${meta.bar}`} aria-hidden />
+                {meta.label}
+                <span className="tabular-nums text-white/45">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {error && (
         <FallbackScreen
           kind="unavailable"
@@ -196,42 +290,54 @@ export default function AdminAuditPage() {
             No payments for this filter.
           </div>
         )}
-        {items.map((item) => (
-          <motion.button
-            key={item.id}
-            type="button"
-            whileHover={{ y: -1 }}
-            onClick={() => {
-              setInvoiceError("");
-              setActive(item);
-            }}
-            className="glass-card w-full p-4 text-left transition hover:border-white/20"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusChip(item.status)}`}>
-                    {item.status || "unknown"}
-                  </span>
-                  <span className="text-sm font-semibold text-white">
-                    {formatInr(item.amounts?.total)}
-                  </span>
-                  {item.purpose && (
-                    <span className="text-[11px] uppercase tracking-wider text-white/40">
-                      {item.purpose}
+        {items.map((item) => {
+          const meta = statusMeta(item.status);
+          return (
+            <motion.button
+              key={item.id}
+              type="button"
+              whileHover={{ y: -1 }}
+              onClick={() => {
+                setInvoiceError("");
+                setActive(item);
+              }}
+              className="glass-card relative w-full overflow-hidden p-4 text-left transition hover:border-white/20"
+            >
+              <span
+                className={`absolute inset-y-0 left-0 w-1 ${meta.bar}`}
+                aria-hidden
+              />
+              <div className="flex flex-wrap items-start justify-between gap-2 pl-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge status={item.status} />
+                    <span className="text-sm font-semibold text-white">
+                      {formatInr(item.amounts?.total)}
                     </span>
-                  )}
+                    {item.purpose && (
+                      <span className="text-[11px] uppercase tracking-wider text-white/40">
+                        {item.purpose}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-white/50">
+                    {[item.customerEmail, item.description || item.sku, item.id]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
                 </div>
-                <p className="mt-1 text-xs text-white/50">
-                  {[item.customerEmail, item.description || item.sku, item.id]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
+                <div className="shrink-0 text-right">
+                  <div className="text-[11px] font-medium text-white/55">
+                    {statusMeta(item.status).label}
+                  </div>
+                  <time className="mt-0.5 block text-[11px] text-white/40">
+                    {formatWhen(item.at)}
+                  </time>
+                </div>
               </div>
-              <time className="shrink-0 text-[11px] text-white/40">{formatWhen(item.at)}</time>
-            </div>
-          </motion.button>
-        ))}
+            </motion.button>
+          );
+        })}
       </div>
 
       {active && (
@@ -245,9 +351,7 @@ export default function AdminAuditPage() {
           <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-white/10 bg-[#0a0d14] p-6 overflow-y-auto">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusChip(active.status)}`}>
-                  {active.status}
-                </span>
+                <StatusBadge status={active.status} size="md" />
                 <h3 className="mt-2 text-lg font-semibold text-white">
                   {formatInr(active.amounts?.total)}
                 </h3>
@@ -259,6 +363,7 @@ export default function AdminAuditPage() {
 
             <dl className="mt-5 space-y-3 text-sm">
               {[
+                ["Status", statusMeta(active.status).label],
                 ["Payment ID", active.id],
                 ["Purpose", active.purpose],
                 ["SKU", active.sku],
