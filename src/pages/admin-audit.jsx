@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  CreditCard, Search, Filter, CalendarRange, Download, Loader2,
+  CreditCard, Search, Filter, CalendarRange, Download, Loader2, RefreshCw,
 } from "lucide-react";
 import { getSession, ROLES } from "@/lib/authSession";
 import { api } from "@/lib/api";
@@ -38,7 +38,24 @@ const STATUS_META = {
     chip: "bg-amber-500/20 text-amber-200 ring-1 ring-amber-400/40",
     bar: "bg-amber-400",
   },
+  captured: {
+    label: "Captured",
+    chip: "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/40",
+    bar: "bg-emerald-400",
+  },
+  authorized: {
+    label: "Authorized",
+    chip: "bg-sky-500/20 text-sky-200 ring-1 ring-sky-400/40",
+    bar: "bg-sky-400",
+  },
+  processed: {
+    label: "Processed",
+    chip: "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/40",
+    bar: "bg-emerald-400",
+  },
 };
+
+const GATEWAY_ID = /^(pay|order|rfnd)_[A-Za-z0-9]+$/;
 
 function formatWhen(raw) {
   if (!raw) return "";
@@ -62,12 +79,113 @@ function formatInr(n) {
   }).format(v);
 }
 
+function formatInrExact(n) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(n) || 0);
+}
+
 function statusMeta(status) {
   return STATUS_META[status] || {
     label: status ? String(status) : "Unknown",
     chip: "bg-white/10 text-white/70 ring-1 ring-white/15",
     bar: "bg-white/30",
   };
+}
+
+function TracePanel({ traces, busy, error, onRefresh }) {
+  return (
+    <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-white/40">Bank and refund trace</p>
+          <p className="mt-1 text-xs text-white/45">
+            Live status, refunds, and bank references. Admins do not need the payment gateway dashboard.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={busy}
+          className="btn-ghost inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold disabled:opacity-50"
+        >
+          {busy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+          Refresh
+        </button>
+      </div>
+      {busy && !traces.length ? (
+        <p className="mt-4 text-sm text-white/50">Checking the gateway…</p>
+      ) : null}
+      {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
+      <div className="mt-4 space-y-4">
+        {traces.map((row) => {
+          const trace = row.trace || {};
+          const refunds = Array.isArray(trace.refunds) ? trace.refunds : [];
+          return (
+            <article key={trace.id || row.localPaymentId} className="rounded-xl border border-white/10 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <StatusBadge status={trace.status} size="md" />
+                <p className="text-sm font-semibold text-white">{formatInrExact(trace.amountInr)}</p>
+              </div>
+              <p className="mt-2 text-xs text-white/50">
+                {row.inLedger
+                  ? `In the ledger${row.localPaymentId ? ` as ${row.localPaymentId}` : ""}.`
+                  : "Not in the ledger. This charge never created a local payment, so the gateway trace is the record."}
+                {row.syncedStatus ? " Ledger status updated to Refunded." : ""}
+              </p>
+              <dl className="mt-3 space-y-2 text-sm">
+                {[
+                  ["Gateway status", trace.status],
+                  ["Captured", trace.captured ? "Yes" : "No"],
+                  ["Refunded amount", trace.amountRefundedInr ? formatInrExact(trace.amountRefundedInr) : null],
+                  ["Method", trace.method],
+                  ["Description", trace.description],
+                  ["Customer", trace.customerEmail || trace.customerContact],
+                  ["When", formatWhen(trace.createdAt)],
+                  ["Payment", trace.id],
+                  ["Order", trace.orderId],
+                  ["Debit reference", trace.debitRrn],
+                  ["Failure", trace.errorDescription],
+                ]
+                  .filter(([, value]) => value)
+                  .map(([label, value]) => (
+                    <div key={label} className="flex justify-between gap-3 border-b border-white/5 pb-2">
+                      <dt className="text-white/45">{label}</dt>
+                      <dd className="text-right text-white/80 break-all">{value}</dd>
+                    </div>
+                  ))}
+              </dl>
+              {refunds.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-white/40">Refunds</p>
+                  {refunds.map((refund) => (
+                    <div key={refund.id} className="rounded-lg bg-black/20 p-3 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <StatusBadge status={refund.status} />
+                        <span className="font-semibold text-white">{formatInrExact(refund.amountInr)}</span>
+                      </div>
+                      <p className="mt-2 break-all text-xs text-white/55">{refund.id}</p>
+                      {refund.reason ? <p className="mt-1 text-xs text-white/70">{refund.reason}</p> : null}
+                      <p className="mt-1 text-xs text-white/45">
+                        {formatWhen(refund.createdAt)}
+                        {refund.speed ? ` · ${refund.speed}` : ""}
+                      </p>
+                      {refund.creditRrn ? (
+                        <p className="mt-1 text-xs text-white/70">Refund reference {refund.creditRrn}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
 function StatusBadge({ status, size = "sm" }) {
@@ -102,6 +220,10 @@ export default function AdminAuditPage() {
   const [active, setActive] = useState(null);
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   const [invoiceError, setInvoiceError] = useState("");
+  const [traces, setTraces] = useState([]);
+  const [traceBusy, setTraceBusy] = useState(false);
+  const [traceError, setTraceError] = useState("");
+  const [traceNonce, setTraceNonce] = useState(0);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedQ(query.trim()), 300);
@@ -158,6 +280,48 @@ export default function AdminAuditPage() {
     };
   }, [session?.role, period, status, debouncedQ, reload]);
 
+  const gatewayId = active
+    ? String(active.razorpayPaymentId || "").trim()
+    : (GATEWAY_ID.test(debouncedQ) ? debouncedQ : "");
+
+  useEffect(() => {
+    if (session?.role !== ROLES.ADMIN || !gatewayId) {
+      setTraces([]);
+      setTraceError("");
+      setTraceBusy(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setTraces([]);
+    setTraceBusy(true);
+    setTraceError("");
+    (async () => {
+      try {
+        const res = await api(`/api/admin/payments/trace?id=${encodeURIComponent(gatewayId)}`);
+        if (cancelled) return;
+        const next = res?.items || res?.data || [];
+        setTraces(next);
+        const synced = next.find((row) => row.syncedStatus && row.localPaymentId);
+        if (synced) {
+          setActive((cur) => (
+            cur && cur.id === synced.localPaymentId ? { ...cur, status: synced.syncedStatus } : cur
+          ));
+          setReload((n) => n + 1);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setTraces([]);
+          setTraceError(toUserMessage(e, USER_MESSAGES.load));
+        }
+      } finally {
+        if (!cancelled) setTraceBusy(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.role, gatewayId, traceNonce]);
+
   const headline = useMemo(() => {
     if (busy) return "Loading…";
     return `${summary.count} payment${summary.count === 1 ? "" : "s"} · ${formatInr(summary.paidTotal)} success`;
@@ -186,7 +350,7 @@ export default function AdminAuditPage() {
           </span>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight">Payment ledger</h1>
           <p className="mt-1 text-sm text-white/55">
-            Track orders and captures. Filter by last week, last month, or all time.
+            Track captures, refunds, and bank references here. Paste a pay_, order_, or rfnd_ id into search.
           </p>
         </div>
         <Link
@@ -223,7 +387,7 @@ export default function AdminAuditPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search email, payment id, purpose…"
+            placeholder="Search email, or paste pay_ / order_ / rfnd_ id"
             className="w-56 bg-transparent text-sm text-white placeholder:text-white/30 outline-none sm:w-72"
           />
         </div>
@@ -284,9 +448,20 @@ export default function AdminAuditPage() {
         />
       )}
 
+      {!active && (traceBusy || traceError || traces.length > 0) && (
+        <TracePanel
+          traces={traces}
+          busy={traceBusy}
+          error={traceError}
+          onRefresh={() => setTraceNonce((n) => n + 1)}
+        />
+      )}
+
       {!busy && !error && items.length === 0 && (
         <div className="glass-card p-8 text-center text-sm text-white/45">
-          No payments for this filter.
+          {traces.length
+            ? "No ledger row for this id. The bank and refund trace above is the record."
+            : "No payments for this filter."}
         </div>
       )}
 
@@ -383,6 +558,8 @@ export default function AdminAuditPage() {
                 ["Case", active.caseId],
                 ["Razorpay order", active.razorpayOrderId],
                 ["Razorpay payment", active.razorpayPaymentId],
+                ["Refund reason", active.refundReason],
+                ["Refunded", formatWhen(active.refundedAt)],
                 ["Taxable", active.amounts?.taxable != null ? formatInr(active.amounts.taxable) : null],
                 ["GST", active.amounts?.gst != null ? formatInr(active.amounts.gst) : null],
               ]
@@ -430,6 +607,21 @@ export default function AdminAuditPage() {
               )}
             </div>
             {invoiceError ? <p className="mt-3 text-xs text-rose-300">{invoiceError}</p> : null}
+
+            <div className="mt-6">
+              {active.razorpayPaymentId ? (
+                <TracePanel
+                  traces={traces}
+                  busy={traceBusy}
+                  error={traceError}
+                  onRefresh={() => setTraceNonce((n) => n + 1)}
+                />
+              ) : (
+                <p className="text-xs text-white/45">
+                  This row has no gateway payment id, so bank and refund references are not available.
+                </p>
+              )}
+            </div>
           </aside>
         </>
       )}

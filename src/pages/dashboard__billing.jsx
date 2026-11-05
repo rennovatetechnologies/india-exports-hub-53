@@ -3,6 +3,7 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Check, CreditCard, Save, Pencil, ArrowLeft, Sparkles, FileText, Download, MessageSquare, CalendarDays, Megaphone } from "lucide-react";
 import { getSession, ROLES } from "@/lib/authSession";
+import { api } from "@/lib/api";
 import {
   loadPlanCatalog,
   savePlanCatalog,
@@ -490,6 +491,26 @@ function AdminPlanEditor() {
   );
 }
 
+const CUSTOMER_PAYMENT_STATUS = {
+  paid: "Paid",
+  created: "Started",
+  failed: "Not completed",
+  refunded: "Refunded",
+};
+
+function formatPaymentWhen(raw) {
+  if (!raw) return "";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function CustomerBilling() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -508,6 +529,10 @@ function CustomerBilling() {
     session?.email ? listInvoicesForEmail(session.email) : [],
   );
   const [installmentPlans, setInstallmentPlans] = useState([]);
+  const [myPayments, setMyPayments] = useState([]);
+  const [paymentsBusy, setPaymentsBusy] = useState(false);
+  const [paymentsLoaded, setPaymentsLoaded] = useState(false);
+  const [paymentsNote, setPaymentsNote] = useState("");
 
   useEffect(() => {
     fetchPlanCatalog({ force: true }).then(setPlans).catch(() => setPlans([]));
@@ -515,6 +540,17 @@ function CustomerBilling() {
     if (session?.email) {
       fetchInvoicesForEmail(session.email).then(setInvoices).catch(() => {});
       fetchMyInstallmentPlans().then(setInstallmentPlans).catch(() => {});
+      setPaymentsBusy(true);
+      api("/api/payments/me")
+        .then((res) => {
+          setMyPayments(res?.items || res?.data || []);
+          setPaymentsNote("");
+        })
+        .catch((e) => setPaymentsNote(toUserMessage(e, USER_MESSAGES.load)))
+        .finally(() => {
+          setPaymentsBusy(false);
+          setPaymentsLoaded(true);
+        });
     }
     const h = () => {
       setPlans(loadPlanCatalog());
@@ -1031,6 +1067,91 @@ function CustomerBilling() {
           Downgrades are not available. Choose a plan priced above {paidPlan.name} to pay only the difference + GST.
         </p>
       )}
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <CreditCard size={16} className="text-[var(--gold)]" />
+              <h2 className="text-lg font-semibold">Your payments</h2>
+            </div>
+            <p className="mt-1 text-xs text-white/45">
+              Orders placed from your account, including refunds and the bank references for a debit or credit.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={paymentsBusy}
+            onClick={() => {
+              setPaymentsBusy(true);
+              api("/api/payments/me")
+                .then((res) => {
+                  setMyPayments(res?.items || res?.data || []);
+                  setPaymentsNote("");
+                })
+                .catch((e) => setPaymentsNote(toUserMessage(e, USER_MESSAGES.load)))
+                .finally(() => {
+                  setPaymentsBusy(false);
+                  setPaymentsLoaded(true);
+                });
+            }}
+            className="btn-ghost rounded-xl px-3 py-2 text-xs font-semibold disabled:opacity-50"
+          >
+            {paymentsBusy ? "Checking…" : "Refresh status"}
+          </button>
+        </div>
+        {paymentsNote ? <p className="text-xs text-rose-200">{paymentsNote}</p> : null}
+        {paymentsLoaded && !paymentsBusy && myPayments.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-white/45">
+            Payments you start while signed in will show here, with status and any refund.
+          </div>
+        ) : null}
+        {myPayments.length > 0 && (
+          <ul className="divide-y divide-white/10 rounded-2xl border border-white/10 bg-white/[0.03]">
+            {myPayments.map((payment) => {
+              const refunds = payment.gateway?.refunds || [];
+              const statusLabel = CUSTOMER_PAYMENT_STATUS[payment.status] || payment.status || "Unknown";
+              const total = payment.amounts?.total ?? payment.gateway?.amountInr;
+              return (
+                <li key={payment.id} className="px-4 py-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-white">
+                        {payment.description || payment.purpose || "Payment"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-white/45">
+                        {statusLabel}
+                        {payment.at ? ` · ${formatPaymentWhen(payment.at)}` : ""}
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold tabular-nums">{formatInr(total)}</span>
+                  </div>
+                  {payment.refundReason ? (
+                    <p className="mt-2 text-xs text-amber-100/80">{payment.refundReason}</p>
+                  ) : null}
+                  {(payment.gateway?.debitRrn || refunds.length > 0) && (
+                    <div className="mt-2 space-y-1 text-xs text-white/55">
+                      {payment.gateway?.debitRrn ? (
+                        <p>Debit reference {payment.gateway.debitRrn}</p>
+                      ) : null}
+                      {refunds.map((refund) => (
+                        <p key={refund.id}>
+                          Refund {formatInr(refund.amountInr)} · {refund.status || "recorded"}
+                          {refund.creditRrn ? ` · credit reference ${refund.creditRrn}` : ""}
+                          {refund.createdAt ? ` · ${formatPaymentWhen(refund.createdAt)}` : ""}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  {payment.razorpayPaymentId ? (
+                    <p className="mt-1 break-all text-[11px] text-white/35">{payment.razorpayPaymentId}</p>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       {invoices.length > 0 && (
         <section className="space-y-3">
