@@ -19,6 +19,8 @@
 
 # production
 /build
+# Written by npm run build. Compared at startup so a stale dist is rebuilt.
+dist/.source-stamp
 
 # misc
 .DS_Store

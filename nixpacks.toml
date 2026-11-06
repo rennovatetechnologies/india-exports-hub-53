@@ -1,7 +1,7 @@
 [variables]
 NIXPACKS_NODE_VERSION = "20"
 
-# Always rebuild the SPA from source. Serving a committed dist/ without
-# this step ships stale mock homepage content.
+# Drop the previous JS bundle before compiling. Startup in serve-spa.mjs
+# rebuilds again if dist/.source-stamp still does not match src/.
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["rm -rf dist/assets dist/index.html dist/.source-stamp", "npm run build"]
