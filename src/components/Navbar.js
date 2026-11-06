@@ -14,6 +14,7 @@ import {
   workspaceFor,
   ROLES,
 } from "@/lib/authSession";
+import SignOutConfirm from "@/components/auth/SignOutConfirm";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ export default function Navbar() {
   const [mobileBrochuresOpen, setMobileBrochuresOpen] = useState(false);
   const [brochureMenu, setBrochureMenu] = useState(() => getBrochureMenu());
   const [session, setSessionState] = useState(null);
+  const [signOutOpen, setSignOutOpen] = useState(false);
   const pathname = useLocation().pathname;
 
   const loggedIn = Boolean(session?.email);
@@ -38,9 +40,11 @@ export default function Navbar() {
       ? "Workspace"
       : "Dashboard";
 
-  const handleLogout = () => {
+  const handleLogout = () => setSignOutOpen(true);
+  const confirmLogout = () => {
     clearSession();
     setMobileOpen(false);
+    setSignOutOpen(false);
     navigate(PATHS.login, { replace: true });
   };
 
@@ -486,6 +490,11 @@ export default function Navbar() {
           </>
         )}
       </AnimatePresence>
+      <SignOutConfirm
+        open={signOutOpen}
+        onCancel={() => setSignOutOpen(false)}
+        onConfirm={confirmLogout}
+      />
     </>
   );
 }

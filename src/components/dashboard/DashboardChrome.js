@@ -18,6 +18,7 @@ import { getSession, ROLES, subscribeAuth, clearSession, workspaceFor } from "@/
 import { DASHBOARD_EXPLORE_LINKS } from "@/lib/siteNav";
 import { PATHS } from "@/lib/routes";
 import { api } from "@/lib/api";
+import SignOutConfirm from "@/components/auth/SignOutConfirm";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -106,6 +107,7 @@ export default function DashboardChrome({ children }) {
   const [refreshing, setRefreshing] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
   const notifRef = useRef(null);
   const notifPanelRef = useRef(null);
   const [session, setSessionState] = useState(() =>
@@ -250,7 +252,9 @@ export default function DashboardChrome({ children }) {
     .slice(0, 2)
     .toUpperCase();
 
+  const requestSignOut = () => setSignOutOpen(true);
   const signOut = () => {
+    setSignOutOpen(false);
     clearSession();
     navigate(PATHS.login, { replace: true });
   };
@@ -395,7 +399,7 @@ export default function DashboardChrome({ children }) {
         })}
         <button
           type="button"
-          onClick={signOut}
+          onClick={requestSignOut}
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-white/60 hover:bg-white/5 hover:text-white"
         >
           <LogOut size={15} /> Sign out
@@ -562,7 +566,7 @@ export default function DashboardChrome({ children }) {
             </div>
             <button
               type="button"
-              onClick={signOut}
+              onClick={requestSignOut}
               className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg glass px-3 text-sm text-white/70 hover:text-white"
               aria-label="Log out"
             >
@@ -574,6 +578,11 @@ export default function DashboardChrome({ children }) {
 
         <main className="px-4 py-6 lg:px-8 lg:py-8">{children}</main>
       </div>
+      <SignOutConfirm
+        open={signOutOpen}
+        onCancel={() => setSignOutOpen(false)}
+        onConfirm={signOut}
+      />
     </div>
   );
 }

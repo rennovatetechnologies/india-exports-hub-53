@@ -11,6 +11,7 @@ import {
   subscribeAuth,
 } from "@/lib/authSession";
 import { gatePathForCase, getCustomerCase, seedDemoCasesIfNeeded } from "@/lib/customerCase";
+import SignOutConfirm from "@/components/auth/SignOutConfirm";
 
 /**
  * One-click role switcher for offline UI demos.
@@ -21,6 +22,7 @@ export default function DemoLoginPanel({ filter }) {
   const [session, setSession] = useState(() =>
     typeof window !== "undefined" ? getSession() : null
   );
+  const [signOutOpen, setSignOutOpen] = useState(false);
 
   useEffect(() => {
     setSession(getSession());
@@ -63,16 +65,22 @@ export default function DemoLoginPanel({ filter }) {
           </span>
           <button
             type="button"
-            onClick={() => {
-              clearSession();
-              navigate(0);
-            }}
+            onClick={() => setSignOutOpen(true)}
             className="shrink-0 text-amber-200/90 hover:text-amber-100 underline-offset-2 hover:underline"
           >
             Sign out
           </button>
         </div>
       )}
+      <SignOutConfirm
+        open={signOutOpen}
+        onCancel={() => setSignOutOpen(false)}
+        onConfirm={() => {
+          setSignOutOpen(false);
+          clearSession();
+          navigate(0);
+        }}
+      />
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {users.map((u) => (
           <button
