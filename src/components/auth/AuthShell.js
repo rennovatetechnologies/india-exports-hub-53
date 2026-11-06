@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ShieldCheck, Globe2, Sparkles } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function AuthShell({ title, subtitle, footer, children }) {
   return (
@@ -61,6 +62,7 @@ export default function AuthShell({ title, subtitle, footer, children }) {
               <div className="absolute -inset-px rounded-[28px] bg-gradient-to-br from-[var(--gold)]/40 via-white/10 to-emerald-400/20 opacity-60 blur-xl" />
               <div className="glass-card relative p-7 sm:p-8">
                 <div className="text-center">
+                  <BrandLogo className="mx-auto mb-4 h-16 w-auto" alt="VIRASTRA by New India Export" />
                   <span className="inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-white/70">
                     <span className="h-1.5 w-1.5 rounded-full bg-[var(--gold)]" /> VIRASTRA by New India Export Account
                   </span>

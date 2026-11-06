@@ -16,6 +16,7 @@ import {
   Sparkles,
   CheckCircle2,
 } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function Hero() {
   const [open, setOpen] = useState(false);
@@ -62,6 +63,7 @@ export default function Hero() {
           <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
             {/* Left: headline on hero art */}
             <div className={featured ? "lg:col-span-7" : "lg:col-span-12"}>
+              <BrandLogo className="mb-5 h-24 w-auto sm:h-28" alt="VIRASTRA by New India Export" />
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}

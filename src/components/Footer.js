@@ -6,6 +6,7 @@ import { useLocation } from "react-router-dom";
 import { PRODUCT_CATEGORIES } from "@/lib/siteNav";
 import { PATHS } from "@/lib/routes";
 import { getSupportEmail, getSupportWhatsAppDisplay, getSupportWhatsAppUrl } from "@/lib/appConfig";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function Footer() {
   const pathname = useLocation().pathname;
@@ -32,7 +33,8 @@ export default function Footer() {
         <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8 py-16">
           <div className="grid gap-12 lg:grid-cols-12">
             <div className="lg:col-span-5">
-              <Link to={PATHS.home} className="inline-flex items-center gap-2">
+              <Link to={PATHS.home} className="inline-flex flex-col items-start gap-3">
+                <BrandLogo className="h-16 w-auto sm:h-20" alt="VIRASTRA by New India Export" />
                 <span className="text-2xl font-semibold tracking-tight">
                   VIRASTRA by New India Export
                 </span>

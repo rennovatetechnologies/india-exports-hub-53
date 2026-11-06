@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ShieldCheck, Lock, Activity } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function AdminAuthShell({ title, subtitle, badge = "Internal portal", footer, children }) {
   return (
@@ -54,6 +55,7 @@ export default function AdminAuthShell({ title, subtitle, badge = "Internal port
             <div className="absolute -inset-px rounded-[28px] bg-gradient-to-br from-cyan-400/30 via-white/10 to-emerald-300/20 opacity-50 blur-xl" />
             <div className="relative rounded-[26px] border border-white/10 bg-[#0a0d14]/85 p-7 backdrop-blur-xl shadow-[0_30px_60px_-30px_rgba(0,0,0,0.8)] sm:p-8">
               <div className="text-center">
+                <BrandLogo className="mx-auto mb-4 h-16 w-auto" alt="VIRASTRA by New India Export" />
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-white/65">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" /> {badge}
                 </span>

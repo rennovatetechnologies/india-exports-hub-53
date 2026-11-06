@@ -17,6 +17,7 @@ import {
   eventModeLabel,
 } from "@/lib/eventsCatalog";
 import { formatInr } from "@/lib/planCatalog";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function EventPage() {
   const [events, setEvents] = useState([]);
@@ -45,6 +46,7 @@ export default function EventPage() {
       <section className="relative overflow-hidden px-5 pb-12 pt-28 sm:px-6 lg:px-8">
         <div className="absolute inset-0 -z-10 bg-mesh opacity-40" />
         <div className="mx-auto max-w-7xl">
+          <BrandLogo className="mb-5 h-20 w-auto sm:h-24" alt="VIRASTRA by New India Export" />
           <span className="inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white/70">
             <Sparkles size={12} className="text-[var(--gold)]" /> Events
           </span>

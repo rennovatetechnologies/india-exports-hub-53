@@ -3,6 +3,7 @@ import { Phone, Mail, MapPin, Send } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getSupportEmail, getSupportWhatsAppDisplay, getSupportWhatsAppUrl } from "@/lib/appConfig";
+import BrandLogo from "@/components/BrandLogo";
 
 const inputCls =
   "rounded-xl border border-white/10 bg-white/[0.04] text-white placeholder:text-white/35 px-4 py-3 focus:ring-2 focus:ring-[var(--gold)]/40 outline-none transition";
@@ -45,6 +46,7 @@ export default function ContactPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/70 via-transparent to-[var(--background)]/80" />
         <div className="relative z-10 text-white px-4 mt-6 sm:mt-8">
           <div className="inline-block mb-4">
+            <BrandLogo className="mx-auto mb-4 h-16 w-auto sm:h-20" alt="VIRASTRA by New India Export" />
             <div className="w-20 h-1 bg-[var(--gold)] mx-auto mb-3" />
             <h1 className="text-4xl sm:text-6xl font-bold mb-3 tracking-tight text-white">
               Contact Us

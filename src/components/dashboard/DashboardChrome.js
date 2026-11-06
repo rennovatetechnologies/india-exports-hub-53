@@ -19,6 +19,7 @@ import { DASHBOARD_EXPLORE_LINKS } from "@/lib/siteNav";
 import { PATHS } from "@/lib/routes";
 import { api } from "@/lib/api";
 import SignOutConfirm from "@/components/auth/SignOutConfirm";
+import BrandLogo from "@/components/BrandLogo";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -304,9 +305,7 @@ export default function DashboardChrome({ children }) {
         className="flex items-center gap-2 rounded-xl -mx-1 px-1 py-1 transition hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
         aria-label="Dashboard home"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--grad-gold)] text-black font-bold">
-          V
-        </span>
+        <BrandLogo className="h-11 w-11 shrink-0" />
         <div className="leading-tight">
           <div className="text-sm font-semibold">VIRASTRA by New India Export</div>
         </div>
@@ -451,6 +450,9 @@ export default function DashboardChrome({ children }) {
               <Menu size={18} />
             </button>
 
+            <Link to={homePath} className="flex min-w-0 items-center gap-2 lg:hidden" aria-label="VIRASTRA by New India Export">
+              <BrandLogo className="h-9 w-9 shrink-0" />
+            </Link>
             <div className="flex-1" />
 
             <button

@@ -15,6 +15,7 @@ import {
   ROLES,
 } from "@/lib/authSession";
 import SignOutConfirm from "@/components/auth/SignOutConfirm";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -194,7 +195,8 @@ export default function Navbar() {
               className="flex shrink-0 items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-md"
               aria-label="VIRASTRA by New India Export Home"
             >
-              <span className="text-xs sm:text-sm md:text-base font-semibold tracking-tight text-gold-gradient leading-tight">
+              <BrandLogo className="h-9 w-auto sm:h-11" />
+              <span className="hidden xl:inline text-sm font-semibold tracking-tight text-gold-gradient leading-tight">
                 VIRASTRA by New India Export
               </span>
             </Link>

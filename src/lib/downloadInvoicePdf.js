@@ -2,8 +2,8 @@ import { jsPDF } from "jspdf";
 import { formatInr } from "@/lib/planCatalog";
 import { getSellerAddressBlock, INVOICE_SELLER } from "@/lib/invoice";
 
-export const BRAND_LOGO_SRC = "/Logo.png";
-const LOGO_ASPECT = 638 / 1820;
+export const BRAND_LOGO_SRC = "/logo.png";
+const LOGO_ASPECT = 810 / 1219;
 
 function formatDate(iso) {
   if (!iso) return "—";
@@ -78,7 +78,7 @@ export async function downloadInvoicePdf(invoice) {
   const address = getSellerAddressBlock();
 
   if (logo?.dataUrl) {
-    const logoW = 176;
+    const logoW = 110;
     const logoH = logoW * (logo.height && logo.width ? logo.height / logo.width : LOGO_ASPECT);
     doc.addImage(logo.dataUrl, "PNG", margin, y - 8, logoW, logoH);
     y += logoH + 6;

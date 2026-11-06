@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Link, useLocation } from "react-router-dom";
 import { Globe, Star, Leaf, Handshake, Package } from "lucide-react";
 import { PATHS } from "@/lib/routes";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function AboutPage() {
   const { pathname } = useLocation();
@@ -27,6 +28,7 @@ export default function AboutPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/70 via-transparent to-[var(--background)]/80" />
         <div className="relative z-10 text-white px-4 mt-6 sm:mt-8">
           <div className="inline-block mb-4">
+            <BrandLogo className="mx-auto mb-4 h-20 w-auto sm:h-24" alt="VIRASTRA by New India Export" />
             <div className="w-20 h-1 bg-[var(--gold)] mx-auto mb-3" />
             <h1 className="text-4xl sm:text-6xl font-bold mb-3 tracking-tight text-white">
               About Virastra

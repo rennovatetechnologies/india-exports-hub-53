@@ -127,7 +127,7 @@ export default function InvoiceModal({ invoice, open, onClose, emailNotice = fal
                   <img
                     src={BRAND_LOGO_SRC}
                     alt="VIRASTRA by New India Export"
-                    className="mt-2 h-14 w-auto max-w-[220px] object-contain object-left sm:h-16"
+                    className="mt-2 h-20 w-auto max-w-[140px] object-contain object-left sm:h-24"
                   />
                   <h2 id="invoice-title" className="mt-3 text-base font-semibold tracking-tight sm:text-lg">
                     {seller?.legalName || "New India Export"}
