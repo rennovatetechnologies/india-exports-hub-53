@@ -1,0 +1,17 @@
+---
+description: Rebuild and commit dist before every frontend push so Railway does not serve a stale bundle
+alwaysApply: true
+---
+
+# Rebuild dist before push
+
+Railway serves the committed `dist/` folder. A source-only push leaves the live site on the old bundle and the old `logo.png`.
+
+When this repo’s source, `public/`, or `index.html` has changed and the work is being committed or pushed:
+
+1. Run `npm run build` in `india-exports-hub-53`.
+2. Stage the rebuilt `dist/` (new hashed assets, deleted old assets, `dist/index.html`, and copied public files such as `dist/logo.png`).
+3. Commit the source and that `dist/` together.
+4. Push that commit. Do not push source without the matching production bundle.
+
+`nixpacks.toml` and `scripts/serve-spa.mjs` are not a substitute. The live site has served a stale committed `dist/` after a source-only deploy.
