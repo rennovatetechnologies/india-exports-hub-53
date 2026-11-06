@@ -7,6 +7,7 @@ import { issueInvoiceForPayment } from "@/lib/invoice";
 import InvoiceModal from "@/components/InvoiceModal";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 import { razorpayCheckoutKey } from "@/components/PayButton";
+import { showPaymentAssurance } from "@/components/paymentAssurance";
 
 export default function BookingModal({ open, setOpen }) {
   const [step, setStep] = useState(0);
@@ -123,7 +124,7 @@ export default function BookingModal({ open, setOpen }) {
         description: `Booking for ${form.category}`,
         order_id: order.id,
         handler: async function (response) {
-          // 3. Verify Payment via API
+          try { rzp.close(); } catch (_) {}
           const verifyRes = await fetch("/api/verify-payment", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -136,7 +137,11 @@ export default function BookingModal({ open, setOpen }) {
 
           const verifyData = await verifyRes.json();
           if (verifyData.success) {
-            // 4. Persist booking server-side (replaces Web3Forms)
+            showPaymentAssurance({
+              outcome: "received",
+              amountInr: 100,
+              description: `Booking for ${form.category}`,
+            });
             const bookingPayload = {
               shipment: form.shipment,
               category: form.category,
@@ -209,7 +214,13 @@ export default function BookingModal({ open, setOpen }) {
 
       const rzp = new window.Razorpay(options);
       rzp.on('payment.failed', function (){
-        setPayError(USER_MESSAGES.payment);
+        try { rzp.close(); } catch (_) {}
+        showPaymentAssurance({
+          outcome: "failed",
+          amountInr: 100,
+          description: `Booking for ${form.category}`,
+        });
+        setPayError(USER_MESSAGES.paymentReversal);
         setIsSubmitting(false);
       });
       rzp.open();

@@ -9,6 +9,7 @@ import { issueInvoiceForPayment } from "@/lib/invoice";
 import InvoiceModal from "@/components/InvoiceModal";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 import { razorpayCheckoutKey } from "@/components/PayButton";
+import { showPaymentAssurance } from "@/components/paymentAssurance";
 
 const WORKSHOP_AMOUNT_INR = 6399;
 
@@ -78,6 +79,7 @@ export default function EventBookingModal({ open, setOpen }) {
         description: "Virtual Shipment Workshop (5 Days)",
         order_id: order.id,
         handler: async function (response) {
+          try { rzp.close(); } catch (_) {}
           const verifyRes = await fetch("/api/verify-payment", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -90,6 +92,11 @@ export default function EventBookingModal({ open, setOpen }) {
 
           const verifyData = await verifyRes.json();
           if (verifyData.success) {
+            showPaymentAssurance({
+              outcome: "received",
+              amountInr: WORKSHOP_AMOUNT_INR,
+              description: "Virtual Shipment Workshop (5 Days)",
+            });
             try {
               await fetch("/api/workshops/virtual-shipment/register", {
                 method: "POST",
@@ -138,7 +145,13 @@ export default function EventBookingModal({ open, setOpen }) {
 
       const rzp = new window.Razorpay(options);
       rzp.on("payment.failed", function () {
-        setPayError(USER_MESSAGES.payment);
+        try { rzp.close(); } catch (_) {}
+        showPaymentAssurance({
+          outcome: "failed",
+          amountInr: WORKSHOP_AMOUNT_INR,
+          description: "Virtual Shipment Workshop (5 Days)",
+        });
+        setPayError(USER_MESSAGES.paymentReversal);
         setIsSubmitting(false);
       });
       rzp.open();

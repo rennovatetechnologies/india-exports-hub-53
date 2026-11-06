@@ -14,7 +14,8 @@ export const USER_MESSAGES = {
   tooLarge: "That file is too large. Try a smaller one.",
   tooMany: "Too many attempts. Please wait a moment and try again.",
   unavailable: "This is temporarily unavailable. Please try again shortly.",
-  payment: "We couldn't complete the payment. No charge was made — you can try again.",
+  payment: "We couldn't complete the payment. If your bank deducted the money, it is credited back within 5–7 business days.",
+  paymentReversal: "This payment did not go through, so access was not activated. If your bank or UPI app already deducted the money, it is credited back to the same account within 5–7 business days.",
   paymentCancelled: "Payment was cancelled. You can try again when you're ready.",
   paymentVerify: "We received your payment but couldn't confirm it. Contact support if you were charged.",
   save: "We couldn't save that. Please try again.",
@@ -107,6 +108,7 @@ function looksLikePayment(text, fallback) {
 export function toUserMessage(err, fallback = USER_MESSAGES.generic) {
   const status = Number(err?.status || err?.statusCode || err?.response?.status) || 0;
   const raw = extractErrorText(err);
+  if (err?.code === "payment_failed_reversal") return USER_MESSAGES.paymentReversal;
   const known = KNOWN_RAW[raw.toLowerCase()];
   if (known) return known;
 

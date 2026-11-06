@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 import { apiUrl } from "@/lib/apiBase";
+import { showPaymentAssurance } from "@/components/paymentAssurance";
 
 /**
  * Key that created the order must open Checkout.
@@ -106,6 +107,35 @@ export async function startRazorpayCheckout(opts) {
     }
 
     await new Promise((resolve, reject) => {
+      let settled = false;
+      let poll = 0;
+      let rzp = null;
+
+      const stopWatching = () => {
+        if (poll) window.clearInterval(poll);
+        poll = 0;
+        try { rzp?.close(); } catch (_) {}
+      };
+
+      const failPayment = () => {
+        if (settled) return;
+        settled = true;
+        stopWatching();
+        showPaymentAssurance({ outcome: "failed", amountInr, description });
+        const err = new Error(USER_MESSAGES.paymentReversal);
+        err.code = "payment_failed_reversal";
+        reject(err);
+      };
+
+      const acceptPayment = (result) => {
+        if (settled) return;
+        settled = true;
+        stopWatching();
+        showPaymentAssurance({ outcome: "received", amountInr, description });
+        onSuccess?.({ ...result, planId, amountInr });
+        resolve(result);
+      };
+
       const options = {
         key,
         amount: order.amount,
@@ -113,12 +143,16 @@ export async function startRazorpayCheckout(opts) {
         name: "VIRASTRA by New India Export",
         description,
         order_id: order.id,
+        retry: { enabled: false },
         prefill: {
           name: customer.name || "",
           email: customer.email || "",
           contact: customer.contact || customer.phone || "",
         },
         handler: async function (response) {
+          if (settled) return;
+          settled = true;
+          stopWatching();
           try {
             const verifyRes = await fetch(apiUrl("/api/verify-payment"), {
               method: "POST",
@@ -132,6 +166,7 @@ export async function startRazorpayCheckout(opts) {
             if (!verifyRes.ok || result.success === false) {
               throw new Error(toUserMessage({ message: result.message, status: verifyRes.status }, USER_MESSAGES.paymentVerify));
             }
+            showPaymentAssurance({ outcome: "received", amountInr, description });
             onSuccess?.({ ...result, ...response, planId, amountInr });
             resolve(result);
           } catch (err) {
@@ -139,22 +174,36 @@ export async function startRazorpayCheckout(opts) {
           }
         },
         modal: {
-          ondismiss: () => reject(new Error(USER_MESSAGES.paymentCancelled)),
+          ondismiss: () => {
+            if (settled) return;
+            settled = true;
+            if (poll) window.clearInterval(poll);
+            reject(new Error(USER_MESSAGES.paymentCancelled));
+          },
         },
       };
 
-      const rzp = new window.Razorpay(options);
-      rzp.on("payment.failed", (response) => {
-        reject(
-          new Error(
-            toUserMessage(
-              { message: response?.error?.description },
-              USER_MESSAGES.payment
-            )
-          )
-        );
+      rzp = new window.Razorpay(options);
+      rzp.on("payment.failed", () => {
+        failPayment();
       });
       rzp.open();
+
+      if (token && order.id) {
+        poll = window.setInterval(async () => {
+          if (settled) return;
+          try {
+            const statusRes = await fetch(
+              apiUrl(`/api/payments/checkout-status?orderId=${encodeURIComponent(order.id)}`),
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            const body = await statusRes.json().catch(() => ({}));
+            const status = body?.data?.status;
+            if (status === "paid") acceptPayment(body.data);
+            else if (status === "failed" || status === "refunded") failPayment();
+          } catch (_) {}
+        }, 4000);
+      }
     });
   } catch (err) {
     const friendly = new Error(toUserMessage(err, USER_MESSAGES.payment));
