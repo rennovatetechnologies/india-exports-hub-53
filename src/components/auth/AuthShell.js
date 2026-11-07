@@ -6,8 +6,17 @@ import BrandLogo from "@/components/BrandLogo";
 export default function AuthShell({ title, subtitle, footer, children }) {
   return (
     <section className="relative min-h-[100svh] overflow-hidden pt-28 pb-16 flex items-center">
-      <div className="absolute inset-0 -z-10 bg-mesh opacity-60" />
-      <div className="absolute inset-0 -z-10 grid-bg" />
+      <div className="absolute inset-0 -z-10">
+        <img
+          src="/background2.jpeg"
+          alt=""
+          aria-hidden="true"
+          className="h-full w-full object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-[var(--background)]/82" />
+        <div className="absolute inset-0 bg-mesh opacity-40" />
+        <div className="absolute inset-0 grid-bg" />
+      </div>
       <div className="pointer-events-none absolute -top-40 -left-32 h-[460px] w-[460px] rounded-full bg-[var(--gold)]/15 blur-3xl" />
       <div className="pointer-events-none absolute bottom-0 -right-32 h-[420px] w-[420px] rounded-full bg-emerald-400/10 blur-3xl" />
 

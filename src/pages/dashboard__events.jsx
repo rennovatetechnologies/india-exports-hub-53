@@ -63,7 +63,7 @@ const emptyDraft = () => ({
   startDate: "",
   endDate: "",
   city: "",
-  img: "/event.png",
+  img: "/background2.jpeg",
   capacity: 50,
   desc: "",
   priceInr: 0,
@@ -825,7 +825,7 @@ function AdminEventsEditor() {
                     loading="lazy"
                     className="absolute inset-0 h-full w-full object-cover"
                     onError={(e) => {
-                      e.currentTarget.src = "/event.png";
+                      e.currentTarget.src = "/background2.jpeg";
                     }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
@@ -1345,7 +1345,7 @@ function CustomerEvents() {
                   loading="lazy"
                   className="absolute inset-0 h-full w-full object-cover"
                   onError={(e) => {
-                    e.currentTarget.src = "/event.png";
+                    e.currentTarget.src = "/background2.jpeg";
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />

@@ -7,6 +7,13 @@ export default function AdminAuthShell({ title, subtitle, badge = "Internal port
   return (
     <section className="relative min-h-[100svh] overflow-hidden bg-[#05060a] text-white flex items-center py-16">
       <div className="pointer-events-none absolute inset-0">
+        <img
+          src="/background1.jpeg"
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-[#05060a]/86" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(56,189,248,0.10),transparent_55%),radial-gradient(circle_at_85%_80%,rgba(244,180,0,0.08),transparent_55%)]" />
         <div className="absolute inset-0 [background-image:linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:42px_42px] opacity-40" />
       </div>

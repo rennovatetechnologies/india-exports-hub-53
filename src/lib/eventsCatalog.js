@@ -5,9 +5,8 @@ import { allowAuthMock } from "@/lib/authSession";
 import { toUserMessage, USER_MESSAGES } from "@/lib/friendlyError";
 
 export const EVENT_IMAGE_OPTIONS = [
-  { value: "/event.png", label: "Conference hall" },
-  { value: "/event2.webp", label: "Summit / expo" },
-  { value: "/Hero.jpg", label: "Trade floor" },
+  { value: "/background1.jpeg", label: "Containers" },
+  { value: "/background2.jpeg", label: "Port terminal" },
   { value: "/gallery/GulfFood.jpg", label: "Gulf Food" },
   { value: "/gallery/WTC2023.jpg", label: "WTC 2023" },
   { value: "/gallery/MumbaiWTC.jpg", label: "Mumbai WTC" },
@@ -33,7 +32,7 @@ export function resolveEventImage(raw) {
   const img = String(raw || "").trim();
   if (ALLOWED_EVENT_IMAGES.has(img)) return img;
   if (img.startsWith("/") || img.startsWith("http")) return img;
-  return "/event.png";
+  return "/background2.jpeg";
 }
 
 export const DEFAULT_EVENTS = [];

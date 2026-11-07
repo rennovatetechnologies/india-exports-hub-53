@@ -61,14 +61,15 @@ Available in multiple varieties — long, round, and striped.`,
       {/* ==== HEADER SECTION ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
         <img
-          src="/Hero.jpg"
+          src="/background2.jpeg"
           alt="Fruits and Vegetables"
           loading="eager"
           decoding="async"
-          className="absolute inset-0 h-full w-full object-cover brightness-75 blur-[2px]"
+          className="absolute inset-0 h-full w-full object-cover object-center"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/70 via-transparent to-[var(--background)]/80" />
+        <div className="absolute inset-0 bg-black/45" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/25 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/75 via-transparent to-[var(--background)]/85" />
         <div className="relative z-10 text-white px-6 mt-6 sm:mt-8">
           <div className="inline-block mb-6">
             <div className="w-20 h-1 bg-[var(--gold)] mx-auto mb-4" />

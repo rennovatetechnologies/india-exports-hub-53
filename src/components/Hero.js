@@ -46,9 +46,9 @@ export default function Hero() {
         {/* Full-bleed hero photo + overlays (headline sits on the image) */}
         <div className="pointer-events-none absolute inset-0 z-0">
           <img
-            src="/Hero.jpg"
+            src="/background2.jpeg"
             alt="Virastra by New India Export — Where Trust Travels, taking India's Products Everywhere"
-            className="h-full w-full object-cover opacity-[0.42] sm:opacity-[0.38]"
+            className="h-full w-full object-cover object-center opacity-[0.42] sm:opacity-[0.38]"
           />
           <div className="absolute inset-0 bg-mesh" />
           <div className="absolute inset-0 grid-bg" />

@@ -54,12 +54,13 @@ Country: ${country}`;
     <div className="min-h-screen text-[var(--foreground)]">
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
         <img
-          src="/Hero.jpg"
+          src="/background1.jpeg"
           alt="Booking Header"
-          className="absolute inset-0 h-full w-full object-cover brightness-75 blur-[2px]"
+          className="absolute inset-0 h-full w-full object-cover scale-105"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/40 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/70 via-transparent to-[var(--background)]/80" />
+        <div className="absolute inset-0 bg-black/45" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/25 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/75 via-transparent to-[var(--background)]/85" />
         <div className="relative z-10 text-white px-6 mt-6 sm:mt-8">
           <h1 className="text-5xl sm:text-7xl font-bold tracking-tight">Book Shipment</h1>
           <p className="max-w-2xl mx-auto text-white/80 text-lg sm:text-xl font-light tracking-wide mt-4">
