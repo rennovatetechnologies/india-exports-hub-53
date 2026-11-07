@@ -29,15 +29,17 @@ export default function AboutShowcase() {
 
   return (
     <section className="relative w-full min-h-screen overflow-hidden flex items-center justify-center py-8 md:py-0">
-      {/* Background */}
+      {/* Background — shipping containers */}
       <img
-        src="/f.jpg"
-        alt="Background"
+        src="/background1.jpeg"
+        alt=""
+        aria-hidden="true"
         loading="eager"
         decoding="async"
-        className="absolute inset-0 h-full w-full min-h-full object-cover brightness-90"
+        className="absolute inset-0 h-full w-full min-h-full object-cover"
       />
-      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0 bg-black/50" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/40 via-transparent to-[var(--background)]/55" />
 
       {/* Content */}
       <div className="relative z-10 flex flex-col md:flex-row items-center justify-between w-[90%] max-w-6xl gap-6 md:gap-10">

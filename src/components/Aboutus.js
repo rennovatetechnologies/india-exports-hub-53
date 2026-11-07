@@ -12,7 +12,17 @@ const highlights = [
 export default function AboutUsSection() {
   return (
     <section className="relative py-24 sm:py-28 overflow-hidden">
-      <div className="absolute inset-0 -z-10 bg-mesh opacity-60" />
+      <div className="absolute inset-0 -z-10">
+        <img
+          src="/background2.jpeg"
+          alt=""
+          aria-hidden="true"
+          className="h-full w-full object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-[var(--background)]/78" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[var(--background)]/90 via-[var(--background)]/55 to-[var(--background)]/80" />
+        <div className="absolute inset-0 bg-mesh opacity-40" />
+      </div>
       <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
         <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
           <div className="lg:col-span-5">

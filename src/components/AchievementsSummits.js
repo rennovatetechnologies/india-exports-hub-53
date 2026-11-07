@@ -47,12 +47,13 @@ export default function AchievementsSummits() {
       {/* BACKGROUND IMAGE */}
       <div className="absolute inset-0 -z-10">
         <img
-          src="/bg.jpg"     // <-- change to whatever bg image you want
-          alt="background"
-          className="absolute inset-0 h-full w-full object-cover"
+          src="/background2.jpeg"
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover object-center"
         />
-        {/* Dark Blur Overlay */}
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+        <div className="absolute inset-0 bg-black/55" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--background)]/50 via-transparent to-[var(--background)]/70" />
       </div>
 
       <h2 className="text-4xl md:text-5xl font-bold text-white mb-12 drop-shadow-xl">
