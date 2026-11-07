@@ -2,22 +2,22 @@
 export const SITE_URL = "https://www.virastrainternationalexport.com";
 
 export const DEFAULT_SEO = {
-  title: "Virastra | New India Export | Indian Export Consultancy by Saurabh Yadav",
+  title: "Virastra | New India Export | Where Trust Travels",
   description:
-    "Virastra International Export (VIRASTRA by New India Export) is an Indian export consultancy and workflow platform founded by Saurabh Nathuram Yadav in Nagpur.",
+    "VIRASTRA by New India Export — premium export consultancy founded by Ms. Gayatri Sharma and Mr. Saurabh Nathuram Yadav. Where Trust Travels, taking India's Products Everywhere.",
 };
 
 const PAGE_SEO = {
   "/": DEFAULT_SEO,
   "/about": {
-    title: "About Virastra | New India Export & Founder Saurabh Yadav",
+    title: "About Virastra | Gayatri Sharma & Saurabh Yadav",
     description:
-      "About Virastra International Export and New India Export. Founded by Saurabh Nathuram Yadav to help Indian exporters ship spices, organic food, and farm products worldwide.",
+      "Our story: Ms. Gayatri Sharma, Founder of Virastra International Export, and Mr. Saurabh Nathuram Yadav, Director of New India Export — bridging Indian suppliers with global demand.",
   },
   "/contact": {
     title: "Contact Virastra | New India Export, Nagpur",
     description:
-      "Contact Virastra by New India Export in Nagpur. Talk to Saurabh Yadav’s export desk about plans, KYC, and shipping from India.",
+      "Contact VIRASTRA by New India Export in Nagpur — WhatsApp, call, or email about plans, KYC, and shipping from India.",
   },
   "/events": {
     title: "Export Events | Virastra by New India Export",

@@ -5,13 +5,15 @@ import { api } from "@/lib/api";
 let cached = null;
 let inflight = null;
 
-const FALLBACK_WHATSAPP = "9967084149";
+const FALLBACK_WHATSAPP = "6396515115";
+const FALLBACK_PHONE = "9967084149";
 
 const FALLBACK = {
   razorpayKeyId: import.meta.env.VITE_RAZORPAY_KEY_ID || "",
   appName: "VIRASTRA by New India Export",
-  supportEmail: "support@virastrainternationalexport.com",
+  supportEmail: "Virastrabynie@gmail.com",
   supportWhatsApp: FALLBACK_WHATSAPP,
+  supportPhone: FALLBACK_PHONE,
   gstRate: 0.18,
   seller: {
     legalName: "New India Export",
@@ -28,6 +30,19 @@ const FALLBACK = {
   },
 };
 
+function normalizeIndiaMobile(raw, fallback) {
+  const d = String(raw || "").replace(/\D/g, "");
+  if (d.length === 12 && d.startsWith("91")) return d.slice(2);
+  if (d.length >= 10) return d.slice(-10);
+  return fallback;
+}
+
+function formatIndiaMobileDisplay(digits) {
+  const d = String(digits || "");
+  if (d.length !== 10) return d ? `+91 ${d}` : "";
+  return `+91 ${d.slice(0, 5)} ${d.slice(5)}`;
+}
+
 function normalize(raw) {
   const d = raw?.data && typeof raw.data === "object" ? { ...raw, ...raw.data } : raw || {};
   const gstRate = Number(d.gstRate);
@@ -35,7 +50,11 @@ function normalize(raw) {
     razorpayKeyId: String(d.razorpayKeyId || FALLBACK.razorpayKeyId || ""),
     appName: String(d.appName || FALLBACK.appName),
     supportEmail: String(d.supportEmail || FALLBACK.supportEmail),
-    supportWhatsApp: normalizeWhatsAppDigits(d.supportWhatsApp || FALLBACK.supportWhatsApp),
+    supportWhatsApp: normalizeIndiaMobile(d.supportWhatsApp || FALLBACK.supportWhatsApp, FALLBACK_WHATSAPP),
+    supportPhone: normalizeIndiaMobile(
+      d.supportPhone || d.supportCall || FALLBACK.supportPhone,
+      FALLBACK_PHONE
+    ),
     gstRate: Number.isFinite(gstRate) && gstRate >= 0 ? gstRate : FALLBACK.gstRate,
     seller: {
       legalName: d.seller?.legalName || FALLBACK.seller.legalName,
@@ -61,16 +80,9 @@ export function getSupportEmail() {
   return getCachedPublicConfig().supportEmail || FALLBACK.supportEmail;
 }
 
-function normalizeWhatsAppDigits(raw) {
-  const d = String(raw || "").replace(/\D/g, "");
-  if (d.length === 12 && d.startsWith("91")) return d.slice(2);
-  if (d.length >= 10) return d.slice(-10);
-  return FALLBACK_WHATSAPP;
-}
-
-/** 10-digit India mobile used for public WhatsApp / phone. */
+/** 10-digit India mobile used for public WhatsApp. */
 export function getSupportWhatsAppDigits() {
-  return normalizeWhatsAppDigits(getCachedPublicConfig().supportWhatsApp);
+  return normalizeIndiaMobile(getCachedPublicConfig().supportWhatsApp, FALLBACK_WHATSAPP);
 }
 
 /** wa.me / E.164 without plus: 91XXXXXXXXXX */
@@ -78,16 +90,29 @@ export function getSupportWhatsAppE164() {
   return `91${getSupportWhatsAppDigits()}`;
 }
 
-/** Display: +91 99670 84149 */
+/** Display: +91 63965 15115 */
 export function getSupportWhatsAppDisplay() {
-  const d = getSupportWhatsAppDigits();
-  return `+91 ${d.slice(0, 5)} ${d.slice(5)}`;
+  return formatIndiaMobileDisplay(getSupportWhatsAppDigits());
 }
 
 export function getSupportWhatsAppUrl(text) {
   const base = `https://wa.me/${getSupportWhatsAppE164()}`;
   if (!text) return base;
   return `${base}?text=${encodeURIComponent(text)}`;
+}
+
+/** 10-digit India mobile used for voice calls. */
+export function getSupportPhoneDigits() {
+  return normalizeIndiaMobile(getCachedPublicConfig().supportPhone, FALLBACK_PHONE);
+}
+
+/** Display: +91 99670 84149 */
+export function getSupportPhoneDisplay() {
+  return formatIndiaMobileDisplay(getSupportPhoneDigits());
+}
+
+export function getSupportPhoneTelUrl() {
+  return `tel:+91${getSupportPhoneDigits()}`;
 }
 
 export function getGstRate() {

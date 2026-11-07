@@ -1,8 +1,14 @@
 import { motion } from "framer-motion";
-import { Phone, Mail, MapPin, Send } from "lucide-react";
+import { Phone, Mail, MapPin, Send, MessageCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { getSupportEmail, getSupportWhatsAppDisplay, getSupportWhatsAppUrl } from "@/lib/appConfig";
+import {
+  getSupportEmail,
+  getSupportPhoneDisplay,
+  getSupportPhoneTelUrl,
+  getSupportWhatsAppDisplay,
+  getSupportWhatsAppUrl,
+} from "@/lib/appConfig";
 import BrandLogo from "@/components/BrandLogo";
 
 const inputCls =
@@ -88,9 +94,9 @@ export default function ContactPage() {
                 </p>
               </div>
               <div className="flex items-center gap-4">
-                <Phone className="text-[var(--gold)] w-6 h-6 shrink-0" />
+                <MessageCircle className="text-emerald-300 w-6 h-6 shrink-0" />
                 <p className="text-lg">
-                  <span className="font-semibold text-white">Phone:</span>{" "}
+                  <span className="font-semibold text-white">WhatsApp:</span>{" "}
                   <a
                     href={getSupportWhatsAppUrl()}
                     target="_blank"
@@ -98,6 +104,15 @@ export default function ContactPage() {
                     className="text-[var(--gold)] font-medium"
                   >
                     {getSupportWhatsAppDisplay()}
+                  </a>
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <Phone className="text-[var(--gold)] w-6 h-6 shrink-0" />
+                <p className="text-lg">
+                  <span className="font-semibold text-white">Call:</span>{" "}
+                  <a href={getSupportPhoneTelUrl()} className="text-[var(--gold)] font-medium">
+                    {getSupportPhoneDisplay()}
                   </a>
                 </p>
               </div>

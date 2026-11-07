@@ -4,6 +4,7 @@
  */
 
 import { api } from "@/lib/api";
+import { apiUrl } from "@/lib/apiBase";
 import { PATHS } from "@/lib/routes";
 
 const STORAGE_KEY = "vistara_brochures_catalog";
@@ -47,12 +48,26 @@ function openDb() {
 }
 
 function brochureFilePath(id) {
-  return `/api/brochures/${encodeURIComponent(id)}/file`;
+  // Must be absolute in production — relative /api/* on the SPA host returns index.html.
+  return apiUrl(`/api/brochures/${encodeURIComponent(id)}/file`);
+}
+
+function toAbsoluteApiPath(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/api/")) return apiUrl(s);
+  return s;
 }
 
 function isApiFilePath(raw) {
   const s = String(raw || "");
-  return s.startsWith("/api/") || s.includes("/api/files/") || s.includes("/api/brochures/");
+  return (
+    s.startsWith("/api/") ||
+    /^https?:\/\/[^/]+\/api\//i.test(s) ||
+    s.includes("/api/files/") ||
+    s.includes("/api/brochures/")
+  );
 }
 
 function normalizeBrochure(row) {
@@ -64,6 +79,7 @@ function normalizeBrochure(row) {
   let path = String(row.path || row.fileUrl || "").trim();
   const hasBackendFile = Boolean(row.fileId || row.driveFileId || row.hasFile);
   if (hasBackendFile) path = brochureFilePath(id);
+  else path = toAbsoluteApiPath(path);
   // IndexedDB blobs are local-only; backend files always use the public API path.
   const hasBlob = Boolean(row.hasBlob) && !isApiFilePath(path);
   if (!path && !hasBlob) return null;
@@ -275,7 +291,7 @@ export async function deleteBrochureBlob(id) {
 
 function displayPath(item) {
   if (!item) return null;
-  if (item.path && isApiFilePath(item.path)) return item.path;
+  if (item.path && isApiFilePath(item.path)) return toAbsoluteApiPath(item.path);
   if (item.path) return encodeURI(item.path);
   return brochureFilePath(item.id);
 }
@@ -283,7 +299,7 @@ function displayPath(item) {
 /** Resolve a display/download URL (API stream, static path, or object URL). Caller must revoke object URLs. */
 export async function resolveBrochureUrl(item) {
   if (!item) return null;
-  if (item.path && isApiFilePath(item.path)) return item.path;
+  if (item.path && isApiFilePath(item.path)) return toAbsoluteApiPath(item.path);
   if (item.hasBlob) {
     const blob = await getBrochureBlob(item.id);
     if (blob) return URL.createObjectURL(blob);
@@ -296,7 +312,7 @@ export async function resolveBrochureUrl(item) {
 /** Open PDF/image in a new tab (backend stream, static path, or uploaded blob). */
 export async function openBrochureItem(item) {
   if (!item) return;
-  const apiPath = item.path && isApiFilePath(item.path) ? item.path : null;
+  const apiPath = item.path && isApiFilePath(item.path) ? toAbsoluteApiPath(item.path) : null;
   if (apiPath) {
     window.open(apiPath, "_blank", "noopener,noreferrer");
     return;

@@ -5,6 +5,7 @@ import {
   openBrochureItem,
   loadBrochuresCatalog,
 } from "@/lib/brochuresCatalog";
+import { apiUrl } from "@/lib/apiBase";
 import { PATHS } from "@/lib/routes";
 import { isStaffSession, workspaceFor } from "@/lib/authSession";
 
@@ -119,7 +120,10 @@ export function dashboardPathForPublicUrl(pathnameWithSearchHash = "", session) 
 export async function openBrochureDownload(itemOrPath) {
   if (!itemOrPath) return;
   if (typeof itemOrPath === "string") {
-    window.open(encodeURI(itemOrPath), "_blank", "noopener,noreferrer");
+    const path = String(itemOrPath).trim();
+    // Relative /api/* on the SPA host returns index.html — send API paths to the backend origin.
+    const href = path.startsWith("/api/") ? apiUrl(path) : encodeURI(path);
+    window.open(href, "_blank", "noopener,noreferrer");
     return;
   }
   await openBrochureItem(itemOrPath);

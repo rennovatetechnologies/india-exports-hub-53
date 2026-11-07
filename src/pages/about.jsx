@@ -1,8 +1,16 @@
 import { motion } from "framer-motion";
 import { Link, useLocation } from "react-router-dom";
-import { Globe, Star, Leaf, Handshake, Package } from "lucide-react";
+import { Globe, Leaf, Handshake, Package } from "lucide-react";
 import { PATHS } from "@/lib/routes";
 import BrandLogo from "@/components/BrandLogo";
+
+const CORE_VALUES = [
+  "Quality First",
+  "Trust and Transparency",
+  "Customer-Centric Service",
+  "Global Mindset, Indian Roots",
+  "Long-Term Partnerships",
+];
 
 export default function AboutPage() {
   const { pathname } = useLocation();
@@ -17,11 +25,10 @@ export default function AboutPage() {
 
   return (
     <div className="flex flex-col min-h-screen text-[var(--foreground)]">
-      {/* ==== HEADER SECTION ==== */}
       <section className="relative w-full h-[50vh] sm:h-[60vh] flex items-center justify-center text-center overflow-hidden">
         <img
           src="/Hero.jpg"
-          alt="About Virastra International Export and New India Export, founded by Saurabh Yadav"
+          alt="About VIRASTRA by New India Export — Where Trust Travels"
           className="absolute inset-0 h-full w-full object-cover brightness-75 blur-[2px]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/30 to-transparent" />
@@ -36,15 +43,13 @@ export default function AboutPage() {
             <div className="w-20 h-1 bg-[var(--gold)] mx-auto" />
           </div>
           <p className="max-w-2xl mx-auto text-base sm:text-lg font-light tracking-wide text-white/85">
-            New India Export — founded by Saurabh Yadav, delivering India’s quality worldwide
+            Where Trust Travels — taking India's Products Everywhere
           </p>
         </div>
       </section>
 
-      {/* ==== ABOUT SECTION ==== */}
       <section className="py-16 px-6">
         <div className="max-w-6xl mx-auto space-y-12">
-          {/* Intro */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -58,23 +63,17 @@ export default function AboutPage() {
               <span className="font-semibold text-[var(--gold)]">
                 VIRASTRA by New India Export
               </span>{" "}
-              (also known as Virastra, Virastra International, and New India Export)
-              focuses on exporting premium Indian products to customers all over
-              the world. We have built a strong, passionate team that works with
-              dedication and courage to fulfill the goals of our company.
+              is the premium consultancy and workflow platform for modern exporters,
+              founded by Ms. Gayatri Sharma of Virastra International Export and
+              Mr. Saurabh Nathuram Yadav of New India Export. Pick a plan, complete KYC,
+              and ship globally — DGFT, ICEGATE, AD code and compliance handled in one
+              elegant flow.
             </p>
             <p className="text-lg text-white/75 mt-4 leading-relaxed text-justify">
-              Our focus lies in maintaining excellence in{" "}
-              <span className="font-semibold text-emerald-300/95">
-                quality, quantity, variety, accuracy, and long-term relations.
-              </span>{" "}
-              All our products meet international and national quality
-              standards, reflecting the authenticity and richness of India’s
-              agricultural and organic heritage.
-            </p>
-            <p className="text-lg text-white/75 mt-4 leading-relaxed text-justify">
-              We aim to spread India’s diverse culture, taste, and quality
-              across the globe — building trust through every shipment we make.
+              <span className="font-semibold text-white">India's products. The world's shelves.</span>{" "}
+              Built on the principles of trust, quality, transparency, and sustainable
+              business growth, our platform aims to bridge the gap between India's rich
+              agricultural resources and the evolving needs of international buyers.
             </p>
           </motion.div>
 
@@ -85,65 +84,55 @@ export default function AboutPage() {
             className="glass-card p-8 sm:p-10"
           >
             <h2 className="text-3xl sm:text-4xl font-semibold text-white mb-6 text-center">
-              Founder — Saurabh Nathuram Yadav
+              Our Story
             </h2>
             <p className="text-lg text-white/75 leading-relaxed text-justify">
-              <span className="font-semibold text-white">Mr. Saurabh Nathuram Yadav</span>{" "}
-              (Saurabh Yadav) is the founder of Virastra International Export and
-              New India Export. With a vision to empower Indian farmers and grow
-              global agricultural trade, Saurabh leads Virastra’s export consultancy
-              from Nagpur — bridging local producers with international buyers.
+              <span className="font-semibold text-white">Ms. Gayatri Sharma</span>, Founder
+              of Virastra International Export, brings the vision and entrepreneurial
+              spirit behind Virastra. With a commitment to building dependable
+              international trade relationships, she contributes to the development of a
+              platform focused on quality-driven sourcing, professional service, and
+              global business opportunities for Indian and International products.
             </p>
             <p className="text-lg text-white/75 mt-4 leading-relaxed text-justify">
-              Under his leadership, Virastra and New India Export help clients export
-              spices, organic food, cereals, and farm products worldwide — with
-              quality, documentation, and long-term trust at the centre of every shipment.
+              <span className="font-semibold text-white">Mr. Saurabh Nathuram Yadav</span>{" "}
+              is the Director of New India Export. Driven by a vision to strengthen
+              India's agricultural export ecosystem, he is committed to connecting Indian
+              suppliers and producers with international buyers through reliable trade
+              practices, export support, and long-term commercial partnerships.
             </p>
           </motion.div>
 
-          {/* Vision + Values */}
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
             className="grid grid-cols-1 md:grid-cols-2 gap-8"
           >
-            {/* Left */}
             <div className="glass-card p-8">
               <h3 className="text-2xl font-semibold text-[var(--gold)] mb-4">
                 Our Vision
               </h3>
               <p className="text-white/75 text-lg leading-relaxed">
-                To create a strong and reliable platform in the{" "}
-                <span className="font-semibold text-white">Export-Import Community</span>,
-                representing the best of Indian agriculture, spices, and organic
-                excellence globally.
-              </p>
-              <p className="text-white/75 mt-3 text-lg leading-relaxed">
-                We believe that{" "}
-                <span className="font-semibold text-white">
-                  customer satisfaction is our greatest review,
-                </span>{" "}
-                and we strive to achieve it with every transaction.
+                To make International trade more accessible, transparent, and dependable
+                by connecting Indian suppliers with global demand, supporting efficient
+                export processes, and fostering partnerships built on integrity and
+                shared success.
               </p>
             </div>
 
-            {/* Right */}
             <div className="glass-card p-8">
               <h3 className="text-2xl font-semibold text-[var(--gold)] mb-4">
-                Our Core Values
+                Commitment to Core Values
               </h3>
               <ul className="list-disc list-inside text-white/75 text-lg space-y-2 marker:text-[var(--gold)]">
-                <li>No compromises on product quality</li>
-                <li>Building long-lasting client relationships</li>
-                <li>Timely supply and transparent services</li>
-                <li>Focus on organic and farm-fresh sourcing</li>
-                <li>Dedication to accuracy and trust</li>
+                {CORE_VALUES.map((value) => (
+                  <li key={value}>{value}</li>
+                ))}
               </ul>
             </div>
           </motion.div>
 
-          {/* Specialities */}
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -176,9 +165,9 @@ export default function AboutPage() {
                   title: "Quality & Service",
                   desc: "Committed to supply, quality, and customer trust.",
                 },
-              ].map((item, i) => (
+              ].map((item) => (
                 <motion.div
-                  key={i}
+                  key={item.title}
                   whileHover={{ y: -5 }}
                   className="flex flex-col items-center justify-center glass rounded-xl p-6 border border-white/10 hover:border-[var(--gold)]/25 transition-all"
                 >
@@ -190,35 +179,33 @@ export default function AboutPage() {
             </div>
           </motion.div>
 
-          {/* Product Buttons */}
           <motion.div
-  initial={{ opacity: 0, y: 40 }}
-  whileInView={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.8, delay: 0.4 }}
-  className="text-center px-4"
->
-  <h3 className="text-xl sm:text-2xl font-semibold text-white mb-5 sm:mb-6">
-    Explore Our Products
-  </h3>
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+            className="text-center px-4"
+          >
+            <h3 className="text-xl sm:text-2xl font-semibold text-white mb-5 sm:mb-6">
+              Explore Our Products
+            </h3>
 
-  <div className="grid grid-cols-2 sm:flex sm:flex-wrap justify-center gap-3 sm:gap-4">
-    {productLinks.map((btn, i) => (
-      <motion.div
-        key={i}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.97 }}
-      >
-        <Link
-          to={btn.link}
-          className="btn-gold block px-4 py-2.5 sm:px-6 sm:py-3 rounded-full text-sm sm:text-base font-medium text-center"
-        >
-          {btn.label}
-        </Link>
-      </motion.div>
-    ))}
-  </div>
-</motion.div>
-
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap justify-center gap-3 sm:gap-4">
+              {productLinks.map((btn) => (
+                <motion.div
+                  key={btn.label}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  <Link
+                    to={btn.link}
+                    className="btn-gold block px-4 py-2.5 sm:px-6 sm:py-3 rounded-full text-sm sm:text-base font-medium text-center"
+                  >
+                    {btn.label}
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
         </div>
       </section>
     </div>

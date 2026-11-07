@@ -47,7 +47,7 @@ export default function Hero() {
         <div className="pointer-events-none absolute inset-0 z-0">
           <img
             src="/Hero.jpg"
-            alt="Virastra by New India Export — Indian export consultancy founded by Saurabh Yadav"
+            alt="Virastra by New India Export — Where Trust Travels, taking India's Products Everywhere"
             className="h-full w-full object-cover opacity-[0.42] sm:opacity-[0.38]"
           />
           <div className="absolute inset-0 bg-mesh" />
@@ -80,9 +80,9 @@ export default function Hero() {
                 transition={{ duration: 0.7, delay: 0.05 }}
                 className="mt-6 text-[44px] leading-[1.05] tracking-tight font-semibold sm:text-6xl lg:text-7xl drop-shadow-[0_2px_24px_rgba(0,0,0,0.45)]"
               >
-                Virastra: export from India
+                Where Trust Travels,
                 <br />
-                <span className="text-aurora">to everywhere.</span>
+                <span className="text-aurora">taking India's Products Everywhere.</span>
               </motion.h1>
 
               <motion.p
@@ -92,7 +92,8 @@ export default function Hero() {
                 className="mt-6 max-w-xl text-base sm:text-lg text-white/75 leading-relaxed"
               >
                 VIRASTRA by New India Export is the premium consultancy and workflow
-                platform for modern exporters, founded by Saurabh Nathuram Yadav.
+                platform for modern exporters, founded by Ms. Gayatri Sharma of Virastra
+                International Export and Mr. Saurabh Nathuram Yadav of New India Export.
                 Pick a plan, complete KYC, and ship globally — DGFT, ICEGATE, AD code
                 and compliance handled in one elegant flow.
               </motion.p>

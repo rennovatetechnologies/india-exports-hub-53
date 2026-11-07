@@ -103,21 +103,23 @@ export default function AboutShowcase() {
   className="w-full md:w-1/2 bg-white/90 rounded-2xl shadow-xl p-6 md:p-10 backdrop-blur-md border border-white/30"
 >
   <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-800 mb-4 tracking-tight">
-    The Visionary Behind VIRASTRA by New India Export
+    Our Story
   </h2>
 
   <p className="text-gray-700 text-base sm:text-lg md:text-xl leading-relaxed mb-4">
-    <span className="font-semibold text-gray-800">Mr. Saurabh Nathuram Yadav</span> is the driving force behind VIRASTRA by New India Export.  
-    With a bold vision to empower Indian farmers and elevate the global agricultural trade, he combines deep expertise, innovation, and a strong commitment to fairness.  
+    <span className="font-semibold text-gray-800">Ms. Gayatri Sharma</span>, Founder of Virastra International Export,
+    brings the vision and entrepreneurial spirit behind Virastra — quality-driven sourcing,
+    professional service, and global opportunities for Indian and international products.
   </p>
 
   <p className="text-gray-700 text-base sm:text-lg md:text-xl leading-relaxed mb-4">
-    Under his leadership, the company bridges local talent with international markets, ensuring farmers thrive while delivering unparalleled quality worldwide.  
-    His passion and ambition are transforming the landscape of Indian exports.
+    <span className="font-semibold text-gray-800">Mr. Saurabh Nathuram Yadav</span>, Director of New India Export,
+    strengthens India's agricultural export ecosystem by connecting suppliers with international
+    buyers through reliable trade practices and long-term partnerships.
   </p>
 
   <p className="italic text-gray-800 text-base sm:text-lg md:text-xl">
-    "Empowering farmers, delivering excellence, and redefining Indian exports globally."
+    "Where Trust Travels — taking India's Products Everywhere."
   </p>
 </motion.div>
 

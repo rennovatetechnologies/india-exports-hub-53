@@ -5,7 +5,13 @@ import { Link } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import { PRODUCT_CATEGORIES } from "@/lib/siteNav";
 import { PATHS } from "@/lib/routes";
-import { getSupportEmail, getSupportWhatsAppDisplay, getSupportWhatsAppUrl } from "@/lib/appConfig";
+import {
+  getSupportEmail,
+  getSupportPhoneDisplay,
+  getSupportPhoneTelUrl,
+  getSupportWhatsAppDisplay,
+  getSupportWhatsAppUrl,
+} from "@/lib/appConfig";
 import BrandLogo from "@/components/BrandLogo";
 
 export default function Footer() {
@@ -40,9 +46,10 @@ export default function Footer() {
                 </span>
               </Link>
               <p className="mt-4 max-w-md text-sm text-white/55 leading-relaxed">
-                Virastra International Export (New India Export), founded by Saurabh
-                Nathuram Yadav. Export products from India to everywhere — the premium
-                consultancy and workflow platform for modern global trade.
+                Where Trust Travels — taking India's Products Everywhere. VIRASTRA by
+                New India Export is the premium consultancy and workflow platform for
+                modern exporters, founded by Ms. Gayatri Sharma and Mr. Saurabh
+                Nathuram Yadav.
               </p>
 
               <div className="mt-6 space-y-2 text-sm text-white/65">
@@ -53,9 +60,14 @@ export default function Footer() {
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 hover:text-white"
                 >
-                  <Phone size={15} className="text-[var(--gold)]" /> {getSupportWhatsAppDisplay()}
+                  <MessageCircle size={15} className="text-emerald-300" /> WhatsApp {getSupportWhatsAppDisplay()}
                 </a>
-                <div className="flex items-center gap-2"><Mail size={15} className="text-[var(--gold)]" /> {getSupportEmail()}</div>
+                <a href={getSupportPhoneTelUrl()} className="flex items-center gap-2 hover:text-white">
+                  <Phone size={15} className="text-[var(--gold)]" /> Call {getSupportPhoneDisplay()}
+                </a>
+                <a href={`mailto:${getSupportEmail()}`} className="flex items-center gap-2 hover:text-white">
+                  <Mail size={15} className="text-[var(--gold)]" /> {getSupportEmail()}
+                </a>
               </div>
             </div>
 
