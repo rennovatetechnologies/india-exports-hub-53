@@ -14,7 +14,7 @@ import {
  * - area="customer": any signed-in user (customers + staff using shared tools)
  * - area="staff": operations / admin only
  * Guests are sent to the correct login with a safe `next` return path.
- * After JWT TTL (2h), session is cleared and this redirects to login.
+ * After JWT TTL (24h), session is cleared and this redirects to login.
  */
 export default function AuthGuard({ children, area = "customer" }) {
   const location = useLocation();

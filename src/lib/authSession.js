@@ -8,8 +8,8 @@ const KYC_COMPLETE_KEY = "vistara_kyc_complete_emails";
 /** Fired on the window when session is created or cleared — keep nav/chrome in sync. */
 export const AUTH_CHANGED_EVENT = "iehub-auth-changed";
 
-/** Client session TTL when JWT has no `exp` (demo / legacy). Matches backend JWT_EXPIRE_HOURS=2. */
-export const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
+/** Client session TTL when JWT has no `exp` (demo / legacy). Matches backend JWT_EXPIRE_HOURS=24. */
+export const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
 let expiryTimerId = null;
 
@@ -68,7 +68,7 @@ export function scheduleSessionExpiry(expiresAtMs) {
   if (!Number.isFinite(at)) return;
   const delay = at - Date.now();
   if (delay <= 0) return;
-  // setTimeout delay is 32-bit; clamp to ~24d (session is 2h so fine)
+  // setTimeout delay is 32-bit; clamp to ~24d (session is 24h so fine)
   expiryTimerId = window.setTimeout(() => {
     expiryTimerId = null;
     clearSession();
@@ -84,7 +84,7 @@ function resolveExpiresAtMs(storedExpiresAt) {
   return null;
 }
 
-/** Persist a 2h window for legacy sessions that have no JWT and no expiresAt. */
+/** Persist a 24h window for legacy sessions that have no JWT and no expiresAt. */
 function ensureExpiresAtOnSessionData(data) {
   const existing = resolveExpiresAtMs(data?.expiresAt);
   if (existing != null) return existing;
