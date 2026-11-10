@@ -15,14 +15,14 @@ const PAGE_SEO = {
       "Our story: Ms. Gayatri Sharma, Founder of Virastra International Export, and Mr. Saurabh Nathuram Yadav, Director of New India Export — bridging Indian suppliers with global demand.",
   },
   "/contact": {
-    title: "Contact Virastra | New India Export, Nagpur",
+    title: "Contact Virastra | New India Export, Greater Noida",
     description:
-      "Contact VIRASTRA by New India Export in Nagpur — WhatsApp, call, or email about plans, KYC, and shipping from India.",
+      "Contact VIRASTRA by New India Export in Greater Noida — WhatsApp, call, or email about plans, KYC, and shipping from India.",
   },
   "/events": {
     title: "Export Events | Virastra by New India Export",
     description:
-      "Workshops and export events from Virastra International Export / New India Export in Nagpur.",
+      "Workshops and export events from Virastra International Export / New India Export in Greater Noida.",
   },
   "/brochures": {
     title: "Export Brochures | Virastra · New India Export",

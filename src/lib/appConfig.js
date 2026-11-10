@@ -16,10 +16,14 @@ const FALLBACK = {
   supportPhone: FALLBACK_PHONE,
   gstRate: 0.18,
   seller: {
-    legalName: "New India Export",
-    gstin: "27AXGPY3435Q1ZK",
+    legalName: "GAYATRI SHARMA",
+    tradeName: "VISTARA INTERNATIONAL EXPORT",
+    brandName: "VIRASTRA by New India Export",
+    gstin: "09FEPPS8330B1Z4",
     address:
-      "1ST FLOOR SHOP NO M-02, PREMIUM PLAZA COMMERCIAL COMPLEX, MATA MANDIR ROAD NEAR CHHOTI LAHORI, DHARAMPETH NAGPUR-440010",
+      "7TH FLOOR, FLAT NO 704 BLOCK 2 O, AWHO HOUSING SOCIETY, GURJINDER VIHAR, NEAR YATHARTH HOSPITAL, GREATER NOIDA, GAUTAMBUDDHA NAGAR, UTTAR PRADESH - 201310",
+    state: "Uttar Pradesh",
+    placeOfSupply: "Uttar Pradesh",
   },
   channels: {
     emailNotifications: true,
@@ -58,8 +62,12 @@ function normalize(raw) {
     gstRate: Number.isFinite(gstRate) && gstRate >= 0 ? gstRate : FALLBACK.gstRate,
     seller: {
       legalName: d.seller?.legalName || FALLBACK.seller.legalName,
+      tradeName: d.seller?.tradeName || FALLBACK.seller.tradeName,
+      brandName: d.seller?.brandName || FALLBACK.seller.brandName,
       gstin: d.seller?.gstin || FALLBACK.seller.gstin,
       address: d.seller?.address || FALLBACK.seller.address,
+      state: d.seller?.state || FALLBACK.seller.state,
+      placeOfSupply: d.seller?.placeOfSupply || FALLBACK.seller.placeOfSupply,
     },
     channels: {
       emailNotifications: d.channels?.emailNotifications !== false,

@@ -81,8 +81,9 @@ export default function ContactPage() {
               <div className="flex items-start gap-4">
                 <MapPin className="text-[var(--gold)] w-6 h-6 mt-1 shrink-0" />
                 <p className="text-lg">
-                  <span className="font-semibold text-white">Office:</span> SHOP NO M02,
-                  Premium Plaza Commercial Complex, Dharampeth, Nagpur – 440010
+                  <span className="font-semibold text-white">Office:</span> Flat No 704,
+                  Block 2 O, 7th Floor, AWHO Housing Society, Gurjinder Vihar, Near Yatharth
+                  Hospital, Greater Noida – 201310
                 </p>
               </div>
               <div className="flex items-center gap-4">
@@ -182,7 +183,7 @@ export default function ContactPage() {
           className="max-w-6xl mx-auto mt-14 rounded-2xl overflow-hidden border border-white/10 glass"
         >
           <iframe
-            src="https://www.google.com/maps?q=Premium+Plaza+Commercial+Complex+Dharampeth+Nagpur+440010&output=embed"
+            src="https://www.google.com/maps?q=AWHO+Housing+Society+Gurjinder+Vihar+Greater+Noida+201310&output=embed"
             width="100%"
             height="450"
             allowFullScreen=""

@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Printer, Mail, CheckCircle2, Download } from "lucide-react";
 import { formatInr } from "@/lib/planCatalog";
-import { getSellerAddressBlock } from "@/lib/invoice";
+import {
+  getSellerAddressBlock,
+  INVOICE_LINE_OF_BUSINESS,
+  INVOICE_PAYMENT_SUCCESS_MESSAGE,
+  INVOICE_SELLER,
+  INVOICE_SERVICE_REFERENCE,
+  INVOICE_TERMS,
+} from "@/lib/invoice";
 import { BRAND_LOGO_SRC, downloadInvoicePdf } from "@/lib/downloadInvoicePdf";
 
 function formatDate(iso) {
@@ -20,8 +27,21 @@ function formatDate(iso) {
   }
 }
 
+function formatDateOnly(iso) {
+  if (!iso) return "—";
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
 /**
- * Tax invoice viewer with client-side PDF download (no remote storage).
+ * Tax invoice viewer aligned to the Virastra invoice format + GST REG-06 seller details.
  * @param {{ invoice: object | null, open: boolean, onClose: () => void, emailNotice?: boolean }} props
  */
 export default function InvoiceModal({ invoice, open, onClose, emailNotice = false }) {
@@ -36,9 +56,27 @@ export default function InvoiceModal({ invoice, open, onClose, emailNotice = fal
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  const seller = invoice?.seller;
+  const seller = invoice?.seller || INVOICE_SELLER;
   const customer = invoice?.customer;
   const amounts = invoice?.amounts;
+  const particulars = invoice
+    ? [
+        ["Receipt No.", invoice.meta?.razorpayPaymentId || invoice.paymentId || invoice.id || "—"],
+        ["Customer Name", customer?.name || "—"],
+        ["Customer Number", customer?.phone || customer?.email || "—"],
+        ["Customer Email", customer?.email || "—"],
+        ["Order Number", invoice.orderId || invoice.paymentId || "—"],
+        ["Line of Business", INVOICE_LINE_OF_BUSINESS],
+        ["Payment Type", "Bill Payment | Subscription"],
+        ["Payment Date & Time", formatDate(invoice.issuedAt)],
+        ["HSN / SAC", invoice.lineItems?.[0]?.hsnSac || "998599"],
+        ["Place of Supply", seller?.placeOfSupply || INVOICE_SELLER.placeOfSupply],
+        ["Taxable Value", formatInr(amounts?.taxable)],
+        [`CGST @ ${amounts?.cgstRate ?? 9}%`, formatInr(amounts?.cgst)],
+        [`SGST @ ${amounts?.sgstRate ?? 9}%`, formatInr(amounts?.sgst)],
+        ["Paid Amount", formatInr(amounts?.total)],
+      ]
+    : [];
 
   const onDownloadPdf = async () => {
     if (!invoice || downloading) return;
@@ -73,7 +111,7 @@ export default function InvoiceModal({ invoice, open, onClose, emailNotice = fal
           >
             <div className="no-print flex items-center justify-between gap-3 border-b border-black/10 px-4 py-3 sm:px-5">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-[#1a1a1a]">Tax Invoice</p>
+                <p className="truncate text-sm font-semibold text-[#1a1a1a]">Invoice</p>
                 {emailNotice && invoice.email?.status === "sent" ? (
                   <p className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-700">
                     <Mail size={12} /> Sent to {customer?.email}
@@ -85,7 +123,7 @@ export default function InvoiceModal({ invoice, open, onClose, emailNotice = fal
                   type="button"
                   onClick={onDownloadPdf}
                   disabled={downloading}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#1a1a1a] px-3 py-1.5 text-xs font-medium text-white hover:bg-black disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0B2A4A] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#081e36] disabled:opacity-60"
                 >
                   <Download size={14} /> {downloading ? "Preparing…" : "Download PDF"}
                 </button>
@@ -121,104 +159,108 @@ export default function InvoiceModal({ invoice, open, onClose, emailNotice = fal
                 </div>
               ) : null}
 
-              <header className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 pb-5">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-black/45">Tax Invoice</p>
+              <header className="border-b border-black/10 pb-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   <img
                     src={BRAND_LOGO_SRC}
                     alt="VIRASTRA by New India Export"
-                    className="mt-2 h-20 w-auto max-w-[140px] object-contain object-left sm:h-24"
+                    className="h-16 w-auto max-w-[120px] object-contain object-left sm:h-20"
                   />
-                  <h2 id="invoice-title" className="mt-3 text-base font-semibold tracking-tight sm:text-lg">
-                    {seller?.legalName || "New India Export"}
-                  </h2>
-                  <p className="mt-2 max-w-sm text-xs leading-relaxed text-black/65">
-                    {getSellerAddressBlock()}
-                  </p>
-                  <p className="mt-2 text-xs font-medium">
-                    GSTIN: <span className="tracking-wide">{seller?.gstin}</span>
-                  </p>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-[#0B2A4A]">
+                      {seller?.tradeName || INVOICE_SELLER.tradeName}
+                    </p>
+                    <p className="text-[10px] uppercase tracking-[0.12em] text-black/45">
+                      Export | Import | Trade Solutions
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right text-xs text-black/65">
-                  <p>
-                    Invoice No.{" "}
-                    <span className="font-semibold text-black">{invoice.invoiceNumber}</span>
+
+                <div className="relative mx-auto mt-5 flex h-9 w-44 items-center justify-center bg-[#0B2A4A]">
+                  <span className="absolute -left-3 top-1/2 h-0 w-0 -translate-y-1/2 border-y-[18px] border-r-[12px] border-y-transparent border-r-[#C9A227]" />
+                  <span className="absolute -right-3 top-1/2 h-0 w-0 -translate-y-1/2 border-y-[18px] border-l-[12px] border-y-transparent border-l-[#C9A227]" />
+                  <h2 id="invoice-title" className="text-sm font-bold tracking-[0.2em] text-white">
+                    INVOICE
+                  </h2>
+                </div>
+
+                <div className="mt-5 flex flex-wrap items-start justify-between gap-4 text-xs text-black/65">
+                  <div className="space-y-1">
+                    <p>
+                      Invoice No.{" "}
+                      <span className="font-semibold text-black">{invoice.invoiceNumber}</span>
+                    </p>
+                    <p>Invoice Date: {formatDateOnly(invoice.issuedAt)}</p>
+                    <p>Due Date: {formatDateOnly(invoice.issuedAt)}</p>
+                  </div>
+                  <div className="sm:text-right">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-black/40">Bill To</p>
+                    <p className="mt-1 text-sm font-semibold text-black">
+                      {customer?.name}
+                      {customer?.phone ? ` (${customer.phone})` : ""}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 text-xs leading-relaxed text-black/60">
+                  <p className="font-medium text-black">
+                    {seller?.legalName || INVOICE_SELLER.legalName} · GSTIN{" "}
+                    <span className="tracking-wide">{seller?.gstin || INVOICE_SELLER.gstin}</span>
                   </p>
-                  <p className="mt-1">Date: {formatDate(invoice.issuedAt)}</p>
-                  {invoice.paymentId ? (
-                    <p className="mt-1 break-all">Payment ID: {invoice.paymentId}</p>
-                  ) : null}
-                  <p className="mt-1">Place of supply: {seller?.placeOfSupply || "Maharashtra"}</p>
+                  <p className="mt-1 max-w-xl">{getSellerAddressBlock()}</p>
                 </div>
               </header>
 
-              <section className="mt-5 grid gap-4 sm:grid-cols-2">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-black/40">Bill to</p>
-                  <p className="mt-1 text-sm font-semibold">{customer?.name}</p>
-                  {customer?.company ? <p className="text-xs text-black/60">{customer.company}</p> : null}
-                  <p className="mt-1 text-xs text-black/60">{customer?.email}</p>
-                  {customer?.phone ? <p className="text-xs text-black/60">{customer.phone}</p> : null}
-                  {customer?.address ? (
-                    <p className="mt-1 text-xs leading-relaxed text-black/60">{customer.address}</p>
-                  ) : null}
-                  {customer?.gstin ? (
-                    <p className="mt-1 text-xs font-medium">GSTIN: {customer.gstin}</p>
-                  ) : null}
-                </div>
-                <div className="sm:text-right">
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-black/40">Status</p>
-                  <p className="mt-1 text-sm font-semibold capitalize text-emerald-800">{invoice.status}</p>
-                  {invoice.sku ? <p className="mt-1 text-xs text-black/50">SKU: {invoice.sku}</p> : null}
-                </div>
-              </section>
-
-              <table className="mt-6 w-full border-collapse text-left text-xs sm:text-sm">
+              <table className="mt-5 w-full border-collapse overflow-hidden rounded-md border border-[#d0d7de] text-left text-xs sm:text-sm">
                 <thead>
-                  <tr className="border-y border-black/15 bg-black/[0.03]">
-                    <th className="px-2 py-2.5 font-medium">Description</th>
-                    <th className="px-2 py-2.5 text-right font-medium">Qty</th>
-                    <th className="px-2 py-2.5 text-right font-medium">Amount</th>
+                  <tr className="bg-[#0B2A4A] text-white">
+                    <th className="px-3 py-2.5 font-medium">Particulars</th>
+                    <th className="px-3 py-2.5 font-medium">Details</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(invoice.lineItems || []).map((li, i) => (
-                    <tr key={i} className="border-b border-black/8">
-                      <td className="px-2 py-2.5">{li.description}</td>
-                      <td className="px-2 py-2.5 text-right tabular-nums">{li.quantity}</td>
-                      <td className="px-2 py-2.5 text-right tabular-nums">
-                        {formatInr(li.unitAmount * (li.quantity || 1))}
-                      </td>
+                  {particulars.map(([label, value], i) => (
+                    <tr key={label} className={i % 2 === 0 ? "bg-[#EAF2F8]" : "bg-white"}>
+                      <td className="px-3 py-2.5 font-medium text-[#0B2A4A]">{label}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-black/80">{value}</td>
                     </tr>
                   ))}
+                  <tr className="bg-[#E8D5B5]">
+                    <td className="px-3 py-3 font-semibold text-[#0B2A4A]">Total Paid Amount</td>
+                    <td className="px-3 py-3 text-sm font-semibold tabular-nums text-black">
+                      {formatInr(amounts?.total)}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
 
-              <div className="mt-5 ml-auto w-full max-w-xs space-y-1.5 text-sm">
-                <div className="flex justify-between text-black/70">
-                  <span>Taxable value</span>
-                  <span className="tabular-nums font-medium text-black">{formatInr(amounts?.taxable)}</span>
+              <div className="mt-5 flex items-start gap-2 text-sm text-emerald-800">
+                <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-semibold">Payment Successful</p>
+                  <p className="text-xs text-emerald-800/80">{INVOICE_PAYMENT_SUCCESS_MESSAGE}</p>
                 </div>
-                <div className="flex justify-between text-black/70">
-                  <span>CGST @ {amounts?.cgstRate ?? 9}%</span>
-                  <span className="tabular-nums">{formatInr(amounts?.cgst)}</span>
-                </div>
-                <div className="flex justify-between text-black/70">
-                  <span>SGST @ {amounts?.sgstRate ?? 9}%</span>
-                  <span className="tabular-nums">{formatInr(amounts?.sgst)}</span>
-                </div>
-                <div className="flex justify-between border-t border-black/15 pt-2 text-base font-semibold">
-                  <span>Grand total</span>
-                  <span className="tabular-nums">{formatInr(amounts?.total)}</span>
-                </div>
-                <p className="text-[10px] text-black/40">
-                  GST {(Number(amounts?.gstRate || 0) * 100).toFixed(0)}% included · CGST + SGST ={" "}
-                  {formatInr(amounts?.gst)}
-                </p>
               </div>
 
-              <p className="mt-8 text-[10px] leading-relaxed text-black/40">
-                This is a computer-generated tax invoice. Use Download PDF to save a copy on your device.
+              <div className="mt-4 rounded-md border border-[#0B2A4A]/60 px-3 py-3">
+                <p className="text-sm font-semibold text-[#0B2A4A]">Virastra Subscription / Service</p>
+                <p className="mt-1 text-xs text-black/60">Reference: {INVOICE_SERVICE_REFERENCE}</p>
+              </div>
+
+              <div className="mt-5 overflow-hidden rounded-md border border-[#0B2A4A]/20">
+                <div className="bg-[#0B2A4A] px-3 py-2 text-xs font-semibold text-white">
+                  Terms and Conditions
+                </div>
+                <ol className="list-decimal space-y-1.5 px-5 py-3 text-[11px] leading-relaxed text-black/55">
+                  {INVOICE_TERMS.map((term) => (
+                    <li key={term}>{term}</li>
+                  ))}
+                </ol>
+              </div>
+
+              <p className="mt-6 text-[10px] leading-relaxed text-black/40">
+                This is a computer-generated tax invoice. Use Download PDF to save a copy on your
+                device.
               </p>
             </div>
           </motion.div>

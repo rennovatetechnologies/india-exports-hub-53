@@ -10,21 +10,43 @@ import { getCachedPublicConfig } from "@/lib/appConfig";
 const INVOICES_KEY = "vistara_invoices_v1";
 const OUTBOX_KEY = "vistara_email_outbox_v1";
 
-/** Seller details for GST tax invoices (New India Export). */
+/** Seller details for GST tax invoices (Form GST REG-06: 09FEPPS8330B1Z4). */
 export const INVOICE_SELLER = {
-  legalName: "New India Export",
+  legalName: "GAYATRI SHARMA",
+  tradeName: "VISTARA INTERNATIONAL EXPORT",
+  additionalTradeName: "VIRASTRA INTERNATIONAL EXPORT",
   brandName: "VIRASTRA by New India Export",
-  gstin: "27AXGPY3435Q1ZK",
+  gstin: "09FEPPS8330B1Z4",
   addressLines: [
-    "1ST FLOOR SHOP NO M-02",
-    "PREMIUM PLAZA COMMERCIAL COMPLEX",
-    "MATA MANDIR ROAD NEAR CHHOTI LAHORI",
-    "DHARAMPETH NAGPUR-440010",
+    "7TH FLOOR, FLAT NO 704 BLOCK 2 O",
+    "AWHO HOUSING SOCIETY, GURJINDER VIHAR",
+    "NEAR YATHARTH HOSPITAL, GREATER NOIDA",
+    "GAUTAMBUDDHA NAGAR, UTTAR PRADESH - 201310",
   ],
-  state: "Maharashtra",
-  stateCode: "27",
-  placeOfSupply: "Maharashtra",
+  state: "Uttar Pradesh",
+  stateCode: "09",
+  placeOfSupply: "Uttar Pradesh",
+  constitution: "Proprietorship",
+  jurisdiction: "Nagpur, Maharashtra, India",
 };
+
+/** Exact copy from the Virastra invoice format template. */
+export const INVOICE_LINE_OF_BUSINESS = "Virastra by New India Export";
+
+export const INVOICE_SERVICE_REFERENCE =
+  "Invoice for Virastra Platform Services (Subscription / Recharge)";
+
+export const INVOICE_PAYMENT_SUCCESS_MESSAGE =
+  "Your payment for Virastra by New India Export has been received successfully.";
+
+export const INVOICE_TERMS = [
+  "The above amount is inclusive of all applicable taxes (GST, etc.).",
+  "This invoice is valid only for the specified service(s) under Virastra by New India Export.",
+  "The service is non-refundable and non-transferable once activated.",
+  "All claims and disputes are subject to the exclusive jurisdiction of the courts at Nagpur, Maharashtra, India.",
+  "In case of any discrepancy in this invoice, please contact our support within 7 (seven) days from the invoice date.",
+  "New India Export reserves the right to modify the service, pricing, or terms without prior notice.",
+];
 
 export function getSellerAddressBlock() {
   const cfg = getCachedPublicConfig();
@@ -106,7 +128,7 @@ function saveMap(map) {
 function nextInvoiceNumber() {
   const y = new Date().getFullYear();
   const seq = String(Date.now()).slice(-6);
-  return `NIE/${y}/${seq}`;
+  return `VIR/${y}/${seq}`;
 }
 
 /**
@@ -289,7 +311,7 @@ export function mockSendInvoiceEmail(invoice) {
     id: `MAIL-${Date.now().toString(36).toUpperCase()}`,
     template: "payment.invoice",
     to,
-    subject: `Tax Invoice ${invoice.invoiceNumber} — ${invoice.seller?.legalName || "New India Export"}`,
+    subject: `Tax Invoice ${invoice.invoiceNumber} — ${invoice.seller?.tradeName || INVOICE_SELLER.tradeName}`,
     vars: {
       invoiceNumber: invoice.invoiceNumber,
       customerName: invoice.customer?.name,
