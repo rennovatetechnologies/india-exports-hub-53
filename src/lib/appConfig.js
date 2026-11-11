@@ -17,11 +17,10 @@ const FALLBACK = {
   gstRate: 0.18,
   seller: {
     legalName: "GAYATRI SHARMA",
-    tradeName: "VISTARA INTERNATIONAL EXPORT",
+    tradeName: "VIRASTRA INTERNATIONAL EXPORT",
     brandName: "VIRASTRA by New India Export",
     gstin: "09FEPPS8330B1Z4",
-    address:
-      "7TH FLOOR, FLAT NO 704 BLOCK 2 O, AWHO HOUSING SOCIETY, GURJINDER VIHAR, NEAR YATHARTH HOSPITAL, GREATER NOIDA, GAUTAMBUDDHA NAGAR, UTTAR PRADESH - 201310",
+    address: "Gautam Buddha Nagar, Uttar Pradesh",
     state: "Uttar Pradesh",
     placeOfSupply: "Uttar Pradesh",
   },

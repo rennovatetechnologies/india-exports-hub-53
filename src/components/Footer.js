@@ -53,7 +53,7 @@ export default function Footer() {
               </p>
 
               <div className="mt-6 space-y-2 text-sm text-white/65">
-                <div className="flex items-start gap-2"><MapPin size={15} className="mt-0.5 text-[var(--gold)]" /> Flat No 704, Block 2 O, 7th Floor, AWHO Housing Society, Gurjinder Vihar, Greater Noida 201310</div>
+                <div className="flex items-start gap-2"><MapPin size={15} className="mt-0.5 text-[var(--gold)]" /> Shop No M02, Premium Plaza Commercial Complex, Dharampeth, Nagpur 440010</div>
                 <a
                   href={getSupportWhatsAppUrl()}
                   target="_blank"

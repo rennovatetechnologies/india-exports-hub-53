@@ -1160,7 +1160,7 @@ function CustomerBilling() {
             <h2 className="text-lg font-semibold">Invoices</h2>
           </div>
           <p className="text-xs text-white/45">
-            GST tax invoices from Vistara International Export (GSTIN 09FEPPS8330B1Z4). Download PDF anytime — nothing is stored on Drive.
+            GST tax invoices from Virastra International Export (GSTIN 09FEPPS8330B1Z4). Download PDF anytime — nothing is stored on Drive.
           </p>
           <ul className="divide-y divide-white/10 rounded-2xl border border-white/10 bg-white/[0.03]">
             {invoices.map((inv) => (

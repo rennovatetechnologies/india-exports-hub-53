@@ -10,19 +10,14 @@ import { getCachedPublicConfig } from "@/lib/appConfig";
 const INVOICES_KEY = "vistara_invoices_v1";
 const OUTBOX_KEY = "vistara_email_outbox_v1";
 
-/** Seller details for GST tax invoices (Form GST REG-06: 09FEPPS8330B1Z4). */
+/** Seller details for GST tax invoices (GSTIN 09FEPPS8330B1Z4). */
 export const INVOICE_SELLER = {
   legalName: "GAYATRI SHARMA",
-  tradeName: "VISTARA INTERNATIONAL EXPORT",
-  additionalTradeName: "VIRASTRA INTERNATIONAL EXPORT",
+  tradeName: "VIRASTRA INTERNATIONAL EXPORT",
+  additionalTradeName: "VISTARA INTERNATIONAL EXPORT",
   brandName: "VIRASTRA by New India Export",
   gstin: "09FEPPS8330B1Z4",
-  addressLines: [
-    "7TH FLOOR, FLAT NO 704 BLOCK 2 O",
-    "AWHO HOUSING SOCIETY, GURJINDER VIHAR",
-    "NEAR YATHARTH HOSPITAL, GREATER NOIDA",
-    "GAUTAMBUDDHA NAGAR, UTTAR PRADESH - 201310",
-  ],
+  addressLines: ["Gautam Buddha Nagar", "Uttar Pradesh"],
   state: "Uttar Pradesh",
   stateCode: "09",
   placeOfSupply: "Uttar Pradesh",
