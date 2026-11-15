@@ -13,6 +13,7 @@ const OUTBOX_KEY = "vistara_email_outbox_v1";
 /** Seller details for GST tax invoices (GSTIN 09FEPPS8330B1Z4). */
 export const INVOICE_SELLER = {
   legalName: "GAYATRI SHARMA",
+  /** GST trade name on tax invoices. */
   tradeName: "VIRASTRA INTERNATIONAL EXPORT",
   additionalTradeName: "VISTARA INTERNATIONAL EXPORT",
   brandName: "VIRASTRA by New India Export",
